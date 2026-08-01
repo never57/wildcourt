@@ -58,3 +58,6 @@ sysinfo.txt
 # Crashlytics generated file
 crashlytics-build.properties
 
+# Reasonix 工具目录（AI 协作配置/技能，不入库）
+.reasonix/
+
