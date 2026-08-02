@@ -1,0 +1,9 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# 本地配置覆盖（含密钥）
+config/appsettings.*.local.json

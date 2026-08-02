@@ -1,0 +1,6 @@
+openapi: 3.0.0
+info:
+  title: WildCourt API
+  version: 0.1.0-alpha
+  description: 服务端 API 骨架，端点见 docs/architecture/02-服务端架构.md §2.2
+paths: {}
