@@ -45,5 +45,5 @@ Q版可爱风 · 全2D手绘 · 移动端异步社交手游。玩家在庭院中
 ## 快速开始
 1. 用 Unity 2022.3.62f3c1 打开 `client/`。
 2. 确保 `client/Assets/StreamingAssets/version.txt` 存在。
-3. 运行配置表导出脚本（Excel → Lua）生成 `LuaScripts/Config/`。
+3. 运行配置表导出脚本（Excel → JSON）生成 `StreamingAssets/config/`（`Config_*.json`）。
 4. 用 Visual Studio 2022 打开 `server/`，执行 `scripts/init_db.sql` 初始化数据库后 `dotnet run`。
