@@ -94,8 +94,8 @@ namespace WildCourt.Net
                 yield return req.SendWebRequest();
 
                 // 网络层失败（断网/超时）：广播断线，重试一次
+                // 注：旧版 Unity 的 UnityWebRequest.Result 无 Timeout 成员，超时归并到 ConnectionError 处理
                 if (req.result == UnityWebRequest.Result.ConnectionError ||
-                    req.result == UnityWebRequest.Result.Timeout ||
                     req.result == UnityWebRequest.Result.ProtocolError && req.responseCode == 0)
                 {
                     EventBus.Publish(new NetDisconnectedEvent { Reason = req.error });
