@@ -69,3 +69,6 @@ crashlytics-build.properties
 
 # VSCode 本地配置目录
 .vscode/
+
+# 服务端运行时日志（dotnet run 重定向输出）
+server/*.log

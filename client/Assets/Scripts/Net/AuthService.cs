@@ -32,7 +32,7 @@ namespace WlidCourt.UI
                 onError: (code, msg) => onError?.Invoke(msg));
         }
 
-        /// <summary>注册：{ username, password(SHA256) } → 用户信息。</summary>
+        /// <summary>注册：{ username, password(SHA256) } → 成功回调（服务端返回 User 基础信息，注册场景无需解析 data）。</summary>
         public void Register(string username, string password, Action onSuccess, Action<string> onError)
         {
             EnsureNetManager();
@@ -43,7 +43,9 @@ namespace WlidCourt.UI
                 password = HashPassword(password),
             };
 
-            NetManager.Instance.Post<UserProfileResponse>(ApiPaths.UserRegister, body,
+            // 注册接口服务端仅返回 User 基础字段（无 shell/coupon/token），
+            // 故用 ApiEnvelope 只解析信封 code/message，避免误用 UserProfileResponse 造成字段对不上。
+            NetManager.Instance.Post<ApiEnvelope>(ApiPaths.UserRegister, body,
                 onSuccess: _ => onSuccess?.Invoke(),
                 onError: (code, msg) => onError?.Invoke(msg));
         }
