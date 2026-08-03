@@ -1,76 +1,65 @@
 using System;
-using System.Collections;
 using UnityEngine;
+using WildCourt.Net;
+using WildCourt.Net.Protocol;
 
 namespace WlidCourt.UI
 {
     /// <summary>
-    /// 认证服务：封装登录/注册 API 请求。
-    /// 当前阶段为本地占位（模拟 0.5s 网络延迟）；后续接入 .NET 10 Web API（AuthController）后，
-    /// 将 TODO 部分替换为 NetworkManager.Request 调用。
-    ///
-    /// === 服务端 MySQL 对接预留 ===
-    /// 服务端 AuthController 对应接口：
-    ///   POST /api/auth/login     { username, password } → { token, playerId }
-    ///   POST /api/auth/register  { username, password } → { success }
-    ///
-    /// MySQL users 表结构参考（文档 04）：
-    ///   id BIGINT PK, username VARCHAR(20) UNIQUE, password_hash VARCHAR(128),
-    ///   created_at DATETIME, last_login DATETIME
-    ///
-    /// 安全约定：
-    ///   - 密码客户端仅做 SHA256 一次哈希再传输（防明文泄露），服务端再做 bcrypt 存储
-    ///   - Token 由服务端生成 JWT，客户端存入 NetworkManager.Token
-    ///   - 后续所有请求带 Authorization: Bearer {token}
+    /// 认证服务：封装登录/注册 API 请求（.NET 10 Web API：api/v1/user/*）。
+    /// 密码约定：客户端 SHA256 一次哈希后传输（防明文泄露），服务端再做 bcrypt 加盐存储；
+    /// 登录成功返回会话 token，注入 <see cref="NetManager.Token"/>，后续请求自动携带 Bearer 头。
     /// </summary>
-    public class AuthService : MonoBehaviour
+    public class AuthService : UnityEngine.MonoBehaviour
     {
-        /// <summary>
-        /// 登录。当前占位：模拟 0.5s 延迟后生成假 token。
-        /// </summary>
+        /// <summary>登录：{ username, password(SHA256) } → { token, userId }。</summary>
         public void Login(string username, string password, Action<string> onSuccess, Action<string> onError)
         {
-            // ========== TODO: 接入真实服务端后替换为以下代码 ==========
-            // var hashedPwd = HashPassword(password);
-            // var body = new { username = username, password = hashedPwd };
-            // NetworkManager.Instance.Request<LoginResponse>("api/auth/login", body,
-            //     res => {
-            //         NetworkManager.Instance.SetToken(res.token);
-            //         onSuccess?.Invoke(res.token);
-            //     },
-            //     err => onError?.Invoke(err));
-            // =====================================================
+            EnsureNetManager();
 
-            StartCoroutine(FakeLoginCoroutine(username, onSuccess));
+            var body = new LoginRequest
+            {
+                username = username.Trim(),
+                password = HashPassword(password),
+            };
+
+            NetManager.Instance.Post<LoginResponse>(ApiPaths.UserLogin, body,
+                onSuccess: res =>
+                {
+                    NetManager.Instance.SetToken(res.data.token);
+                    onSuccess?.Invoke(res.data.token);
+                },
+                onError: (code, msg) => onError?.Invoke(msg));
+        }
+
+        /// <summary>注册：{ username, password(SHA256) } → 用户信息。</summary>
+        public void Register(string username, string password, Action onSuccess, Action<string> onError)
+        {
+            EnsureNetManager();
+
+            var body = new RegisterRequest
+            {
+                username = username.Trim(),
+                password = HashPassword(password),
+            };
+
+            NetManager.Instance.Post<UserProfileResponse>(ApiPaths.UserRegister, body,
+                onSuccess: _ => onSuccess?.Invoke(),
+                onError: (code, msg) => onError?.Invoke(msg));
         }
 
         /// <summary>
-        /// 注册。当前占位：模拟 0.5s 延迟后成功。
+        /// 确保 NetManager 单例存在（start 场景当前未挂载 NetManager，此处自举；
+        /// 若场景已配置则复用，DontDestroyOnLoad 保证跨场景存活）。
         /// </summary>
-        public void Register(string username, string password, Action onSuccess, Action<string> onError)
+        private static void EnsureNetManager()
         {
-            // ========== TODO: 接入真实服务端后替换为以下代码 ==========
-            // var hashedPwd = HashPassword(password);
-            // var body = new { username = username, password = hashedPwd };
-            // NetworkManager.Instance.Request<EmptyResponse>("api/auth/register", body,
-            //     _ => onSuccess?.Invoke(),
-            //     err => onError?.Invoke(err));
-            // =====================================================
-
-            StartCoroutine(FakeRegisterCoroutine(onSuccess));
-        }
-
-        private IEnumerator FakeLoginCoroutine(string username, Action<string> onSuccess)
-        {
-            yield return new WaitForSeconds(0.5f);
-            var fakeToken = "placeholder_token_" + username + "_" + DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            onSuccess?.Invoke(fakeToken);
-        }
-
-        private IEnumerator FakeRegisterCoroutine(Action onSuccess)
-        {
-            yield return new WaitForSeconds(0.5f);
-            onSuccess?.Invoke();
+            if (NetManager.Instance == null)
+            {
+                var go = new GameObject("NetManager");
+                UnityEngine.Object.DontDestroyOnLoad(go);
+                go.AddComponent<NetManager>();
+            }
         }
 
         /// <summary>
@@ -85,17 +74,5 @@ namespace WlidCourt.UI
                 return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
             }
         }
-
-        // ---- 服务端响应 DTO（后续接入真实 HTTP 时使用） ----
-
-        [Serializable]
-        private class LoginResponse
-        {
-            public string token;
-            public long playerId;
-        }
-
-        [Serializable]
-        private class EmptyResponse { }
     }
 }

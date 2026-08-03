@@ -34,7 +34,71 @@ public class WlidCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // TODO: 表名/主键/索引/长度约束等 Fluent 配置（字段见文档 15.3），骨架阶段留空。
+        // 已落实体 7 张表的主键/约束配置（字段见文档 15.3）；
+        // 其余 6 张表（nonfiction_collections / badges / match_pools / operation_logs /
+        // daily_settlements / sign_in_records）待实体补齐后加入。
+        modelBuilder.Entity<UserEntity>(e =>
+        {
+            e.ToTable("users");
+            e.HasKey(x => x.UserId);
+            e.Property(x => x.UserId).ValueGeneratedOnAdd();
+            e.Property(x => x.Username).HasMaxLength(20).IsRequired();
+            e.HasIndex(x => x.Username).IsUnique();
+            e.Property(x => x.PasswordHash).HasMaxLength(128).IsRequired();
+            e.Property(x => x.Nickname).HasMaxLength(20).IsRequired();
+            e.Property(x => x.ProvinceId).IsRequired();
+            e.Property(x => x.CityId).IsRequired();
+            e.Property(x => x.Level).IsRequired();
+        });
+
+        modelBuilder.Entity<PetEntity>(e =>
+        {
+            e.ToTable("pets");
+            e.HasKey(x => x.PetId);
+            e.Property(x => x.PetId).ValueGeneratedOnAdd();
+            e.Property(x => x.Type).HasMaxLength(32).IsRequired();
+            e.Property(x => x.Status).HasMaxLength(16).IsRequired();
+        });
+
+        modelBuilder.Entity<LetterEntity>(e =>
+        {
+            e.ToTable("letters");
+            e.HasKey(x => x.LetterId);
+            e.Property(x => x.LetterId).ValueGeneratedOnAdd();
+            e.Property(x => x.Content).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ItemId).HasMaxLength(64);
+            e.Property(x => x.Status).HasMaxLength(16).IsRequired();
+        });
+
+        modelBuilder.Entity<FriendEntity>(e =>
+        {
+            e.ToTable("friends");
+            e.HasKey(x => new { x.UserId, x.FriendId });
+        });
+
+        modelBuilder.Entity<InventoryEntity>(e =>
+        {
+            e.ToTable("inventories");
+            e.HasKey(x => new { x.UserId, x.ItemId });
+            e.Property(x => x.ItemId).HasMaxLength(64).IsRequired();
+        });
+
+        modelBuilder.Entity<YardEntity>(e =>
+        {
+            e.ToTable("yards");
+            e.HasKey(x => x.UserId);
+            e.Property(x => x.LayoutJson).HasColumnType("longtext").IsRequired();
+        });
+
+        modelBuilder.Entity<TransactionEntity>(e =>
+        {
+            e.ToTable("transactions");
+            e.HasKey(x => x.TransId);
+            e.Property(x => x.TransId).ValueGeneratedOnAdd();
+            e.Property(x => x.Type).HasMaxLength(32).IsRequired();
+            e.Property(x => x.ItemId).HasMaxLength(64).IsRequired();
+        });
+
         base.OnModelCreating(modelBuilder);
     }
 }

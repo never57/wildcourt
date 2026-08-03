@@ -62,6 +62,7 @@ namespace WildCourt.Net.Protocol
         public const int Unauthorized = 401;    // 未登录/token 失效
         public const int Forbidden = 403;
         public const int NotFound = 404;
+        public const int Conflict = 409;    // 状态冲突（如账号已存在）
         public const int ServerError = 500;
         public const int NetworkError = -1;     // 客户端本地：网络不通
         public const int Timeout = -2;          // 客户端本地：请求超时

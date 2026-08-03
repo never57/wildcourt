@@ -1,5 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using WlidCourt.Api.Hubs;
 using WlidCourt.Api.Middleware;
+using WlidCourt.Api.Services;
+using WlidCourt.Api.Utils;
+using WlidCourt.Data.DbContext;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,32 +16,33 @@ builder.Configuration
     .AddJsonFile(Path.Combine(configDir, "appsettings.json"), optional: true, reloadOnChange: true)
     .AddJsonFile(Path.Combine(configDir, $"appsettings.{builder.Environment.EnvironmentName}.json"), optional: true, reloadOnChange: true);
 
-// 2. 注册 DbContext(MySQL) + RedisUtil
-//    builder.Services.AddDbContext<WlidCourtDbContext>(...);
-//    builder.Services.AddSingleton<RedisUtil>(...);
-// 3. 注册 Services / Jobs(Quartz) / Hubs(SignalR) / Middleware
-//    builder.Services.AddScoped<UserService>();
-//    builder.Services.AddScoped<PetService>();
-//    builder.Services.AddScoped<MatchService>();
-//    builder.Services.AddScoped<LetterService>();
-//    builder.Services.AddScoped<FriendService>();
-//    builder.Services.AddScoped<ShopService>();
-//    builder.Services.AddScoped<YardService>();
-//    builder.Services.AddScoped<SettlementService>();
-//    builder.Services.AddScoped<MiniGameService>();
-//    builder.Services.AddScoped<PlayerService>();
-//    builder.Services.AddScoped<AuditService>();
-//    builder.Services.AddQuartz(q => { /* 4 个 Job 的调度器配置，见文档 02 §2.4 */ });
-//    builder.Services.AddSignalR();
-// 4. 启动时加载 JSON 配置（Config_PlayerLevel.json 等，供 PlayerService/MatchService 使用，
-//    见文档 16 §16.3：服务端同步部署 StreamingAssets/config 下同一份 JSON）
-// 5. 校验 MySQL / Redis 连通性 → 失败快速退出
-// 6. 启动调度器（DailySettlementJob / MatchPoolRefreshJob / ActivityEndJob / LetterAuditJob）
+// 2. 注册 DbContext(MySQL) + 会话存储
+var connectionString = builder.Configuration.GetConnectionString("MySql")
+    ?? "Server=localhost;Port=3306;Database=wlidcourt_dev;User=root;Password=;CharSet=utf8mb4;";
+builder.Services.AddDbContext<WlidCourtDbContext>(opt =>
+    opt.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+builder.Services.AddSingleton<SessionStore>(); // Redis 就绪前为内存会话（见 SessionStore 注释）
 
-builder.Services.AddControllers();
+// 3. 注册 Services（后续业务 Service 按需追加）
+builder.Services.AddScoped<UserService>();
+
+// 统一 JSON 信封：camelCase 输出 + 大小写不敏感反序列化（对齐客户端小写字段 DTO）
+builder.Services.AddControllers()
+    .AddJsonOptions(opt =>
+    {
+        opt.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        opt.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
 builder.Services.AddSignalR();
 
 var app = builder.Build();
+
+// 4. 启动时确保数据库与表结构就绪（EF Core 迁移；开发期自动建库建表）
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<WlidCourtDbContext>();
+    db.Database.Migrate();
+}
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<AuthMiddleware>();

@@ -7,15 +7,23 @@ namespace WildCourt.Net.Protocol
     [Serializable]
     public class RegisterRequest
     {
-        public string nickname;   // 昵称
-        public int provinceId;    // 所选省份（1~34）
-        public int cityId;        // 所选城市
+        public string username;   // 账号（4~20 位字母数字下划线）
+        public string password;   // 客户端 SHA256 哈希后传输
     }
 
     [Serializable]
     public class LoginRequest
     {
-        public long userId;       // 简化登录：正式版以账号/设备 token 换取会话
+        public string username;
+        public string password;   // 客户端 SHA256 哈希后传输
+    }
+
+    /// <summary>登录响应 data（服务端 LoginResponse）。</summary>
+    [Serializable]
+    public class LoginResponse
+    {
+        public string token;      // 会话 token，登录后注入 NetManager
+        public long userId;
     }
 
     /// <summary>玩家信息（响应 data）。</summary>
