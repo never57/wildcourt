@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "level": 1,
+      "farmlandCount": 6,
+      "processorSlots": 2,
+      "foodBowlCapacity": 10,
+      "decorationLimit": 50,
+      "showcaseSlots": 3,
+      "mailboxCapacity": 20,
+      "unlockCond": "Lv1"
+    },
+    {
+      "level": 2,
+      "farmlandCount": 8,
+      "processorSlots": 3,
+      "foodBowlCapacity": 13,
+      "decorationLimit": 100,
+      "showcaseSlots": 5,
+      "mailboxCapacity": 30,
+      "unlockCond": "Lv2"
+    },
+    {
+      "level": 3,
+      "farmlandCount": 10,
+      "processorSlots": 4,
+      "foodBowlCapacity": 17,
+      "decorationLimit": 150,
+      "showcaseSlots": 7,
+      "mailboxCapacity": 40,
+      "unlockCond": "Lv3"
+    },
+    {
+      "level": 4,
+      "farmlandCount": 12,
+      "processorSlots": 5,
+      "foodBowlCapacity": 20,
+      "decorationLimit": 200,
+      "showcaseSlots": 9,
+      "mailboxCapacity": 50,
+      "unlockCond": "Lv4"
+    }
+  ]
+}
