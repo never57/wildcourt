@@ -67,6 +67,9 @@ namespace WildCourt.Core
             IsReady = true;
             EventBus.Publish(new GameReadyEvent());
             Debug.Log("[GameManager] 初始化完成，进入场景流（Launch → ProvinceSelect → Main）");
+
+            // IEnumerator 协程必须包含 yield 语句，否则编译器报 CS0161
+            yield return null;
         }
 
         /// <summary>切换场景（Launch / ProvinceSelect / Main / Yard ...，文档 03 §3.3）。</summary>
