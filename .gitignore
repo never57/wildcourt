@@ -64,3 +64,5 @@ crashlytics-build.properties
 # VSCode 工作区文件（本地个人配置）
 *.code-workspace
 
+# CodeBuddy 工具目录（AI 协作配置/技能，不入库）
+.codebuddy/
