@@ -23,7 +23,7 @@ namespace WildCourt.Net
     {
         public static NetManager Instance { get; private set; }
 
-        public string ServerUrl { get; private set; } = "http://localhost:5000";
+        public string ServerUrl { get; private set; } = "http://43.138.133.137:5000";
         public string Token { get; private set; }
 
         [SerializeField] private float timeoutSeconds = 10f;

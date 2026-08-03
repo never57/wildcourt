@@ -7,14 +7,14 @@ namespace WlidCourt.Tests;
 /// </summary>
 public class YardServiceTests
 {
-    [Fact]
+    [Fact(Skip = "待 YardService 业务实现后补全")]
     public void SaveLayout_RejectsOverCapacity()
     {
         // TODO: 实现等级容量校验测试。
         throw new NotImplementedException();
     }
 
-    [Fact]
+    [Fact(Skip = "待 YardService 业务实现后补全")]
     public void SaveLayout_SavesValidLayout()
     {
         // TODO: 实现合法布局保存测试。

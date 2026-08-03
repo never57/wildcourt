@@ -1,0 +1,68 @@
+# WildCourt 服务端部署（docker compose）
+# 用法（在 server/ 目录）：
+#   1. 复制 .env.example 为 .env 并填写密码
+#   2. docker compose up -d --build
+#
+# 注意：
+#   - MySQL/Redis 为"服务器自装"方案（容器内）；若改用腾讯云托管版，
+#     删除 mysql/redis 两个服务，在 .env 里改连接串指向托管实例即可。
+#   - 测试期 api 映射 5000 到公网便于直连验证；正式上线建议改
+#     "127.0.0.1:5000:5000" 并用 Nginx 反代（见 docs 部署文档）。
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: wlidcourt-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: wlidcourt
+      MYSQL_USER: wlidcourt_app
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD}
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:3306:3306"   # 仅本机可达，不暴露公网
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: wlidcourt-redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"   # 仅本机可达
+
+  api:
+    build: .
+    container_name: wlidcourt-api
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:5000
+      WLIDCOURT_CONFIG_DIR: /app/config
+      TZ: Asia/Shanghai   # 每日结算 Job 按 UTC+8 计算（04:00 结算边界）
+      # 覆盖 config/appsettings.Production.json 中的连接串（Program.cs 已支持环境变量）
+      ConnectionStrings__MySql: "Server=mysql;Port=3306;Database=wlidcourt;User=wlidcourt_app;Password=${MYSQL_APP_PASSWORD};CharSet=utf8mb4;"
+      Redis__ConnectionString: "redis:6379"
+    volumes:
+      - ./config:/app/config:ro   # 生产配置目录（含数值配置 JSON 也可放这里）
+    ports:
+      - "5000:5000"   # 测试期公网直连（需云防火墙放行 5000）；正式上线改回 "127.0.0.1:5000:5000" 走 Nginx+HTTPS
+
+volumes:
+  mysql_data:
+  redis_data:

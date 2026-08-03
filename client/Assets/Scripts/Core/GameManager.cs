@@ -16,8 +16,8 @@ namespace WildCourt.Core
         public static GameManager Instance { get; private set; }
 
         [Header("服务端（文档 17 §17.4 联调）")]
-        [SerializeField] private string serverUrl = "http://localhost:5000";
-        [SerializeField] private string wsUrl = "ws://localhost:5000/chat";
+        [SerializeField] private string serverUrl = "http://43.138.133.137:5000";
+        [SerializeField] private string wsUrl = "ws://43.138.133.137:5000/chat";
 
         [Header("热更（文档 14，腾讯云 COS + CDN）")]
         [SerializeField] private string hotfixCdnUrl = "";

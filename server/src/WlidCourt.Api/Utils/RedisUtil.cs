@@ -1,32 +1,66 @@
+using StackExchange.Redis;
+
 namespace WlidCourt.Api.Utils;
 
 /// <summary>
 /// Redis 封装：String / Sorted Set / List 操作，覆盖 8 类 Key（文档 02 §2.7、文档 15.3）。
+/// 基于 StackExchange.Redis；连接串来自 appsettings["Redis:ConnectionString"]（如 localhost:6379）。
 /// </summary>
 public class RedisUtil
 {
-    public Task<string?> GetStringAsync(string key)
+    private readonly ConnectionMultiplexer _redis;
+    private readonly IDatabase _db;
+
+    public RedisUtil(string connectionString)
     {
-        throw new NotImplementedException();
+        // abortConnect=false：Redis 未就绪时不抛异常（后台重试），与启动降级策略一致
+        // （Program.cs 迁移降级 + Redis 可后起），也便于 dotnet ef 设计时构建 host。
+        var options = ConfigurationOptions.Parse(connectionString);
+        options.AbortOnConnectFail = false;
+        _redis = ConnectionMultiplexer.Connect(options);
+        _db = _redis.GetDatabase();
     }
 
-    public Task SetStringAsync(string key, string value, TimeSpan? expiry = null)
+    // ---- String ----
+
+    public async Task<string?> GetStringAsync(string key)
     {
-        throw new NotImplementedException();
+        var value = await _db.StringGetAsync(key);
+        return value.IsNull ? null : value.ToString();
     }
 
-    public Task<double> AddToSortedSetAsync(string key, long member, double score)
+    public async Task SetStringAsync(string key, string value, TimeSpan? expiry = null)
     {
-        throw new NotImplementedException();
+        await _db.StringSetAsync(key, value, expiry);
     }
 
-    public Task<List<long>> RangeByScoreAsync(string key, double min, double max, int count)
+    public async Task<bool> DeleteAsync(string key)
     {
-        throw new NotImplementedException();
+        return await _db.KeyDeleteAsync(key);
     }
 
-    public Task PushToListAsync(string key, string value)
+    // ---- Sorted Set ----
+
+    public async Task<double> AddToSortedSetAsync(string key, long member, double score)
     {
-        throw new NotImplementedException();
+        return await _db.SortedSetIncrementAsync(key, member, score);
+    }
+
+    public async Task<List<long>> RangeByScoreAsync(string key, double min, double max, int count)
+    {
+        var values = await _db.SortedSetRangeByScoreAsync(key, min, max, Exclude.None, Order.Descending, 0, count);
+        var result = new List<long>(values.Length);
+        foreach (var v in values)
+        {
+            if (long.TryParse(v.ToString(), out var id)) result.Add(id);
+        }
+        return result;
+    }
+
+    // ---- List ----
+
+    public async Task PushToListAsync(string key, string value)
+    {
+        await _db.ListRightPushAsync(key, value);
     }
 }

@@ -1,0 +1,8 @@
+# Docker 构建上下文排除（防止 bin/obj 混入镜像、防止 .env 泄漏进镜像）
+**/bin/
+**/obj/
+.env
+docs/
+.git/
+.gitignore
+README.md

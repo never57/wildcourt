@@ -14,9 +14,9 @@ namespace WlidCourt.Api.Services;
 public partial class UserService
 {
     private readonly WlidCourtDbContext _db;
-    private readonly SessionStore _sessions;
+    private readonly ISessionStore _sessions;
 
-    public UserService(WlidCourtDbContext db, SessionStore sessions)
+    public UserService(WlidCourtDbContext db, ISessionStore sessions)
     {
         _db = db;
         _sessions = sessions;
@@ -24,6 +24,7 @@ public partial class UserService
 
     /// <summary>
     /// 注册（选省/市）。账号已存在或格式非法抛 <see cref="BusinessException"/>。
+    /// 并发同名注册依赖 username 唯一索引兜底（DbUpdateException → 409）。
     /// </summary>
     public async Task<User> RegisterAsync(string username, string passwordHash)
     {
@@ -51,13 +52,22 @@ public partial class UserService
             CreatedAt = DateTime.UtcNow,
         };
         _db.Users.Add(entity);
-        await _db.SaveChangesAsync();
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // 并发同名注册：唯一索引冲突（TOCTOU 兜底，避免 500）
+            throw new BusinessException(ApiCodes.Conflict, "账号已存在");
+        }
 
         return ToModel(entity);
     }
 
     /// <summary>
-    /// 登录：校验账号密码 → 签发会话 token（user_session:{token}）→ 更新 last_login。
+    /// 登录：校验账号密码 → 签发会话 token（Redis user_session:{token}）→ 更新 last_login。
     /// </summary>
     public async Task<LoginResponse> LoginAsync(string username, string passwordHash)
     {
@@ -72,7 +82,7 @@ public partial class UserService
 
         return new LoginResponse
         {
-            Token = _sessions.Create(entity.UserId),
+            Token = await _sessions.CreateAsync(entity.UserId),
             UserId = entity.UserId,
         };
     }

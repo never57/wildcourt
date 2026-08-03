@@ -1,50 +1,42 @@
-using System.Collections.Concurrent;
-
 namespace WlidCourt.Api.Utils;
 
 /// <summary>
-/// 会话存储：token → userId（文档 02 §2.3 user_session:{token}）。
-/// 当前为进程内内存实现（开发期），待 RedisUtil 落实后替换为 Redis，
-/// 仅需改本类内部实现，接口不变（迁移腾讯云时 Redis 就绪）。
+/// 会话存储（Redis 实现）：key = user_session:{token}，value = userId，TTL 7 天。
+/// 多实例共享、重启不掉线；token 无滑动续期（固定 7 天，重复登录产生多个并存 token，可接受）。
 /// </summary>
-public class SessionStore
+public class SessionStore : ISessionStore
 {
-    private sealed record SessionEntry(long UserId, DateTime ExpiresAt);
+    private const string KeyPrefix = "user_session:";
 
     /// <summary>会话有效期（默认 7 天）。</summary>
     private static readonly TimeSpan SessionTtl = TimeSpan.FromDays(7);
 
-    private readonly ConcurrentDictionary<string, SessionEntry> _sessions = new();
+    private readonly RedisUtil _redis;
 
-    /// <summary>为指定用户创建会话，返回 token。</summary>
-    public string Create(long userId)
+    public SessionStore(RedisUtil redis)
+    {
+        _redis = redis;
+    }
+
+    public async Task<string> CreateAsync(long userId)
     {
         var token = Guid.NewGuid().ToString("N");
-        _sessions[token] = new SessionEntry(userId, DateTime.UtcNow.Add(SessionTtl));
+        await _redis.SetStringAsync(KeyPrefix + token, userId.ToString(), SessionTtl);
         return token;
     }
 
-    /// <summary>校验 token，成功返回 true 并输出 userId。</summary>
-    public bool TryGetUserId(string token, out long userId)
+    public async Task<long?> TryGetUserIdAsync(string token)
     {
-        userId = 0;
-        if (string.IsNullOrEmpty(token)) return false;
-
-        if (_sessions.TryGetValue(token, out var entry))
-        {
-            if (entry.ExpiresAt > DateTime.UtcNow)
-            {
-                userId = entry.UserId;
-                return true;
-            }
-            _sessions.TryRemove(token, out _); // 过期清理
-        }
-        return false;
+        if (string.IsNullOrEmpty(token)) return null;
+        var value = await _redis.GetStringAsync(KeyPrefix + token);
+        return long.TryParse(value, out var userId) ? userId : null;
     }
 
-    /// <summary>主动销毁会话（登出/封禁）。</summary>
-    public void Remove(string token)
+    public async Task RemoveAsync(string token)
     {
-        if (!string.IsNullOrEmpty(token)) _sessions.TryRemove(token, out _);
+        if (!string.IsNullOrEmpty(token))
+        {
+            await _redis.DeleteAsync(KeyPrefix + token);
+        }
     }
 }

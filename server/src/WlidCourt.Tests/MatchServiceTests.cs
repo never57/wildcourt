@@ -7,14 +7,14 @@ namespace WlidCourt.Tests;
 /// </summary>
 public class MatchServiceTests
 {
-    [Fact]
+    [Fact(Skip = "待 MatchService 业务实现后补全")]
     public void FindTargets_ReturnsWeightedTargets()
     {
         // TODO: 实现权重排序测试。
         throw new NotImplementedException();
     }
 
-    [Fact]
+    [Fact(Skip = "待 MatchService 业务实现后补全")]
     public void FindTargets_FallsBackToProvincePool()
     {
         // TODO: 实现城市池不足时回退省池测试。

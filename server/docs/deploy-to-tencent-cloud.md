@@ -136,3 +136,72 @@ server {
 - [ ] Nginx WebSocket 升级头（SignalR ChatHub）
 - [ ] 安全组最小化开放端口
 - [ ] 备份策略（`server/scripts/backup_db.sh` 当前为骨架，需实现）
+
+## 9. Docker 部署（推荐：腾讯云轻量 + Ubuntu 24.04 + 预装 Docker 27.5.1）
+
+部署文件已就位：`server/Dockerfile`、`server/docker-compose.yml`、`server/.env.example`（MySQL/Redis 容器自装方案；若改用腾讯云托管版，删除 compose 里 mysql/redis 服务并在 .env 改连接串）。
+
+### 9.1 本地发布并上传（在本地 Windows 的 server/ 目录）
+
+```powershell
+# 1) 把 server/ 整个目录（含 Dockerfile、docker-compose.yml、config/）打成包
+#    在项目根：git 已忽略 bin/obj，可直接复制 server/ 目录
+# 2) 上传到服务器（任选其一）
+scp -r server user@<公网IP>:/opt/wlidcourt/          # 若本地有 scp
+# 或本机打包后从控制台/终端上传
+```
+
+> 源码级部署即可，镜像在服务器上构建（轻量服务器 2 核可承受）。
+
+### 9.2 服务器端首次配置（SSH 登录后）
+
+登录方式（二选一）：
+- **网页终端**：轻量控制台 → 实例列表 → 点 **"登录"**（OrcaTerm 网页终端，免装 SSH 客户端）
+- **SSH**：本机 `ssh root@<公网IP>`（密码为控制台设置的实例密码；忘记可在控制台重置）
+
+```bash
+cd /opt/wlidcourt/server
+cp .env.example .env && vim .env          # 改 MYSQL_ROOT_PASSWORD / MYSQL_APP_PASSWORD（强密码）
+docker compose up -d --build              # 构建并启动 mysql + redis + api
+docker compose ps                         # 三个服务都 Up 即成功
+```
+
+> 上传 `server/` 目录：网页终端可拖拽上传（OrcaTerm 支持），或本机 `scp -r server root@<IP>:/opt/wlidcourt/`。
+
+### 9.3 首次建库
+
+EF Core 迁移在 api 容器启动时自动执行（`db.Database.Migrate()`），无需手工建表。
+
+### 9.4 防火墙（腾讯云轻量控制台 → 实例 → 防火墙标签页）
+
+- 测试期：放行 **5000**（直连验证 `http://<公网IP>:5000`）、**22**（SSH）
+- 正式上线：只放行 **80/443/22**，5000 改由 Nginx 反代
+- 注意：轻量用的是"防火墙"（不是 CVM 的安全组），加规则后立即生效
+
+### 9.5 验证
+
+```bash
+curl http://localhost:5000/api/v1/user/register -X POST -H "Content-Type: application/json" -d '{}'
+# 预期 {"code":400,"message":"密码不能为空"} → 服务正常
+# 再用与本地一致的方式注册/登录（SHA256 密码）
+```
+
+### 9.6 日志与运维
+
+```bash
+docker compose logs -f api        # 服务端日志
+docker compose logs mysql         # 数据库日志
+docker compose restart api        # 重启 api
+docker compose down && docker compose up -d   # 全量重启
+```
+
+### 9.7 域名 + HTTPS（正式上线时）
+
+1. 域名解析 A 记录 → 服务器公网 IP
+2. 腾讯云申请免费 SSL 证书（SSL 证书控制台）
+3. compose 增加 nginx 服务或宿主机装 Nginx，反代 `api:5000`，配置 WebSocket 升级头（SignalR ChatHub，见 §6）
+4. 安全组只留 80/443/22
+
+### 9.8 数值配置 JSON（客户端 StreamingAssets/config）
+
+compose 已把宿主机 `server/config/` 挂载到容器 `/app/config`；把 `client/Assets/StreamingAssets/config/` 下的 `Config_*.json` 复制进该目录即可（当前 Program.cs 尚未加载，后续业务落实后生效）。
