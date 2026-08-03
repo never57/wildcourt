@@ -27,6 +27,5 @@
 # OS
 .DS_Store
 Thumbs.db
-
 # 热更产物（AssetBundle 运行时生成）
 /Assets/StreamingAssets/AssetBundles/
