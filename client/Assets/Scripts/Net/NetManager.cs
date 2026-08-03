@@ -23,7 +23,12 @@ namespace WildCourt.Net
     {
         public static NetManager Instance { get; private set; }
 
-        public string ServerUrl { get; private set; } = "http://localhost:5000";
+        public string ServerUrl { get; private set; }
+
+        [Header("服务端（文档 17 §17.4 联调）")]
+        [Tooltip("REST 服务地址，需与服务端 launchSettings 端口一致（默认 http://localhost:5000）")]
+        [SerializeField] private string serverUrl = "http://localhost:5000";
+
         public string Token { get; private set; }
 
         [SerializeField] private float timeoutSeconds = 10f;
@@ -40,12 +45,14 @@ namespace WildCourt.Net
             }
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            // 默认取序列化配置的 serverUrl（服务端端口默认 5000）
+            ServerUrl = serverUrl;
         }
 
         /// <summary>初始化（文档 17 §17.4 联调：localhost:5000）。</summary>
         public void Init(string serverUrl, string wsUrl)
         {
-            ServerUrl = serverUrl;
+            ServerUrl = string.IsNullOrEmpty(serverUrl) ? ServerUrl : serverUrl;
             DefaultHandlers.RegisterAll();
             _realtime = GetComponent<SignalRClient>() ?? gameObject.AddComponent<SignalRClient>();
             ConnectRealtime(wsUrl);
