@@ -84,6 +84,9 @@ namespace WildCourt.Net
         {
             using (UnityWebRequest req = new UnityWebRequest(ServerUrl + path, method))
             {
+                // 开发/联调阶段允许任何连接（含本地 HTTP 明文），规避 "Insecure connection not allowed"。
+                // 生产环境应移除该兜底并改用 HTTPS + 证书校验。
+                req.certificateHandler = new InsecureCertificateHandler();
                 req.downloadHandler = new DownloadHandlerBuffer();
                 req.timeout = (int)timeoutSeconds;
                 req.SetRequestHeader("Accept", "application/json");
@@ -156,6 +159,12 @@ namespace WildCourt.Net
             if (_realtime == null || string.IsNullOrEmpty(wsUrl)) return;
             _realtime.OnPush += HandlerCenter.Instance.Route;
             _realtime.Connect(wsUrl, Token);
+        }
+
+        /// <summary>信任所有证书的兜底 handler（仅开发/联调使用，规避 HTTP 明文被拒）。</summary>
+        private sealed class InsecureCertificateHandler : CertificateHandler
+        {
+            protected override bool ValidateCertificate(byte[] certificateData) => true;
         }
     }
 }
