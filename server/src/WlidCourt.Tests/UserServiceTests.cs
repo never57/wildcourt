@@ -21,8 +21,18 @@ public class UserServiceTests
         var db = new WlidCourtDbContext(options);
         var sessions = new Mock<ISessionStore>();
         sessions.Setup(s => s.CreateAsync(It.IsAny<long>())).ReturnsAsync("test-token");
-        var service = new UserService(db, sessions.Object);
+        var service = new UserService(db, sessions.Object, CreateYardService(db));
         return (service, sessions);
+    }
+
+    /// <summary>YardService 实例（注册时建默认庭院；配置目录用临时空表）。</summary>
+    private static YardService CreateYardService(WlidCourtDbContext db)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "wc_cfg_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "Config_YardUnlock.json"), "{\"rows\":[]}");
+        File.WriteAllText(Path.Combine(dir, "Config_Decorations.json"), "{\"rows\":[]}");
+        return new YardService(db, new ConfigService(dir));
     }
 
     [Fact]

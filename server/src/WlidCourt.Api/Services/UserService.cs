@@ -15,11 +15,13 @@ public partial class UserService
 {
     private readonly WlidCourtDbContext _db;
     private readonly ISessionStore _sessions;
+    private readonly YardService _yard;
 
-    public UserService(WlidCourtDbContext db, ISessionStore sessions)
+    public UserService(WlidCourtDbContext db, ISessionStore sessions, YardService yard)
     {
         _db = db;
         _sessions = sessions;
+        _yard = yard;
     }
 
     /// <summary>
@@ -62,6 +64,9 @@ public partial class UserService
             // 并发同名注册：唯一索引冲突（TOCTOU 兜底，避免 500）
             throw new BusinessException(ApiCodes.Conflict, "账号已存在");
         }
+
+        // 注册即建默认庭院（文档 03：注册后可直接进庭院）
+        await _yard.CreateDefaultAsync(entity.UserId);
 
         return ToModel(entity);
     }

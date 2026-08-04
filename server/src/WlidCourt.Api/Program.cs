@@ -27,8 +27,12 @@ var redisConn = builder.Configuration["Redis:ConnectionString"] ?? "localhost:63
 builder.Services.AddSingleton(new RedisUtil(redisConn));
 builder.Services.AddSingleton<ISessionStore, SessionStore>();
 
+// 数值配置（服务端与客户端同读 Config_*.json，文档 16 §16.3）
+builder.Services.AddSingleton(new ConfigService(configDir));
+
 // 3. 注册 Services（后续业务 Service 按需追加）
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<YardService>();
 
 // 统一 JSON 信封：camelCase 输出 + 大小写不敏感反序列化（对齐客户端小写字段 DTO）
 builder.Services.AddControllers()
