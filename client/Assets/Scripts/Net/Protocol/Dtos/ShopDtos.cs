@@ -31,21 +31,4 @@ namespace WildCourt.Net.Protocol
         public int count;
         public string currency;
     }
-
-    // ---------- Yard（YardController、文档 03 §3.2） ----------
-
-    [Serializable]
-    public class YardResponse
-    {
-        public int level;
-        public string layoutJson;
-    }
-
-    /// <summary>保存布局（3 个布局槽，slotIndex 0~2；服务端校验等级容量，文档 02 §2.3 YardService）。</summary>
-    [Serializable]
-    public class LayoutSaveRequest
-    {
-        public string layoutJson;
-        public int slotIndex;
-    }
 }
