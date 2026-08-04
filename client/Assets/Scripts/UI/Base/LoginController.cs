@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using WildCourt.Core;
 
 namespace WlidCourt.UI
 {
@@ -36,7 +37,7 @@ namespace WlidCourt.UI
 
         [Header("跳转场景名")]
         [Tooltip("登录成功后跳转到的场景")]
-        public string gameSceneName = "SampleScene";
+        public string gameSceneName = "MainScene";
 
         private AuthService _auth;
 
@@ -178,7 +179,15 @@ namespace WlidCourt.UI
         /// </summary>
         private void LoadGameScene()
         {
-            SceneManager.LoadScene(gameSceneName);
+            // 统一走 GameManager 的场景切换入口，便于后续扩展加载流程
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.LoadScene(gameSceneName);
+            }
+            else
+            {
+                SceneManager.LoadScene(gameSceneName);
+            }
         }
 
         // ---- 工具 ----
