@@ -1,7 +1,7 @@
 # 部署检查与上线待办（腾讯云 Docker 方案）
 
-> 更新：2026-08-03（已部署到腾讯云，docker compose 三件套 mysql/redis/api；登录闭环修复已合入）
-> 关联：`docs/deploy-to-tencent-cloud.md`（部署步骤）、`docs/REVIEW-ISSUES.md`（登录闭环代码审查）
+> 更新：2026-08-04（**重建部署已完成**：删库重建、snake_case 新表、Redis 会话已生效）
+> 关联：`docs/deploy-to-tencent-cloud.md`（部署步骤）、`docs/REVIEW-ISSUES.md`（登录闭环代码审查）、`docs/migration-rebuild-guide.md`（迁移重做指引）
 
 ## 一、部署现状 ✅（已确认无误）
 
@@ -20,9 +20,9 @@
 
 | # | 事项 | 状态 | 说明 |
 | --- | --- | --- | --- |
-| 1 | **HTTPS** | ⏳ 待办 | compose 已收口 `127.0.0.1:5000`，需：域名解析 + 腾讯云免费 SSL + Nginx 反代（模板见下），防火墙只留 80/443/22 |
-| 2 | **Redis 会话落地** | ✅ 已修 | `RedisUtil` 已实现，`SessionStore` 切 Redis（`ISessionStore` 接口），compose `redis:6379` 就绪；重新部署后生效 |
-| 3 | **数据库连接兜底** | ✅ 已修 | `Migrate()` 失败仅告警降级启动（Program.cs），不再重启循环；仍建议保证 MySQL 就绪再正式上线 |
+| 1 | **HTTPS** | ⏳ 待办 | compose 已收口 `127.0.0.1:5000`（当前测试期为 `5000:5000` 公网直连），需：域名解析 + 腾讯云免费 SSL + Nginx 反代（模板见下），防火墙只留 80/443/22 |
+| 2 | **Redis 会话落地** | ✅ 已部署生效 | `RedisUtil` 已实现，`SessionStore` 切 Redis（`ISessionStore` 接口）；2026-08-04 重建部署后生效，重启 api 不掉线 |
+| 3 | **数据库连接兜底** | ✅ 已部署生效 | `Migrate()` 失败仅告警降级启动（Program.cs）；2026-08-04 重建后验证通过 |
 
 ## 三、Nginx + HTTPS 配置模板（上线 #1 用）
 

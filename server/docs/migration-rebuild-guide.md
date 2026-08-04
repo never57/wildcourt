@@ -1,5 +1,8 @@
 # 迁移重做与重新部署指引（snake_case 列名 + EF9 保持）
 
+> ✅ **已于 2026-08-04 执行完成**：删库重建、新迁移 InitSchema 已生效、Redis 会话验证通过（重启 api 不掉线）。
+> 以下为操作记录，供后续参考。
+
 > 背景：登录闭环修复包含 **列名统一 snake_case**（Pomelo.EntityFrameworkCore.MySql 无 10.x
 > 稳定版，EF 保持 9.0.18/Pomelo 9.0.0），旧的 `20260803092406_InitUsers` 迁移
 > （EF9 + PascalCase 列名）与新模型不兼容，需删库重建。
