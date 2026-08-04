@@ -45,17 +45,17 @@ namespace WildCourt.Net.Handler
         public void Route(NetEvent evt, string data)
         {
             if (!_handlers.TryGetValue(evt, out var list)) return;
-            // 拷贝一份避免处理过程中注册表被修改
-            var snapshot = list.ToArray();
-            foreach (var handler in snapshot)
+            // 倒序遍历：注册表仅在 Register/Unregister（低频，非推送路径）修改，
+            // 直接索引遍历避免每次推送 ToArray() 分配新数组（Rule 5：热点路径禁止 new）。
+            for (int i = list.Count - 1; i >= 0; i--)
             {
                 try
                 {
-                    handler.HandleNetEvent(evt, data);
+                    list[i].HandleNetEvent(evt, data);
                 }
                 catch (Exception e)
                 {
-                    UnityEngine.Debug.LogError($"[HandlerCenter] {evt} 处理异常: {e}");
+                    UnityEngine.Debug.LogError("[HandlerCenter] 处理异常: " + evt + " :: " + e);
                 }
             }
         }

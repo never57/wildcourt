@@ -51,15 +51,21 @@ namespace WlidCourt.UI
 
             loginButton.onClick.AddListener(OnLoginClick);
             registerButton.onClick.AddListener(OnRegisterClick);
-            gotoRegisterLink.onClick.AddListener(() => SwitchPanel(false));
-            gotoLoginLink.onClick.AddListener(() => SwitchPanel(true));
+            gotoRegisterLink.onClick.AddListener(OnGotoRegister);
+            gotoLoginLink.onClick.AddListener(OnGotoLogin);
         }
 
         private void OnDestroy()
         {
             if (loginButton) loginButton.onClick.RemoveListener(OnLoginClick);
             if (registerButton) registerButton.onClick.RemoveListener(OnRegisterClick);
+            if (gotoRegisterLink) gotoRegisterLink.onClick.RemoveListener(OnGotoRegister);
+            if (gotoLoginLink) gotoLoginLink.onClick.RemoveListener(OnGotoLogin);
         }
+
+        // 用命名方法替代匿名 Lambda（Rule 7：避免临时闭包分配，且保证 OnDestroy 可移除）
+        private void OnGotoRegister() => SwitchPanel(false);
+        private void OnGotoLogin() => SwitchPanel(true);
 
         /// <summary>
         /// 切换到登录面板（true）或注册面板（false）。
