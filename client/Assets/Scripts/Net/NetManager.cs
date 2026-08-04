@@ -79,6 +79,16 @@ namespace WildCourt.Net
             StartCoroutine(SendRequest<T>("POST", path, bodyJson, onSuccess, onError, maxRetry));
         }
 
+        public void Put<T>(string path, object body, Action<ApiResponse<T>> onSuccess, Action<int, string> onError = null)
+        {
+            PutJson<T>(path, body == null ? null : JsonUtil.ToJson(body), onSuccess, onError);
+        }
+
+        public void PutJson<T>(string path, string bodyJson, Action<ApiResponse<T>> onSuccess, Action<int, string> onError = null)
+        {
+            StartCoroutine(SendRequest<T>("PUT", path, bodyJson, onSuccess, onError, maxRetry));
+        }
+
         private IEnumerator SendRequest<T>(string method, string path, string bodyJson,
             Action<ApiResponse<T>> onSuccess, Action<int, string> onError, int retryLeft)
         {
