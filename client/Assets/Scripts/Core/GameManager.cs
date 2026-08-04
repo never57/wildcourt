@@ -75,6 +75,7 @@ namespace WildCourt.Core
         /// <summary>切换场景（Launch / ProvinceSelect / Main / Yard ...，文档 03 §3.3）。</summary>
         public void LoadScene(string sceneName)
         {
+           
             SceneManager.LoadScene(sceneName);
         }
     }
