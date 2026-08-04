@@ -1,0 +1,28 @@
+{
+  "rows": [
+    {
+      "level": 1,
+      "totalExp": 0,
+      "yardProgress": 1,
+      "note": "初始等级"
+    },
+    {
+      "level": 2,
+      "totalExp": 400,
+      "yardProgress": 2,
+      "note": "经验曲线待策划表最终确认"
+    },
+    {
+      "level": 3,
+      "totalExp": 900,
+      "yardProgress": 3,
+      "note": "经验曲线待策划表最终确认"
+    },
+    {
+      "level": 4,
+      "totalExp": 1500,
+      "yardProgress": 4,
+      "note": "满级（文档 05 §5.5：满级 1500 EXP）"
+    }
+  ]
+}
