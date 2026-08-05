@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using WildCourt.Core;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
 using WildCourt.UI.Yard;
@@ -38,6 +39,12 @@ namespace WildCourt.Gameplay.Yard
             EnsureEventSystem();
             EnsureCamera();
 
+            // 直接从 MainScene 播放（未经过 Splash/Login 的 GameManager.Boot）时，确保配置表已加载
+            if (!ConfigMgr.Instance.IsLoaded)
+            {
+                ConfigMgr.Instance.LoadAll();
+            }
+
             var host = new GameObject("YardRuntimeHost");
             var yard = host.AddComponent<YardManager>();
             host.AddComponent<YardRenderer>();
@@ -60,13 +67,13 @@ namespace WildCourt.Gameplay.Yard
                         if (YardPanel.Instance != null) YardPanel.Instance.OnInventoryLoaded(resp.data);
                     },
                     (code, msg) => Debug.LogWarning($"[Yard] inventory 加载失败: {msg}"));
+
+                yard.LoadYard();
             }
             else
             {
-                Debug.LogWarning("[Yard] NetManager 不存在，跳过初始数据拉取");
+                Debug.LogWarning("[Yard] NetManager 不存在，跳过初始数据拉取（请从 Splash/Login 正常进入）");
             }
-
-            yard.LoadYard();
         }
 
         private static void EnsureEventSystem()

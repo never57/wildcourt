@@ -195,9 +195,13 @@ namespace WildCourt.UI.Yard
 
             var header = CreateUiObject("Header", root.transform);
             SetAnchors(header, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -36f), new Vector2(-10f, -4f));
-            _shellText = AddText(header, "庭贝 0", 20, new Color(1f, 0.85f, 0.3f));
+            var shellGo = CreateUiObject("Shell", header.transform);
+            SetStretch(shellGo);
+            _shellText = AddText(shellGo, "庭贝 0", 20, new Color(1f, 0.85f, 0.3f));
             _shellText.alignment = TextAnchor.MiddleLeft;
-            _hintText = AddText(header, "长按装饰拖到庭院；点击已摆放装饰可旋转/删除", 15, new Color(0.85f, 0.9f, 0.95f));
+            var hintGo = CreateUiObject("Hint", header.transform);
+            SetStretch(hintGo);
+            _hintText = AddText(hintGo, "长按装饰拖到庭院；点击已摆放装饰可旋转/删除", 15, new Color(0.85f, 0.9f, 0.95f));
             _hintText.alignment = TextAnchor.MiddleRight;
 
             var tabRow = CreateUiObject("Tabs", root.transform);
