@@ -14,6 +14,9 @@ public class YardItemDto
 
     /// <summary>旋转：0/90/180/270。</summary>
     public int Rotation { get; set; }
+
+    /// <summary>镜像（水平翻转，与旋转叠加）。</summary>
+    public bool Mirror { get; set; }
 }
 
 /// <summary>保存布局请求（PUT /api/v1/yard/layout，文档 03 §3.9 方案槽）。</summary>

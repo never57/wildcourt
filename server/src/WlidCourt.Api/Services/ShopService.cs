@@ -65,6 +65,13 @@ public class ShopService
             throw new BusinessException(ApiCodes.BadRequest, "商品不存在或不可购买");
         }
 
+        var inventory = await _db.Inventories.FirstOrDefaultAsync(i => i.UserId == userId && i.ItemId == itemId);
+        int ownedNow = inventory?.Count ?? 0;
+        if (ownedNow + count > deco.MaxCount)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, $"已达到该装饰数量上限（{deco.MaxCount}）");
+        }
+
         var total = deco.Price * count;
         var user = await _db.Users.FindAsync(userId)
             ?? throw new BusinessException(ApiCodes.NotFound, "用户不存在");
@@ -75,7 +82,6 @@ public class ShopService
 
         user.Shell -= total;
 
-        var inventory = await _db.Inventories.FirstOrDefaultAsync(i => i.UserId == userId && i.ItemId == itemId);
         if (inventory == null)
         {
             _db.Inventories.Add(new InventoryEntity { UserId = userId, ItemId = itemId, Count = count });

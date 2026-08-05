@@ -23,7 +23,12 @@ namespace WildCourt.Gameplay.Yard
         public const float WorldCenterY = 4.75f;
 
         /// <summary>长按进入“移动/拖放”的阈值（秒）。</summary>
-        public const float LongPressSeconds = 0.35f;
+        public const float LongPressSeconds = 0.5f;
+
+        /// <summary>缩放范围与步长（滚轮与面板 +/- 按钮共用）。</summary>
+        public const float MinZoom = 5f;
+        public const float MaxZoom = 20f;
+        public const float ZoomStep = 1.5f;
 
         /// <summary>选中/取消选中事件（YardPanel 订阅显示操作按钮）。</summary>
         public event Action<int> ItemSelected;
@@ -95,6 +100,8 @@ namespace WildCourt.Gameplay.Yard
 
         private void Update()
         {
+            HandleZoom();
+
             var yard = YardManager.Instance;
             if (yard == null) return;
 
@@ -119,7 +126,7 @@ namespace WildCourt.Gameplay.Yard
         {
             var (x, y) = ScreenToCell(Input.mousePosition);
             bool valid = yard.CanPlaceAt(x, y);
-            ShowGhost(yard.SelectedDecoration, x, y, valid);
+            ShowGhost(yard.SelectedDecoration, x, y, 0, false, valid);
 
             if (Input.GetMouseButtonUp(0))
             {
@@ -173,7 +180,7 @@ namespace WildCourt.Gameplay.Yard
                     {
                         _moveIndex = idx;
                         var item = yard.Items[idx];
-                        ShowGhost(GetDecoration(item.id), item.x, item.y, true);
+                        ShowGhost(GetDecoration(item.id), item.x, item.y, item.rotation, item.mirror, true);
                     }
                 }
             }
@@ -183,7 +190,7 @@ namespace WildCourt.Gameplay.Yard
                 var item = yard.Items[_moveIndex];
                 var (x, y) = ScreenToCell(Input.mousePosition);
                 bool valid = yard.CanMoveTo(_moveIndex, x, y);
-                ShowGhost(GetDecoration(item.id), x, y, valid);
+                ShowGhost(GetDecoration(item.id), x, y, item.rotation, item.mirror, valid);
                 if (Input.GetMouseButtonUp(0))
                 {
                     bool overUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
@@ -261,23 +268,58 @@ namespace WildCourt.Gameplay.Yard
                 var item = yard.Items[i];
                 var d = GetDecoration(item.id);
                 if (d == null) continue;
-                var go = CreateCellSprite(d, item.x, item.y, item.rotation);
+                var go = CreateCellSprite(d, item.x, item.y, item.rotation, item.mirror);
                 _placed.Add(go);
             }
         }
 
-        private GameObject CreateCellSprite(DecorationConfig d, int x, int y, int rotation)
+        private GameObject CreateCellSprite(DecorationConfig d, int x, int y, int rotation, bool mirror)
         {
             var go = new GameObject("deco_" + d.id);
             go.transform.SetParent(transform, false);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = _solidSprite;
-            sr.color = GetCategoryColor(d.category);
+            var sprite = DecorationSprites.Get(d.id);
+            sr.sprite = sprite != null ? sprite : _solidSprite;
+            sr.color = sprite != null ? Color.white : GetCategoryColor(d.category);
             sr.sortingOrder = (x + y) * 10;
             var (w, h) = GetSize(d, rotation);
             go.transform.localPosition = IsoToWorld(x, y);
-            go.transform.localScale = new Vector3(w, h, 1f);
+            go.transform.localScale = new Vector3(w * (mirror ? -1f : 1f), h, 1f);
+
+            if (!string.IsNullOrEmpty(d.effect))
+            {
+                CreateEffectParticles(go, d.effect, x, y);
+            }
             return go;
+        }
+
+        /// <summary>占位粒子（如树类的飘落效果），后续按美术配置调参。</summary>
+        private static void CreateEffectParticles(GameObject parent, string effect, int x, int y)
+        {
+            var go = new GameObject("fx_" + effect);
+            go.transform.SetParent(parent.transform, false);
+            go.transform.localPosition = new Vector3(0f, 0.45f, 0f);
+
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.loop = true;
+            main.startLifetime = 2.5f;
+            main.startSpeed = 0.35f;
+            main.startSize = 0.1f;
+            main.gravityModifier = 0.12f;
+            main.startColor = new Color(0.45f, 0.85f, 0.35f, 0.85f);
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            var emission = ps.emission;
+            emission.rateOverTime = 5f;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(0.9f, 0.2f, 0.1f);
+
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            var mat = new Material(Shader.Find("Sprites/Default"));
+            if (mat != null) renderer.material = mat;
+            renderer.sortingOrder = (x + y) * 10 + 1;
         }
 
         private void BuildGround()
@@ -319,7 +361,7 @@ namespace WildCourt.Gameplay.Yard
 
         // ---- 幽灵 ----
 
-        private void ShowGhost(DecorationConfig d, int x, int y, bool valid)
+        private void ShowGhost(DecorationConfig d, int x, int y, int rotation, bool mirror, bool valid)
         {
             if (d == null)
             {
@@ -334,10 +376,10 @@ namespace WildCourt.Gameplay.Yard
                 _ghostRenderer.sprite = _solidSprite;
                 _ghostRenderer.sortingOrder = 9999;
             }
-            var (w, h) = GetSize(d, 0);
+            var (w, h) = GetSize(d, rotation);
             _ghostRenderer.color = valid ? GhostValidColor : GhostInvalidColor;
             _ghost.transform.localPosition = IsoToWorld(x, y);
-            _ghost.transform.localScale = new Vector3(w, h, 1f);
+            _ghost.transform.localScale = new Vector3(w * (mirror ? -1f : 1f), h, 1f);
         }
 
         private void HideGhost()
@@ -345,6 +387,25 @@ namespace WildCourt.Gameplay.Yard
             if (_ghost != null) Destroy(_ghost);
             _ghost = null;
             _ghostRenderer = null;
+        }
+
+        // ---- 缩放 ----
+
+        private void HandleZoom()
+        {
+            float scroll = Input.mouseScrollDelta.y;
+            if (Mathf.Abs(scroll) > 0.01f)
+            {
+                ZoomBy(scroll * ZoomStep);
+            }
+        }
+
+        /// <summary>缩放（+ 放大 / - 缩小），钳制 MinZoom~MaxZoom；面板 +/- 按钮调用。</summary>
+        public void ZoomBy(float delta)
+        {
+            var cam = Camera.main;
+            if (cam == null) return;
+            cam.orthographicSize = Mathf.Clamp(cam.orthographicSize - delta, MinZoom, MaxZoom);
         }
 
         // ---- 工具 ----

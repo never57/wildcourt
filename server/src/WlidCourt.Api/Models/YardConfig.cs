@@ -51,4 +51,10 @@ public class DecorationConfig
     public string Acquire { get; set; } = string.Empty;
 
     public string Description { get; set; } = string.Empty;
+
+    /// <summary>可拥有/可摆放数量上限（当前统一 2，可配置不同值）。</summary>
+    public int MaxCount { get; set; } = 2;
+
+    /// <summary>粒子效果类型（空 = 无；如 leaves），客户端占位表现。</summary>
+    public string Effect { get; set; } = string.Empty;
 }

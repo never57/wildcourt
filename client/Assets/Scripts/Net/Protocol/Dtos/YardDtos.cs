@@ -13,6 +13,7 @@ namespace WildCourt.Net.Protocol
         public int x;          // 网格 X（斜 45° 等轴测）
         public int y;          // 网格 Y
         public int rotation;   // 0/90/180/270
+        public bool mirror;    // 镜像（水平翻转，与旋转叠加）
     }
 
     /// <summary>庭院解锁容量（Sheet16 YardUnlock，文档 03 §3.5.1）。</summary>

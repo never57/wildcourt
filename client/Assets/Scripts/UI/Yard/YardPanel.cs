@@ -44,6 +44,8 @@ namespace WildCourt.UI.Yard
         private Text _pageText;
         private Transform _gridRoot;
         private GameObject _actionBar;
+        private GameObject _panelRoot;
+        private GameObject _expandButton;
         private Button _prevButton;
         private Button _nextButton;
 
@@ -155,12 +157,10 @@ namespace WildCourt.UI.Yard
 
         public void OnCellRelease(DecorationConfig d, float downTime)
         {
-            if (Time.unscaledTime - downTime < YardRenderer.LongPressSeconds &&
-                _yard.State == YardManager.EditState.Idle)
+            // 短按仅提示：放置走长按拖放
+            if (Time.unscaledTime - downTime < YardRenderer.LongPressSeconds)
             {
-                // 短按：进入放置模式（点击后到庭院点击放置）
-                _yard.BeginPlace(d.id);
-                SetHint("点击庭院格子放置；右键/Esc 取消");
+                SetHint("长按图标拖到庭院放置；点击已摆放装饰可旋转/镜像/删除");
             }
         }
 
@@ -170,7 +170,7 @@ namespace WildCourt.UI.Yard
             if (_actionBar != null) _actionBar.SetActive(true);
             if (index >= 0 && index < _yard.Items.Count)
             {
-                SetHint("已选中 " + _yard.Items[index].id + "，可旋转/删除或长按拖到新位置");
+                SetHint("已选中 " + _yard.Items[index].id + "，可旋转/镜像/删除或长按拖到新位置");
             }
         }
 
@@ -190,22 +190,36 @@ namespace WildCourt.UI.Yard
         private void BuildUI()
         {
             var root = CreateUiObject("YardPanel", transform);
-            SetAnchors(root, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, 320f));
+            _panelRoot = root;
+            SetAnchors(root, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, 248f));
             AddImage(root, new Color(0.16f, 0.20f, 0.26f, 0.96f));
 
             var header = CreateUiObject("Header", root.transform);
-            SetAnchors(header, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -36f), new Vector2(-10f, -4f));
+            SetAnchors(header, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -30f), new Vector2(-10f, -4f));
             var shellGo = CreateUiObject("Shell", header.transform);
             SetStretch(shellGo);
-            _shellText = AddText(shellGo, "庭贝 0", 20, new Color(1f, 0.85f, 0.3f));
+            _shellText = AddText(shellGo, "庭贝 0", 16, new Color(1f, 0.85f, 0.3f));
             _shellText.alignment = TextAnchor.MiddleLeft;
             var hintGo = CreateUiObject("Hint", header.transform);
-            SetStretch(hintGo);
-            _hintText = AddText(hintGo, "长按装饰拖到庭院；点击已摆放装饰可旋转/删除", 15, new Color(0.85f, 0.9f, 0.95f));
+            var hintRt = hintGo.GetComponent<RectTransform>();
+            hintRt.anchorMin = Vector2.zero;
+            hintRt.anchorMax = Vector2.one;
+            hintRt.offsetMin = Vector2.zero;
+            hintRt.offsetMax = new Vector2(-68f, 0f);
+            _hintText = AddText(hintGo, "长按图标拖到庭院放置；点击已摆放装饰可旋转/镜像/删除", 13, new Color(0.85f, 0.9f, 0.95f));
             _hintText.alignment = TextAnchor.MiddleRight;
 
+            var collapseGo = CreateUiObject("Collapse", header.transform);
+            var collapseRt = collapseGo.GetComponent<RectTransform>();
+            collapseRt.anchorMin = new Vector2(1f, 0f);
+            collapseRt.anchorMax = new Vector2(1f, 1f);
+            collapseRt.pivot = new Vector2(1f, 0.5f);
+            collapseRt.anchoredPosition = new Vector2(-4f, 0f);
+            collapseRt.sizeDelta = new Vector2(60f, 20f);
+            AddButton(collapseGo, "收起", () => TogglePanel(false));
+
             var tabRow = CreateUiObject("Tabs", root.transform);
-            SetAnchors(tabRow, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -66f), new Vector2(-10f, -40f));
+            SetAnchors(tabRow, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -56f), new Vector2(-10f, -34f));
             var tabLayout = tabRow.AddComponent<HorizontalLayoutGroup>();
             tabLayout.spacing = 4f;
             tabLayout.childAlignment = TextAnchor.MiddleLeft;
@@ -214,7 +228,7 @@ namespace WildCourt.UI.Yard
                 var tabGo = CreateUiObject("tab_" + cat, tabRow.transform);
                 var le = tabGo.AddComponent<LayoutElement>();
                 le.preferredWidth = 96f;
-                le.preferredHeight = 24f;
+                le.preferredHeight = 20f;
                 var img = AddImage(tabGo, TabNormal);
                 var btn = tabGo.AddComponent<Button>();
                 btn.targetGraphic = img;
@@ -227,17 +241,24 @@ namespace WildCourt.UI.Yard
                 });
                 var tabLabelGo = CreateUiObject("label", tabGo.transform);
                 SetStretch(tabLabelGo);
-                AddText(tabLabelGo, cat, 15, Color.white);
+                AddText(tabLabelGo, cat, 13, Color.white);
                 _tabButtons.Add((btn, img, cat));
             }
 
             var grid = CreateUiObject("Grid", root.transform);
-            SetAnchors(grid, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -250f), new Vector2(-10f, -70f));
+            SetAnchors(grid, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -216f), new Vector2(-10f, -60f));
+            var gridLayout = grid.AddComponent<GridLayoutGroup>();
+            gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            gridLayout.constraintCount = Columns;
+            gridLayout.cellSize = new Vector2(118f, 44f);
+            gridLayout.spacing = new Vector2(8f, 8f);
+            gridLayout.childAlignment = TextAnchor.MiddleCenter;
+            gridLayout.padding = new RectOffset(6, 6, 4, 4);
             _gridRoot = grid.transform;
 
-            // 选中动作条（旋转/删除），默认隐藏
+            // 选中动作条（旋转/镜像/删除），默认隐藏
             _actionBar = CreateUiObject("Actions", root.transform);
-            SetAnchors(_actionBar, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 44f), new Vector2(-10f, 72f));
+            SetAnchors(_actionBar, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 38f), new Vector2(-10f, 60f));
             var actionLayout = _actionBar.AddComponent<HorizontalLayoutGroup>();
             actionLayout.spacing = 6f;
             actionLayout.childAlignment = TextAnchor.MiddleLeft;
@@ -245,27 +266,32 @@ namespace WildCourt.UI.Yard
             {
                 if (_selectedIndex >= 0) _yard.RotateItem(_selectedIndex);
             });
-            SetButtonWidth(rotateBtn, 90f);
+            SetButtonWidth(rotateBtn, 80f);
+            var mirrorBtn = AddButton(CreateUiObject("Mirror", _actionBar.transform), "镜像", () =>
+            {
+                if (_selectedIndex >= 0) _yard.MirrorItem(_selectedIndex);
+            });
+            SetButtonWidth(mirrorBtn, 80f);
             var deleteBtn = AddButton(CreateUiObject("Delete", _actionBar.transform), "删除", () =>
             {
                 if (_selectedIndex >= 0) _yard.RemoveItem(_selectedIndex);
             });
-            SetButtonWidth(deleteBtn, 90f);
+            SetButtonWidth(deleteBtn, 80f);
             _actionBar.SetActive(false);
 
             var footer = CreateUiObject("Footer", root.transform);
-            SetAnchors(footer, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 6f), new Vector2(-10f, 34f));
+            SetAnchors(footer, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(10f, 4f), new Vector2(-10f, 28f));
             var footerLayout = footer.AddComponent<HorizontalLayoutGroup>();
             footerLayout.spacing = 6f;
             footerLayout.childAlignment = TextAnchor.MiddleLeft;
 
             _prevButton = AddButton(CreateUiObject("Prev", footer.transform), "上一页", () => ChangePage(-1));
-            SetButtonWidth(_prevButton, 90f);
-            _pageText = AddText(CreateUiObject("Page", footer.transform), "1/1", 15, Color.white);
+            SetButtonWidth(_prevButton, 80f);
+            _pageText = AddText(CreateUiObject("Page", footer.transform), "1/1", 13, Color.white);
             var pageLe = _pageText.GetComponent<LayoutElement>() ?? _pageText.gameObject.AddComponent<LayoutElement>();
-            pageLe.preferredWidth = 56f;
+            pageLe.preferredWidth = 48f;
             _nextButton = AddButton(CreateUiObject("Next", footer.transform), "下一页", () => ChangePage(1));
-            SetButtonWidth(_nextButton, 90f);
+            SetButtonWidth(_nextButton, 80f);
 
             for (int i = 1; i <= YardManager.LayoutSlotCount; i++)
             {
@@ -275,11 +301,39 @@ namespace WildCourt.UI.Yard
                     _yard.SwitchSlot(slot);
                     SetHint("当前方案槽 " + slot);
                 });
-                SetButtonWidth(slotBtn, 74f);
+                SetButtonWidth(slotBtn, 64f);
             }
 
             var saveBtn = AddButton(CreateUiObject("Save", footer.transform), "保存", () => _yard.SaveLayout());
-            SetButtonWidth(saveBtn, 90f);
+            SetButtonWidth(saveBtn, 80f);
+
+            // 展开按钮（收起后常驻左下角）
+            _expandButton = CreateUiObject("Expand", transform);
+            SetAnchors(_expandButton, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(10f, 10f), new Vector2(80f, 36f));
+            AddButton(_expandButton, "展开", () => TogglePanel(true));
+            _expandButton.SetActive(false);
+
+            // 缩放按钮（右上角，不受面板收起影响）
+            var zoomOut = CreateUiObject("ZoomOut", transform);
+            SetAnchors(zoomOut, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-92f, -12f), new Vector2(-62f, -42f));
+            AddButton(zoomOut, "－", () => Zoom(-1f));
+            var zoomIn = CreateUiObject("ZoomIn", transform);
+            SetAnchors(zoomIn, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-56f, -12f), new Vector2(-26f, -42f));
+            AddButton(zoomIn, "＋", () => Zoom(1f));
+        }
+
+        private void TogglePanel(bool show)
+        {
+            if (_panelRoot != null) _panelRoot.SetActive(show);
+            if (_expandButton != null) _expandButton.SetActive(!show);
+        }
+
+        private void Zoom(int dir)
+        {
+            if (YardRenderer.Instance != null)
+            {
+                YardRenderer.Instance.ZoomBy(dir * YardRenderer.ZoomStep);
+            }
         }
 
         private void ChangePage(int delta)
@@ -325,40 +379,61 @@ namespace WildCourt.UI.Yard
         private void CreateCell(DecorationConfig d, int index)
         {
             bool owned = _owned.TryGetValue(d.id, out var cnt) && cnt > 0;
+            bool full = owned && cnt >= d.maxCount;
             var cell = CreateUiObject("cell_" + d.id, _gridRoot);
-            var rt = cell.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(0f, 1f);
-            rt.pivot = new Vector2(0f, 1f);
-            rt.anchoredPosition = new Vector2((index % Columns) * 156f, -(index / Columns) * 58f);
-            rt.sizeDelta = new Vector2(150f, 52f);
-            AddImage(cell, owned ? YardRenderer.GetCategoryColor(d.category) : new Color(0.42f, 0.42f, 0.42f, 0.9f));
+            var img = AddImage(cell, owned ? YardRenderer.GetCategoryColor(d.category) : new Color(0.42f, 0.42f, 0.42f, 0.9f));
+            var icon = DecorationSprites.Get(d.id);
+            if (icon != null)
+            {
+                img.sprite = icon;
+                img.color = owned ? Color.white : new Color(0.62f, 0.62f, 0.62f, 0.9f);
+            }
 
             var nameGo = CreateUiObject("name", cell.transform);
             SetStretch(nameGo);
-            var nameText = AddText(nameGo, d.name, 15, Color.white);
+            var nameText = AddText(nameGo, d.name, 13, Color.white);
             nameText.alignment = TextAnchor.UpperCenter;
 
             var priceGo = CreateUiObject("price", cell.transform);
             SetStretch(priceGo);
-            var priceText = AddText(priceGo, owned ? "拥有 " + cnt : d.price + " 庭贝", 13, new Color(1f, 0.9f, 0.6f));
+            var priceText = AddText(priceGo, owned ? $"拥有 {cnt}/{d.maxCount}" : d.price + " 庭贝", 11, new Color(1f, 0.9f, 0.6f));
             priceText.alignment = TextAnchor.LowerCenter;
 
             if (owned)
             {
                 cell.AddComponent<YardItemCell>().Init(this, d);
+                if (full)
+                {
+                    var fullGo = CreateUiObject("full", cell.transform);
+                    var fullRt = fullGo.GetComponent<RectTransform>();
+                    fullRt.anchorMin = new Vector2(1f, 0f);
+                    fullRt.anchorMax = new Vector2(1f, 0f);
+                    fullRt.pivot = new Vector2(1f, 0f);
+                    fullRt.anchoredPosition = new Vector2(-4f, 3f);
+                    fullRt.sizeDelta = new Vector2(50f, 18f);
+                    AddText(fullGo, "已满", 11, new Color(0.8f, 0.8f, 0.8f));
+                }
+                else
+                {
+                    CreateBuyButton(cell, d);
+                }
             }
             else
             {
-                var buyGo = CreateUiObject("buy", cell.transform);
-                var buyRt = buyGo.GetComponent<RectTransform>();
-                buyRt.anchorMin = new Vector2(1f, 0f);
-                buyRt.anchorMax = new Vector2(1f, 0f);
-                buyRt.pivot = new Vector2(1f, 0f);
-                buyRt.anchoredPosition = new Vector2(-3f, 3f);
-                buyRt.sizeDelta = new Vector2(54f, 22f);
-                AddButton(buyGo, "购买", () => BuyItem(d));
+                CreateBuyButton(cell, d);
             }
+        }
+
+        private void CreateBuyButton(GameObject cell, DecorationConfig d)
+        {
+            var buyGo = CreateUiObject("buy", cell.transform);
+            var buyRt = buyGo.GetComponent<RectTransform>();
+            buyRt.anchorMin = new Vector2(1f, 0f);
+            buyRt.anchorMax = new Vector2(1f, 0f);
+            buyRt.pivot = new Vector2(1f, 0f);
+            buyRt.anchoredPosition = new Vector2(-3f, 3f);
+            buyRt.sizeDelta = new Vector2(46f, 20f);
+            AddButton(buyGo, "购买", () => BuyItem(d));
         }
 
         private void RefreshTabs()
@@ -438,7 +513,7 @@ namespace WildCourt.UI.Yard
             btn.onClick.AddListener(() => onClick());
             var labelGo = CreateUiObject("label", go.transform);
             SetStretch(labelGo);
-            AddText(labelGo, label, 16, Color.white);
+            AddText(labelGo, label, 14, Color.white);
             return btn;
         }
 
@@ -446,7 +521,7 @@ namespace WildCourt.UI.Yard
         {
             var le = btn.GetComponent<LayoutElement>() ?? btn.gameObject.AddComponent<LayoutElement>();
             le.preferredWidth = width;
-            le.preferredHeight = 26f;
+            le.preferredHeight = 22f;
         }
 
         private static Font LoadFont()
@@ -458,7 +533,7 @@ namespace WildCourt.UI.Yard
     }
 
     /// <summary>
-    /// 装饰格子：长按触发拖放（阶段 C），短按进入放置模式。
+    /// 装饰格子：长按触发拖放放置（阈值见 YardRenderer.LongPressSeconds），短按仅提示。
     /// </summary>
     public class YardItemCell : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {

@@ -187,6 +187,14 @@ namespace WildCourt.Gameplay.Yard
             LayoutChanged?.Invoke();
         }
 
+        /// <summary>镜像切换（水平翻转，与旋转叠加）。</summary>
+        public void MirrorItem(int index)
+        {
+            if (index < 0 || index >= Items.Count) return;
+            Items[index].mirror = !Items[index].mirror;
+            LayoutChanged?.Invoke();
+        }
+
         /// <summary>删除已放置装饰（庭贝不返还，文档 03 §3.9）。</summary>
         public void RemoveItem(int index)
         {
@@ -245,6 +253,7 @@ namespace WildCourt.Gameplay.Yard
             if (Items.Count >= Cap.decorationLimit) return false;
             var d = GetDecoration(item.id);
             if (d == null) return false;
+            if (PlacedCount(item.id) >= d.maxCount) return false;
             var (w, h) = GetSize(d, item.rotation);
             if (item.x < 0 || item.y < 0 || item.x + w > YardWidth || item.y + h > YardHeight) return false;
             for (int i = 0; i < Items.Count; i++)
@@ -259,6 +268,17 @@ namespace WildCourt.Gameplay.Yard
                 if (overlap) return false;
             }
             return true;
+        }
+
+        /// <summary>当前已摆放的指定装饰数量。</summary>
+        private int PlacedCount(string id)
+        {
+            int count = 0;
+            foreach (var item in Items)
+            {
+                if (item.id == id) count++;
+            }
+            return count;
         }
 
         /// <summary>尺寸（旋转 90/270 时宽高交换，文档 03 §3.8）。</summary>

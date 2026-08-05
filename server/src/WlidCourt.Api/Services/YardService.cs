@@ -66,17 +66,30 @@ public class YardService
             }
         }
 
-        // 校验：装饰必须已拥有（inventories 数量 ≥ 1；摆放不消耗，拥有 1 件可重复摆放，文档 03 §3.9）
-        var ownedIds = await _db.Inventories
+        // 校验：装饰必须已拥有，且同 ID 摆放数 ≤ min(拥有数, 配置上限 maxCount)
+        var ownedRows = await _db.Inventories
             .Where(i => i.UserId == userId && i.Count > 0)
-            .Select(i => i.ItemId)
+            .Select(i => new { i.ItemId, i.Count })
             .ToListAsync();
-        var ownedSet = new HashSet<string>(ownedIds, StringComparer.OrdinalIgnoreCase);
+        var ownedMap = ownedRows.ToDictionary(r => r.ItemId, r => r.Count, StringComparer.OrdinalIgnoreCase);
         foreach (var item in items)
         {
-            if (!ownedSet.Contains(item.Id))
+            if (!ownedMap.ContainsKey(item.Id))
             {
                 throw new BusinessException(ApiCodes.BadRequest, $"未拥有装饰: {item.Id}");
+            }
+        }
+
+        var placedCount = items
+            .GroupBy(i => i.Id, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in placedCount)
+        {
+            var deco = byId[kv.Key];
+            int limit = Math.Min(ownedMap[kv.Key], deco.MaxCount);
+            if (kv.Value > limit)
+            {
+                throw new BusinessException(ApiCodes.BadRequest, $"装饰 {kv.Key} 摆放数量超出上限（{limit}）");
             }
         }
 

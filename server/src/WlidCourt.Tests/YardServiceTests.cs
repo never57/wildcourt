@@ -28,9 +28,9 @@ public class YardServiceTests : IDisposable
             "{\"rows\":[{\"level\":1,\"farmlandCount\":6,\"processorSlots\":2,\"foodBowlCapacity\":10,\"decorationLimit\":3,\"showcaseSlots\":3,\"mailboxCapacity\":20,\"unlockCond\":\"Lv1\"}]}");
         File.WriteAllText(Path.Combine(_configDir, "Config_Decorations.json"),
             "{\"rows\":[" +
-            "{\"id\":\"D001\",\"name\":\"枫树\",\"category\":\"景观\",\"price\":100,\"sizeX\":1,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\"}," +
-            "{\"id\":\"D002\",\"name\":\"长凳\",\"category\":\"家具\",\"price\":120,\"sizeX\":2,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\"}," +
-            "{\"id\":\"D003\",\"name\":\"桂花树\",\"category\":\"景观\",\"price\":200,\"sizeX\":2,\"sizeY\":2,\"rotatable\":false,\"acquire\":\"商店\",\"description\":\"\"}" +
+            "{\"id\":\"D001\",\"name\":\"枫树\",\"category\":\"景观\",\"price\":100,\"sizeX\":1,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\",\"maxCount\":2,\"effect\":\"leaves\"}," +
+            "{\"id\":\"D002\",\"name\":\"长凳\",\"category\":\"家具\",\"price\":120,\"sizeX\":2,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\",\"maxCount\":2,\"effect\":\"\"}," +
+            "{\"id\":\"D003\",\"name\":\"桂花树\",\"category\":\"景观\",\"price\":200,\"sizeX\":2,\"sizeY\":2,\"rotatable\":false,\"acquire\":\"商店\",\"description\":\"\",\"maxCount\":2,\"effect\":\"leaves\"}" +
             "]}");
 
         var options = new DbContextOptionsBuilder<WlidCourtDbContext>()
@@ -146,6 +146,32 @@ public class YardServiceTests : IDisposable
 
         var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.SaveLayoutAsync(UserId, 1, items));
         Assert.Equal(ApiCodes.BadRequest, ex.Code);
+    }
+
+    [Fact]
+    public async Task SaveLayout_ExceedsMaxCount_Throws()
+    {
+        // maxCount=2：3 个 D001 先过总数上限（3 ≤ 3），再被同 ID 上限拦下
+        var items = new List<YardItemDto>
+        {
+            Item("D001", 0, 0), Item("D001", 2, 0), Item("D001", 4, 0),
+        };
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.SaveLayoutAsync(UserId, 1, items));
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+    }
+
+    [Fact]
+    public async Task SaveLayout_Mirror_RoundTrips()
+    {
+        var items = new List<YardItemDto> { Item("D001", 0, 0) };
+        items[0].Mirror = true;
+
+        await _service.SaveLayoutAsync(UserId, 1, items);
+        var yard = await _service.GetAsync(UserId);
+
+        var slot = yard.Slots.Single(s => s.SlotIndex == 1);
+        Assert.True(slot.Items.Single().Mirror);
     }
 
     [Fact]

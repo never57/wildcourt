@@ -16,4 +16,6 @@ public class DecorationConfig
     public bool rotatable;       // 是否支持旋转（0°/90°/180°/270°）
     public string acquire;       // 获取方式：商店/节日活动
     public string description;   // 描述
+    public int maxCount = 2;     // 可拥有/可摆放数量上限（当前统一 2）
+    public string effect = "";   // 粒子效果类型（空=无，如 leaves）
 }

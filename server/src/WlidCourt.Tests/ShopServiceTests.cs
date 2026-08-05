@@ -23,8 +23,8 @@ public class ShopServiceTests : IDisposable
         Directory.CreateDirectory(_configDir);
         File.WriteAllText(Path.Combine(_configDir, "Config_Decorations.json"),
             "{\"rows\":[" +
-            "{\"id\":\"D001\",\"name\":\"枫树\",\"category\":\"景观\",\"price\":100,\"sizeX\":1,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\"}," +
-            "{\"id\":\"D013\",\"name\":\"红灯笼\",\"category\":\"节日限定\",\"price\":300,\"sizeX\":1,\"sizeY\":1,\"rotatable\":false,\"acquire\":\"春节活动\",\"description\":\"\"}" +
+            "{\"id\":\"D001\",\"name\":\"枫树\",\"category\":\"景观\",\"price\":100,\"sizeX\":1,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\",\"maxCount\":2,\"effect\":\"leaves\"}," +
+            "{\"id\":\"D013\",\"name\":\"红灯笼\",\"category\":\"节日限定\",\"price\":300,\"sizeX\":1,\"sizeY\":1,\"rotatable\":false,\"acquire\":\"春节活动\",\"description\":\"\",\"maxCount\":2,\"effect\":\"\"}" +
             "]}");
 
         var options = new DbContextOptionsBuilder<WlidCourtDbContext>()
@@ -94,7 +94,21 @@ public class ShopServiceTests : IDisposable
     [Fact]
     public async Task Buy_InsufficientShell_ThrowsAndKeepsState()
     {
-        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.BuyAsync(UserId, "D001", 11, "shell"));
+        (await _db.Users.FindAsync(UserId))!.Shell = 50;
+        await _db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.BuyAsync(UserId, "D001", 1, "shell"));
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+
+        Assert.Equal(50, (await _db.Users.FindAsync(UserId))!.Shell);
+        Assert.Empty(_db.Inventories);
+        Assert.Empty(_db.Transactions);
+    }
+
+    [Fact]
+    public async Task Buy_OverMaxCount_ThrowsAndKeepsState()
+    {
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.BuyAsync(UserId, "D001", 3, "shell"));
         Assert.Equal(ApiCodes.BadRequest, ex.Code);
 
         Assert.Equal(1000, (await _db.Users.FindAsync(UserId))!.Shell);
