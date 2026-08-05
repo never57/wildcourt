@@ -174,8 +174,7 @@ namespace WildCourt.Gameplay.Yard
                 _clickPending = false;
                 if (!overUi)
                 {
-                    var (x, y) = ScreenToCell(Input.mousePosition);
-                    int idx = FindItemAt(x, y);
+                    int idx = FindItemAtScreen(Input.mousePosition);
                     if (idx >= 0)
                     {
                         _moveIndex = idx;
@@ -211,8 +210,7 @@ namespace WildCourt.Gameplay.Yard
                 _clickPending = false;
                 bool overUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
                 if (overUi) return;
-                var (x, y) = ScreenToCell(Input.mousePosition);
-                int idx = FindItemAt(x, y);
+                int idx = FindItemAtScreen(Input.mousePosition);
                 if (idx >= 0) SelectItem(idx);
                 else DeselectItem();
             }
@@ -412,9 +410,7 @@ namespace WildCourt.Gameplay.Yard
 
         public (int X, int Y) ScreenToCell(Vector3 screen)
         {
-            var cam = Camera.main;
-            if (cam == null) return (0, 0);
-            var wp = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, 10f));
+            var wp = ScreenToWorld(screen);
             float a = IsoW * 0.5f;
             float b = IsoH * 0.5f;
             float gx = (wp.x / a + wp.y / b) * 0.5f;
@@ -422,15 +418,27 @@ namespace WildCourt.Gameplay.Yard
             return (Mathf.FloorToInt(gx), Mathf.FloorToInt(gy));
         }
 
+        public Vector3 ScreenToWorld(Vector3 screen)
+        {
+            var cam = Camera.main;
+            if (cam == null) return Vector3.zero;
+            return cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, 10f));
+        }
+
         public static Vector3 IsoToWorld(int x, int y)
         {
             return new Vector3((x - y) * IsoW * 0.5f, (x + y) * IsoH * 0.5f, 0f);
         }
 
-        private int FindItemAt(int x, int y)
+        /// <summary>
+        /// 按“视觉块”命中：以锚点为中心的轴对齐矩形（半宽/半高按配置与旋转，镜像不改变矩形），
+        /// 点击物块任意位置都可命中；重叠时取 x+y 最大的（近下远上）。
+        /// </summary>
+        private int FindItemAtScreen(Vector3 screen)
         {
             var yard = YardManager.Instance;
             if (yard == null) return -1;
+            var wp = ScreenToWorld(screen);
             int best = -1;
             int bestSum = int.MinValue;
             for (int i = 0; i < yard.Items.Count; i++)
@@ -439,7 +447,10 @@ namespace WildCourt.Gameplay.Yard
                 var d = GetDecoration(item.id);
                 if (d == null) continue;
                 var (w, h) = GetSize(d, item.rotation);
-                if (item.x <= x && x < item.x + w && item.y <= y && y < item.y + h && item.x + item.y > bestSum)
+                var center = IsoToWorld(item.x, item.y);
+                if (Mathf.Abs(wp.x - center.x) <= w * 0.5f &&
+                    Mathf.Abs(wp.y - center.y) <= h * 0.5f &&
+                    item.x + item.y > bestSum)
                 {
                     best = i;
                     bestSum = item.x + item.y;
