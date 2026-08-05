@@ -13,6 +13,9 @@ namespace WlidCourt.Api.Services;
 /// </summary>
 public partial class UserService
 {
+    /// <summary>新玩家初始庭贝（阶段 A 联调用；后续随数值配置表规范挪入 Config_*.json）。</summary>
+    public const int InitialShell = 1000;
+
     private readonly WlidCourtDbContext _db;
     private readonly ISessionStore _sessions;
     private readonly YardService _yard;
@@ -51,6 +54,8 @@ public partial class UserService
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(passwordHash),
             Nickname = username,
             Level = 1,
+            Shell = InitialShell,
+            Coupon = 0,
             CreatedAt = DateTime.UtcNow,
         };
         _db.Users.Add(entity);
@@ -106,6 +111,8 @@ public partial class UserService
         ProvinceId = e.ProvinceId,
         CityId = e.CityId,
         Level = e.Level,
+        Shell = e.Shell,
+        Coupon = e.Coupon,
         CreatedAt = e.CreatedAt,
         LastLogin = e.LastLogin,
     };

@@ -49,6 +49,30 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task Register_GrantsInitialCurrency()
+    {
+        var (service, _) = CreateService();
+
+        var user = await service.RegisterAsync("newbie", "password-hash");
+
+        Assert.Equal(UserService.InitialShell, user.Shell);
+        Assert.Equal(0, user.Coupon);
+    }
+
+    [Fact]
+    public async Task GetProfile_ReturnsCurrencyFromRegistration()
+    {
+        var (service, _) = CreateService();
+        var user = await service.RegisterAsync("newbie", "password-hash");
+
+        var profile = await service.GetProfileAsync(user.UserId);
+
+        Assert.NotNull(profile);
+        Assert.Equal(UserService.InitialShell, profile!.Shell);
+        Assert.Equal(0, profile.Coupon);
+    }
+
+    [Fact]
     public async Task Register_InvalidUsername_ThrowsBadRequest()
     {
         var (service, _) = CreateService();

@@ -193,6 +193,10 @@ namespace WlidCourt.Data.Migrations
                         .HasColumnType("int")
                         .HasColumnName("city_id");
 
+                    b.Property<int>("Coupon")
+                        .HasColumnType("int")
+                        .HasColumnName("coupon");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("created_at");
@@ -220,6 +224,10 @@ namespace WlidCourt.Data.Migrations
                     b.Property<int>("ProvinceId")
                         .HasColumnType("int")
                         .HasColumnName("province_id");
+
+                    b.Property<int>("Shell")
+                        .HasColumnType("int")
+                        .HasColumnName("shell");
 
                     b.Property<string>("Username")
                         .IsRequired()

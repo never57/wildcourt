@@ -8,21 +8,21 @@
     },
     {
       "level": 2,
-      "totalExp": 400,
+      "totalExp": 200,
       "yardProgress": 2,
-      "note": "经验曲线待策划表最终确认"
+      "note": "与文档 03 §3.5.1 对齐"
     },
     {
       "level": 3,
-      "totalExp": 900,
+      "totalExp": 600,
       "yardProgress": 3,
-      "note": "经验曲线待策划表最终确认"
+      "note": "与文档 03 §3.5.1 对齐"
     },
     {
       "level": 4,
       "totalExp": 1500,
       "yardProgress": 4,
-      "note": "满级（文档 05 §5.5：满级 1500 EXP）"
+      "note": "满级（与文档 03 §3.5.1 对齐，1500 EXP）"
     }
   ]
 }

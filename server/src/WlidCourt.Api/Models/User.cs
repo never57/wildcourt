@@ -15,6 +15,12 @@ public class User
 
     public int Level { get; set; }
 
+    /// <summary>庭贝（日常软货币，文档 09 §9.1）。</summary>
+    public int Shell { get; set; }
+
+    /// <summary>邮券（活动限定货币，仅活动产出，文档 09 §9.1.1）。</summary>
+    public int Coupon { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime? LastLogin { get; set; }
