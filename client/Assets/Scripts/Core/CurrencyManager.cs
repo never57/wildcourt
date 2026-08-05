@@ -12,6 +12,14 @@ public class CurrencyManager
 
     public event Action<int, int> OnCurrencyChanged;
 
+    /// <summary>服务端快照同步（阶段 C：登录/购买后对齐权威数值）。</summary>
+    public void Set(int shell, int coupon)
+    {
+        Shell = shell;
+        Stamp = coupon;
+        OnCurrencyChanged?.Invoke(Shell, Stamp);
+    }
+
     public void AddShell(int amount)
     {
         if (amount < 0) return;

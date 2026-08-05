@@ -4,6 +4,7 @@ using WlidCourt.Api.Models;
 using WlidCourt.Api.Services;
 using WlidCourt.Api.Utils;
 using WlidCourt.Data.DbContext;
+using WlidCourt.Data.Entities;
 using Xunit;
 
 namespace WlidCourt.Tests;
@@ -15,6 +16,12 @@ public class UserServiceTests
 {
     private static (UserService Service, Mock<ISessionStore> Sessions) CreateService()
     {
+        var (service, sessions, _) = CreateServiceWithDb();
+        return (service, sessions);
+    }
+
+    private static (UserService Service, Mock<ISessionStore> Sessions, WlidCourtDbContext Db) CreateServiceWithDb()
+    {
         var options = new DbContextOptionsBuilder<WlidCourtDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
@@ -22,7 +29,7 @@ public class UserServiceTests
         var sessions = new Mock<ISessionStore>();
         sessions.Setup(s => s.CreateAsync(It.IsAny<long>())).ReturnsAsync("test-token");
         var service = new UserService(db, sessions.Object, CreateYardService(db));
-        return (service, sessions);
+        return (service, sessions, db);
     }
 
     /// <summary>YardService 实例（注册时建默认庭院；配置目录用临时空表）。</summary>
@@ -57,6 +64,34 @@ public class UserServiceTests
 
         Assert.Equal(UserService.InitialShell, user.Shell);
         Assert.Equal(0, user.Coupon);
+    }
+
+    [Fact]
+    public async Task GetInventory_EmptyAfterRegister()
+    {
+        var (service, _, db) = CreateServiceWithDb();
+        var user = await service.RegisterAsync("newbie", "password-hash");
+
+        var inventory = await service.GetInventoryAsync(user.UserId);
+
+        Assert.Empty(inventory.Items);
+        Assert.NotNull(db);
+    }
+
+    [Fact]
+    public async Task GetInventory_ReturnsOwnedItems()
+    {
+        var (service, _, db) = CreateServiceWithDb();
+        var user = await service.RegisterAsync("newbie", "password-hash");
+        db.Inventories.Add(new InventoryEntity { UserId = user.UserId, ItemId = "D001", Count = 2 });
+        db.Inventories.Add(new InventoryEntity { UserId = user.UserId, ItemId = "D013", Count = 0 });
+        await db.SaveChangesAsync();
+
+        var inventory = await service.GetInventoryAsync(user.UserId);
+
+        var item = Assert.Single(inventory.Items);
+        Assert.Equal("D001", item.ItemId);
+        Assert.Equal(2, item.Count);
     }
 
     [Fact]

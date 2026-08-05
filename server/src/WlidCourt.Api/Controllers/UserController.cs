@@ -74,6 +74,14 @@ public class UserController : ControllerBase
         return ApiResponse<LevelResponse>.Ok(new LevelResponse { Level = level, Exp = user?.Exp ?? 0 });
     }
 
+    /// <summary>背包快照（阶段 C：编辑面板“已拥有”状态）。</summary>
+    [HttpGet("inventory")]
+    public async Task<ApiResponse<InventoryResponse>> GetInventory()
+    {
+        var result = await _userService.GetInventoryAsync(GetUserId());
+        return ApiResponse<InventoryResponse>.Ok(result);
+    }
+
     private long GetUserId()
     {
         if (HttpContext.Items.TryGetValue("UserId", out var value) && value is long userId)

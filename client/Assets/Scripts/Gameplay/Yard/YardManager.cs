@@ -149,6 +149,30 @@ namespace WildCourt.Gameplay.Yard
             }
         }
 
+        /// <summary>移动目标位是否合法（阶段 C：拖放预览用，重叠判定排除自身）。</summary>
+        public bool CanMoveTo(int index, int x, int y)
+        {
+            if (index < 0 || index >= Items.Count) return false;
+            var item = Items[index];
+            var d = GetDecoration(item.id);
+            if (d == null) return false;
+            var (w, h) = GetSize(d, item.rotation);
+            if (x < 0 || y < 0 || x + w > YardWidth || y + h > YardHeight) return false;
+
+            for (int i = 0; i < Items.Count; i++)
+            {
+                if (i == index) continue;
+                var other = Items[i];
+                var od = GetDecoration(other.id);
+                if (od == null) continue;
+                var (ow, oh) = GetSize(od, other.rotation);
+                bool overlap = x < other.x + ow && x + w > other.x &&
+                               y < other.y + oh && y + h > other.y;
+                if (overlap) return false;
+            }
+            return true;
+        }
+
         /// <summary>旋转已放置装饰（顺时针 90°，文档 03 §3.9）。</summary>
         public void RotateItem(int index)
         {

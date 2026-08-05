@@ -54,6 +54,21 @@ namespace WildCourt.Net.Protocol
         public int exp;
     }
 
+    /// <summary>背包条目（GET /api/v1/user/inventory，阶段 C“已拥有”状态）。</summary>
+    [Serializable]
+    public class InventoryItem
+    {
+        public string itemId;
+        public int count;
+    }
+
+    /// <summary>背包响应（信封 data）。</summary>
+    [Serializable]
+    public class InventoryResponse
+    {
+        public InventoryItem[] items;
+    }
+
     // ---------- Pet（PetController） ----------
 
     /// <summary>宠物信息（响应 data）。status: 在家 / 派遣中 / 休息中。</summary>

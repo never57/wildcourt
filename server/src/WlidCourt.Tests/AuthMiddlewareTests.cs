@@ -110,6 +110,19 @@ public class AuthMiddlewareTests
     }
 
     [Fact]
+    public async Task NoToken_InventoryPath_Returns401Envelope()
+    {
+        var (middleware, _) = CreateMiddleware();
+
+        var context = CreateContext("/api/v1/user/inventory");
+        await middleware.InvokeAsync(context);
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        var body = System.Text.Encoding.UTF8.GetString(((MemoryStream)context.Response.Body).ToArray());
+        Assert.Contains("\"code\":401", body);
+    }
+
+    [Fact]
     public async Task InvalidToken_Returns401Envelope()
     {
         var (middleware, _) = CreateMiddleware();

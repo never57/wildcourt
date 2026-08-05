@@ -31,4 +31,14 @@ namespace WildCourt.Net.Protocol
         public int count;
         public string currency;
     }
+
+    /// <summary>购买响应（最新余额 + 本次购买，阶段 C 最小购买入口用）。</summary>
+    [Serializable]
+    public class BuyResponse
+    {
+        public int shell;
+        public int coupon;
+        public string itemId;
+        public int count;
+    }
 }

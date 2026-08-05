@@ -104,6 +104,17 @@ public partial class UserService
         return entity == null ? null : ToModel(entity);
     }
 
+    /// <summary>背包快照（阶段 C：编辑面板“已拥有”状态，数量 &gt; 0 才返回）。</summary>
+    public async Task<InventoryResponse> GetInventoryAsync(long userId)
+    {
+        var items = await _db.Inventories
+            .Where(i => i.UserId == userId && i.Count > 0)
+            .OrderBy(i => i.ItemId)
+            .Select(i => new InventoryItemDto { ItemId = i.ItemId, Count = i.Count })
+            .ToListAsync();
+        return new InventoryResponse { Items = items };
+    }
+
     private static User ToModel(UserEntity e) => new()
     {
         UserId = e.UserId,
