@@ -22,7 +22,8 @@ services:
       TZ: Asia/Shanghai
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
-      - mysql_data:/var/lib/mysql
+      # 数据挂载到宿主机 /data/mysql（不使用命名卷，便于直接备份/查看数据文件）
+      - /data/mysql:/var/lib/mysql
     ports:
       - "127.0.0.1:3306:3306"   # 仅本机可达，不暴露公网
     healthcheck:
@@ -64,5 +65,4 @@ services:
       - "5000:5000"   # 测试期公网直连（需云防火墙放行 5000）；正式上线改回 "127.0.0.1:5000:5000" 走 Nginx+HTTPS
 
 volumes:
-  mysql_data:
   redis_data:
