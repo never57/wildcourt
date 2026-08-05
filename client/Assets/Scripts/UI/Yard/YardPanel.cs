@@ -225,7 +225,9 @@ namespace WildCourt.UI.Yard
                     _page = 0;
                     RefreshList();
                 });
-                AddText(tabGo, cat, 15, Color.white);
+                var tabLabelGo = CreateUiObject("label", tabGo.transform);
+                SetStretch(tabLabelGo);
+                AddText(tabLabelGo, cat, 15, Color.white);
                 _tabButtons.Add((btn, img, cat));
             }
 
@@ -404,7 +406,21 @@ namespace WildCourt.UI.Yard
 
         private Text AddText(GameObject go, string content, int size, Color color)
         {
+            // uGUI 限制：一个 GameObject 只能有一个 Graphic（Image/Text/RawImage 互斥），
+            // 已有同类型或添加失败时挂到子节点，避免 AddComponent 返回 null。
+            if (go.GetComponent<Text>() != null)
+            {
+                var child = CreateUiObject("text", go.transform);
+                SetStretch(child);
+                return AddText(child, content, size, color);
+            }
             var text = go.AddComponent<Text>();
+            if (text == null)
+            {
+                var child = CreateUiObject("text", go.transform);
+                SetStretch(child);
+                return AddText(child, content, size, color);
+            }
             text.text = content;
             if (_font != null) text.font = _font;
             text.fontSize = size;
