@@ -316,10 +316,10 @@ namespace WildCourt.UI.Yard
             // 缩放按钮（右上角，不受面板收起影响）
             var zoomOut = CreateUiObject("ZoomOut", transform);
             SetAnchors(zoomOut, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-92f, -12f), new Vector2(-62f, -42f));
-            AddButton(zoomOut, "－", () => Zoom(-1f));
+            AddButton(zoomOut, "－", () => Zoom(-1));
             var zoomIn = CreateUiObject("ZoomIn", transform);
             SetAnchors(zoomIn, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-56f, -12f), new Vector2(-26f, -42f));
-            AddButton(zoomIn, "＋", () => Zoom(1f));
+            AddButton(zoomIn, "＋", () => Zoom(1));
         }
 
         private void TogglePanel(bool show)

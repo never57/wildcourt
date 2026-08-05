@@ -86,7 +86,8 @@ public class YardService
         foreach (var kv in placedCount)
         {
             var deco = byId[kv.Key];
-            int limit = Math.Min(ownedMap[kv.Key], deco.MaxCount);
+            // 拥有 ≥1 即可摆到配置上限 maxCount（不受实际背包数量限制）
+            int limit = deco.MaxCount;
             if (kv.Value > limit)
             {
                 throw new BusinessException(ApiCodes.BadRequest, $"装饰 {kv.Key} 摆放数量超出上限（{limit}）");

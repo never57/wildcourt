@@ -162,6 +162,18 @@ public class YardServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveLayout_OwnedOne_PlacesTwo()
+    {
+        // 拥有 1 件 D001，可摆 2 个（上限 maxCount=2，不受背包数量限制）
+        var items = new List<YardItemDto> { Item("D001", 0, 0), Item("D001", 2, 0) };
+
+        var yard = await _service.SaveLayoutAsync(UserId, 1, items);
+
+        var slot = yard.Slots.Single(s => s.SlotIndex == 1);
+        Assert.Equal(2, slot.Items.Count);
+    }
+
+    [Fact]
     public async Task SaveLayout_Mirror_RoundTrips()
     {
         var items = new List<YardItemDto> { Item("D001", 0, 0) };
