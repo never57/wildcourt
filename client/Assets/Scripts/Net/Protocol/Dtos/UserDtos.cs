@@ -47,6 +47,13 @@ namespace WildCourt.Net.Protocol
         public int exp;
     }
 
+    /// <summary>增加经验请求（联调测试接口 POST /api/v1/user/exp，alpha 阶段）。</summary>
+    [Serializable]
+    public class AddExpRequest
+    {
+        public int exp;
+    }
+
     // ---------- Pet（PetController） ----------
 
     /// <summary>宠物信息（响应 data）。status: 在家 / 派遣中 / 休息中。</summary>

@@ -20,6 +20,10 @@ namespace WildCourt.Gameplay.Yard
     {
         public const int LayoutSlotCount = 3;
 
+        /// <summary>围墙网格尺寸（文档 03 §3.8 边界限制；与服务端 YardService 常量一致，坐标 0~19）。</summary>
+        public const int YardWidth = 20;
+        public const int YardHeight = 20;
+
         /// <summary>编辑模式状态（文档 03 §3.9：放置/移动/旋转/删除）。</summary>
         public enum EditState
         {
@@ -218,6 +222,7 @@ namespace WildCourt.Gameplay.Yard
             var d = GetDecoration(item.id);
             if (d == null) return false;
             var (w, h) = GetSize(d, item.rotation);
+            if (item.x < 0 || item.y < 0 || item.x + w > YardWidth || item.y + h > YardHeight) return false;
             for (int i = 0; i < Items.Count; i++)
             {
                 var other = Items[i];

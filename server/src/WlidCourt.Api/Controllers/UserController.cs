@@ -13,10 +13,12 @@ namespace WlidCourt.Api.Controllers;
 public class UserController : ControllerBase
 {
     private readonly UserService _userService;
+    private readonly PlayerService _playerService;
 
-    public UserController(UserService userService)
+    public UserController(UserService userService, PlayerService playerService)
     {
         _userService = userService;
+        _playerService = playerService;
     }
 
     /// <summary>注册（账号+密码，密码为客户端 SHA256 哈希）。</summary>
@@ -39,7 +41,7 @@ public class UserController : ControllerBase
     [HttpGet("profile")]
     public async Task<ApiResponse<User>> GetProfile()
     {
-        var userId = (long)HttpContext.Items["UserId"]!;
+        var userId = GetUserId();
         var user = await _userService.GetProfileAsync(userId);
         if (user == null)
         {
@@ -48,16 +50,36 @@ public class UserController : ControllerBase
         return ApiResponse<User>.Ok(user);
     }
 
-    /// <summary>玩家等级（当前返回用户等级，EXP 系统待 PlayerService 落实）。</summary>
+    /// <summary>玩家等级与经验（PlayerService 权威）。</summary>
     [HttpGet("level")]
     public async Task<ApiResponse<LevelResponse>> GetLevel()
     {
-        var userId = (long)HttpContext.Items["UserId"]!;
+        var userId = GetUserId();
         var user = await _userService.GetProfileAsync(userId);
         if (user == null)
         {
             throw new BusinessException(ApiCodes.NotFound, "用户不存在");
         }
-        return ApiResponse<LevelResponse>.Ok(new LevelResponse { Level = user.Level, Exp = 0 });
+        var level = await _playerService.GetLevelAsync(userId);
+        return ApiResponse<LevelResponse>.Ok(new LevelResponse { Level = level, Exp = user.Exp });
+    }
+
+    /// <summary>联调测试接口：增加玩家经验并重算等级（alpha 阶段，后续由真实玩法来源替换或收紧）。</summary>
+    [HttpPost("exp")]
+    public async Task<ApiResponse<LevelResponse>> AddExp([FromBody] AddExpRequest request)
+    {
+        var userId = GetUserId();
+        var level = await _playerService.AddExpAsync(userId, request.Exp);
+        var user = await _userService.GetProfileAsync(userId);
+        return ApiResponse<LevelResponse>.Ok(new LevelResponse { Level = level, Exp = user?.Exp ?? 0 });
+    }
+
+    private long GetUserId()
+    {
+        if (HttpContext.Items.TryGetValue("UserId", out var value) && value is long userId)
+        {
+            return userId;
+        }
+        throw new BusinessException(ApiCodes.Unauthorized, "未登录");
     }
 }

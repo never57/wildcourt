@@ -23,3 +23,9 @@ public class LoginResponse
 
     public long UserId { get; set; }
 }
+
+/// <summary>增加经验请求（联调测试接口 POST /api/v1/user/exp，alpha 阶段，后续由真实玩法来源替换）。</summary>
+public class AddExpRequest
+{
+    public int Exp { get; set; }
+}

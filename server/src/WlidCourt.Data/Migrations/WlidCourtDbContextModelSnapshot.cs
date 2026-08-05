@@ -201,6 +201,10 @@ namespace WlidCourt.Data.Migrations
                         .HasColumnType("datetime(6)")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("Exp")
+                        .HasColumnType("int")
+                        .HasColumnName("exp");
+
                     b.Property<DateTime?>("LastLogin")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("last_login");

@@ -61,6 +61,7 @@ public class WlidCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.Level).HasColumnName("level").IsRequired();
             e.Property(x => x.Shell).HasColumnName("shell").IsRequired();
             e.Property(x => x.Coupon).HasColumnName("coupon").IsRequired();
+            e.Property(x => x.Exp).HasColumnName("exp").IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
             e.Property(x => x.LastLogin).HasColumnName("last_login");
         });

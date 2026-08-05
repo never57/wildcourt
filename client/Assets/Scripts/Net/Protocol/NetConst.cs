@@ -10,6 +10,7 @@ namespace WildCourt.Net.Protocol
         public const string UserLogin = Base + "/user/login";
         public const string UserProfile = Base + "/user/profile";
         public const string UserLevel = Base + "/user/level";
+        public const string UserExp = Base + "/user/exp";
 
         // PetController
         public const string PetInfo = Base + "/pet/info";

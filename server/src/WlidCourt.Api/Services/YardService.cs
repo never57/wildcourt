@@ -16,6 +16,10 @@ public class YardService
     private const string DecorationsFile = "Config_Decorations.json";
     public const int LayoutSlotCount = 3;
 
+    /// <summary>围墙网格尺寸（文档 03 §3.8 边界限制；与客户端 YardManager 常量一致，坐标 0~19）。</summary>
+    public const int YardWidth = 20;
+    public const int YardHeight = 20;
+
     private readonly WlidCourtDbContext _db;
     private readonly ConfigService _config;
 
@@ -59,6 +63,30 @@ public class YardService
             if (!byId.ContainsKey(item.Id))
             {
                 throw new BusinessException(ApiCodes.BadRequest, $"装饰不存在: {item.Id}");
+            }
+        }
+
+        // 校验：装饰必须已拥有（inventories 数量 ≥ 1；摆放不消耗，拥有 1 件可重复摆放，文档 03 §3.9）
+        var ownedIds = await _db.Inventories
+            .Where(i => i.UserId == userId && i.Count > 0)
+            .Select(i => i.ItemId)
+            .ToListAsync();
+        var ownedSet = new HashSet<string>(ownedIds, StringComparer.OrdinalIgnoreCase);
+        foreach (var item in items)
+        {
+            if (!ownedSet.Contains(item.Id))
+            {
+                throw new BusinessException(ApiCodes.BadRequest, $"未拥有装饰: {item.Id}");
+            }
+        }
+
+        // 校验：不可超出围墙范围（文档 03 §3.8 边界限制，旋转后尺寸参与计算）
+        foreach (var item in items)
+        {
+            var (x, y, w, h) = GetRect(item, byId);
+            if (x < 0 || y < 0 || x + w > YardWidth || y + h > YardHeight)
+            {
+                throw new BusinessException(ApiCodes.BadRequest, "装饰超出围墙范围");
             }
         }
 
@@ -139,14 +167,7 @@ public class YardService
 
     private static void ValidateNoOverlap(List<YardItemDto> items, Dictionary<string, DecorationConfig> byId)
     {
-        var rects = items.Select(item =>
-        {
-            var d = byId[item.Id];
-            bool swap = d.SizeX != d.SizeY && (item.Rotation == 90 || item.Rotation == 270);
-            int w = swap ? d.SizeY : d.SizeX;
-            int h = swap ? d.SizeX : d.SizeY;
-            return (item, w, h);
-        }).ToList();
+        var rects = items.Select(item => (Item: item, Rect: GetRect(item, byId))).ToList();
 
         for (int i = 0; i < rects.Count; i++)
         {
@@ -154,14 +175,24 @@ public class YardService
             {
                 var a = rects[i];
                 var b = rects[j];
-                bool overlap = a.item.X < b.item.X + b.w && a.item.X + a.w > b.item.X &&
-                               a.item.Y < b.item.Y + b.h && a.item.Y + a.h > b.item.Y;
+                bool overlap = a.Item.X < b.Rect.X + b.Rect.W && a.Item.X + a.Rect.W > b.Rect.X &&
+                               a.Item.Y < b.Rect.Y + b.Rect.H && a.Item.Y + a.Rect.H > b.Rect.Y;
                 if (overlap)
                 {
-                    throw new BusinessException(ApiCodes.BadRequest, $"装饰重叠: {a.item.Id} 与 {b.item.Id}");
+                    throw new BusinessException(ApiCodes.BadRequest, $"装饰重叠: {a.Item.Id} 与 {b.Item.Id}");
                 }
             }
         }
+    }
+
+    /// <summary>计算装饰占格矩形（旋转 90/270 时宽高交换，文档 03 §3.8）。</summary>
+    private static (int X, int Y, int W, int H) GetRect(YardItemDto item, Dictionary<string, DecorationConfig> byId)
+    {
+        var d = byId[item.Id];
+        bool swap = d.SizeX != d.SizeY && (item.Rotation == 90 || item.Rotation == 270);
+        int w = swap ? d.SizeY : d.SizeX;
+        int h = swap ? d.SizeX : d.SizeY;
+        return (item.X, item.Y, w, h);
     }
 
     internal static YardLayout DeserializeLayout(string? layoutJson)

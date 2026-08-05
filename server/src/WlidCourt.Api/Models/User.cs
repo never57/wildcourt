@@ -21,6 +21,9 @@ public class User
     /// <summary>邮券（活动限定货币，仅活动产出，文档 09 §9.1.1）。</summary>
     public int Coupon { get; set; }
 
+    /// <summary>玩家经验（等级由经验驱动，文档 03 §3.5）。</summary>
+    public int Exp { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime? LastLogin { get; set; }

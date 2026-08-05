@@ -29,7 +29,8 @@ public class YardServiceTests : IDisposable
         File.WriteAllText(Path.Combine(_configDir, "Config_Decorations.json"),
             "{\"rows\":[" +
             "{\"id\":\"D001\",\"name\":\"枫树\",\"category\":\"景观\",\"price\":100,\"sizeX\":1,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\"}," +
-            "{\"id\":\"D002\",\"name\":\"长凳\",\"category\":\"家具\",\"price\":120,\"sizeX\":2,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\"}" +
+            "{\"id\":\"D002\",\"name\":\"长凳\",\"category\":\"家具\",\"price\":120,\"sizeX\":2,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\"}," +
+            "{\"id\":\"D003\",\"name\":\"桂花树\",\"category\":\"景观\",\"price\":200,\"sizeX\":2,\"sizeY\":2,\"rotatable\":false,\"acquire\":\"商店\",\"description\":\"\"}" +
             "]}");
 
         var options = new DbContextOptionsBuilder<WlidCourtDbContext>()
@@ -45,6 +46,11 @@ public class YardServiceTests : IDisposable
             Level = 1,
             CreatedAt = DateTime.UtcNow,
         });
+        _db.SaveChanges();
+        // 归属校验前置：拥有 D001 / D002（D003 配置存在但未拥有，用于未拥有用例）
+        _db.Inventories.AddRange(
+            new InventoryEntity { UserId = UserId, ItemId = "D001", Count = 1 },
+            new InventoryEntity { UserId = UserId, ItemId = "D002", Count = 1 });
         _db.SaveChanges();
 
         _service = new YardService(_db, new ConfigService(_configDir));
@@ -107,6 +113,36 @@ public class YardServiceTests : IDisposable
     public async Task SaveLayout_InvalidDecorationId_Throws()
     {
         var items = new List<YardItemDto> { Item("D999", 0, 0) };
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.SaveLayoutAsync(UserId, 1, items));
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+    }
+
+    [Fact]
+    public async Task SaveLayout_OutOfBounds_Throws()
+    {
+        // 1×1 装饰放在 x=20：超出围墙 0~19（文档 03 §3.8 边界限制）
+        var items = new List<YardItemDto> { Item("D001", 20, 0) };
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.SaveLayoutAsync(UserId, 1, items));
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+    }
+
+    [Fact]
+    public async Task SaveLayout_MultiCellDecorationOutOfBounds_Throws()
+    {
+        // D002 为 2×1，x=19 时右缘越界（19+2 > 20）
+        var items = new List<YardItemDto> { Item("D002", 19, 0) };
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.SaveLayoutAsync(UserId, 1, items));
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+    }
+
+    [Fact]
+    public async Task SaveLayout_NotOwnedDecoration_Throws()
+    {
+        // D003 配置存在但玩家未拥有（inventories 无记录）
+        var items = new List<YardItemDto> { Item("D003", 0, 0) };
 
         var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.SaveLayoutAsync(UserId, 1, items));
         Assert.Equal(ApiCodes.BadRequest, ex.Code);

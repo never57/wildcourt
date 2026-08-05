@@ -113,6 +113,7 @@ public partial class UserService
         Level = e.Level,
         Shell = e.Shell,
         Coupon = e.Coupon,
+        Exp = e.Exp,
         CreatedAt = e.CreatedAt,
         LastLogin = e.LastLogin,
     };
