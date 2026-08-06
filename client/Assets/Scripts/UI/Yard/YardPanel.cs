@@ -76,6 +76,7 @@ namespace WildCourt.UI.Yard
                 YardRenderer.Instance.ItemDeselected += OnItemDeselected;
             }
             _yard.Error += OnYardError;
+            _yard.LayoutChanged += OnLayoutChanged;
 
             BuildUI();
             RefreshList();
@@ -90,6 +91,7 @@ namespace WildCourt.UI.Yard
                 YardRenderer.Instance.ItemDeselected -= OnItemDeselected;
             }
             if (_yard != null) _yard.Error -= OnYardError;
+            if (_yard != null) _yard.LayoutChanged -= OnLayoutChanged;
         }
 
         // ---- 数据 ----
@@ -183,6 +185,12 @@ namespace WildCourt.UI.Yard
         private void OnYardError(string msg)
         {
             SetHint(msg);
+        }
+
+        private void OnLayoutChanged()
+        {
+            // 摆放/移动/旋转/切换槽后刷新“已建造”数量
+            RefreshList();
         }
 
         // ---- UI 构建 ----
@@ -372,68 +380,77 @@ namespace WildCourt.UI.Yard
             int start = _page * PageSize;
             for (int i = 0; i < PageSize && start + i < _visible.Count; i++)
             {
-                CreateCell(_visible[start + i], i);
+                CreateCell(_visible[start + i]);
             }
         }
 
-        private void CreateCell(DecorationConfig d, int index)
+        private void CreateCell(DecorationConfig d)
         {
-            bool owned = _owned.TryGetValue(d.id, out var cnt) && cnt > 0;
-            bool full = owned && cnt >= d.maxCount;
+            int owned = _owned.TryGetValue(d.id, out var cnt) ? cnt : 0;
+            int built = CountBuilt(d.id);
+            int remain = d.maxCount - owned;
+            bool canBuy = remain > 0;
+
             var cell = CreateUiObject("cell_" + d.id, _gridRoot);
-            var img = AddImage(cell, owned ? YardRenderer.GetCategoryColor(d.category) : new Color(0.42f, 0.42f, 0.42f, 0.9f));
+            var img = AddImage(cell, owned > 0 ? YardRenderer.GetCategoryColor(d.category) : new Color(0.42f, 0.42f, 0.42f, 0.9f));
             var icon = DecorationSprites.Get(d.id);
             if (icon != null)
             {
                 img.sprite = icon;
-                img.color = owned ? Color.white : new Color(0.62f, 0.62f, 0.62f, 0.9f);
+                img.color = owned > 0 ? Color.white : new Color(0.62f, 0.62f, 0.62f, 0.9f);
             }
 
+            // 顶部：名称
             var nameGo = CreateUiObject("name", cell.transform);
             SetStretch(nameGo);
-            var nameText = AddText(nameGo, d.name, 13, Color.white);
+            var nameText = AddText(nameGo, d.name, 12, Color.white);
             nameText.alignment = TextAnchor.UpperCenter;
 
-            var priceGo = CreateUiObject("price", cell.transform);
-            SetStretch(priceGo);
-            var priceText = AddText(priceGo, owned ? $"拥有 {cnt}/{d.maxCount}" : d.price + " 庭贝", 11, new Color(1f, 0.9f, 0.6f));
-            priceText.alignment = TextAnchor.LowerCenter;
+            // 中间：已建造 X / 拥有 Y
+            var countGo = CreateUiObject("count", cell.transform);
+            SetStretch(countGo);
+            var countText = AddText(countGo, $"已建造 {built}/{owned}", 11, new Color(1f, 0.9f, 0.6f));
+            countText.alignment = TextAnchor.MiddleCenter;
 
-            if (owned)
+            // 右下角：剩余 N / 已满
+            var remainGo = CreateUiObject("remain", cell.transform);
+            var remainRt = remainGo.GetComponent<RectTransform>();
+            remainRt.anchorMin = new Vector2(1f, 0f);
+            remainRt.anchorMax = new Vector2(1f, 0f);
+            remainRt.pivot = new Vector2(1f, 0f);
+            remainRt.anchoredPosition = new Vector2(-4f, 3f);
+            remainRt.sizeDelta = new Vector2(56f, 18f);
+            var remainText = AddText(remainGo, canBuy ? $"剩余 {remain}" : "已满", 10, new Color(0.85f, 0.85f, 0.9f));
+            remainText.alignment = TextAnchor.MiddleRight;
+
+            // 左下：购买按钮（剩余 > 0 时）
+            if (canBuy)
+            {
+                var buyGo = CreateUiObject("buy", cell.transform);
+                var buyRt = buyGo.GetComponent<RectTransform>();
+                buyRt.anchorMin = new Vector2(0f, 0f);
+                buyRt.anchorMax = new Vector2(0f, 0f);
+                buyRt.pivot = new Vector2(0f, 0f);
+                buyRt.anchoredPosition = new Vector2(4f, 3f);
+                buyRt.sizeDelta = new Vector2(44f, 18f);
+                AddButton(buyGo, "购买", () => BuyItem(d));
+            }
+
+            if (owned > 0)
             {
                 cell.AddComponent<YardItemCell>().Init(this, d);
-                if (full)
-                {
-                    var fullGo = CreateUiObject("full", cell.transform);
-                    var fullRt = fullGo.GetComponent<RectTransform>();
-                    fullRt.anchorMin = new Vector2(1f, 0f);
-                    fullRt.anchorMax = new Vector2(1f, 0f);
-                    fullRt.pivot = new Vector2(1f, 0f);
-                    fullRt.anchoredPosition = new Vector2(-4f, 3f);
-                    fullRt.sizeDelta = new Vector2(50f, 18f);
-                    AddText(fullGo, "已满", 11, new Color(0.8f, 0.8f, 0.8f));
-                }
-                else
-                {
-                    CreateBuyButton(cell, d);
-                }
-            }
-            else
-            {
-                CreateBuyButton(cell, d);
             }
         }
 
-        private void CreateBuyButton(GameObject cell, DecorationConfig d)
+        /// <summary>当前方案槽中已摆放的同 ID 装饰数量。</summary>
+        private int CountBuilt(string id)
         {
-            var buyGo = CreateUiObject("buy", cell.transform);
-            var buyRt = buyGo.GetComponent<RectTransform>();
-            buyRt.anchorMin = new Vector2(1f, 0f);
-            buyRt.anchorMax = new Vector2(1f, 0f);
-            buyRt.pivot = new Vector2(1f, 0f);
-            buyRt.anchoredPosition = new Vector2(-3f, 3f);
-            buyRt.sizeDelta = new Vector2(46f, 20f);
-            AddButton(buyGo, "购买", () => BuyItem(d));
+            int count = 0;
+            foreach (var item in _yard.Items)
+            {
+                if (item.id == id) count++;
+            }
+            return count;
         }
 
         private void RefreshTabs()

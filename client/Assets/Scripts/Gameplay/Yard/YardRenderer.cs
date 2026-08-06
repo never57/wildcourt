@@ -56,6 +56,7 @@ namespace WildCourt.Gameplay.Yard
         private GameObject _ghost;
         private SpriteRenderer _ghostRenderer;
         private Sprite _solidSprite;
+        private Sprite _diamondSprite;
         private int _selectedIndex = -1;
         private int _moveIndex = -1;
         private bool _clickPending;
@@ -83,6 +84,7 @@ namespace WildCourt.Gameplay.Yard
                 yard.Error += OnYardError;
             }
             _solidSprite = CreateSolidSprite(Color.white, 4);
+            _diamondSprite = CreateDiamondSprite(Color.white, 16);
             BuildGround();
             Rebuild();
         }
@@ -277,7 +279,7 @@ namespace WildCourt.Gameplay.Yard
             go.transform.SetParent(transform, false);
             var sr = go.AddComponent<SpriteRenderer>();
             var sprite = DecorationSprites.Get(d.id);
-            sr.sprite = sprite != null ? sprite : _solidSprite;
+            sr.sprite = sprite != null ? sprite : _diamondSprite;
             sr.color = sprite != null ? Color.white : GetCategoryColor(d.category);
             sr.sortingOrder = (x + y) * 10;
             var (w, h) = GetSize(d, rotation);
@@ -327,7 +329,7 @@ namespace WildCourt.Gameplay.Yard
             _ground = new GameObject("yard_ground");
             _ground.transform.SetParent(transform, false);
             var sr = _ground.AddComponent<SpriteRenderer>();
-            sr.sprite = _solidSprite;
+            sr.sprite = _diamondSprite;
             sr.color = GrassColor;
             sr.sortingOrder = -1000;
             _ground.transform.localPosition = new Vector3(0f, WorldCenterY, 0f);
@@ -350,7 +352,7 @@ namespace WildCourt.Gameplay.Yard
             var go = new GameObject("wall");
             go.transform.SetParent(transform, false);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = _solidSprite;
+            sr.sprite = _diamondSprite;
             sr.color = WallColor;
             sr.sortingOrder = (x + y) * 10 - 5;
             go.transform.localPosition = IsoToWorld(x, y);
@@ -371,7 +373,7 @@ namespace WildCourt.Gameplay.Yard
                 _ghost = new GameObject("ghost");
                 _ghost.transform.SetParent(transform, false);
                 _ghostRenderer = _ghost.AddComponent<SpriteRenderer>();
-                _ghostRenderer.sprite = _solidSprite;
+                _ghostRenderer.sprite = _diamondSprite;
                 _ghostRenderer.sortingOrder = 9999;
             }
             var (w, h) = GetSize(d, rotation);
@@ -480,6 +482,27 @@ namespace WildCourt.Gameplay.Yard
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             var pixels = new Color[size * size];
             for (int i = 0; i < pixels.Length; i++) pixels[i] = color;
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+        }
+
+        /// <summary>生成菱形贴图（等轴测占位，|dx|+|dy| ≤ r 填充），scale 按 w×h 即得对角线 w×h 的菱形。</summary>
+        private static Sprite CreateDiamondSprite(Color color, int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float center = (size - 1) * 0.5f;
+            float radius = size * 0.5f;
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = Mathf.Abs(x - center);
+                    float dy = Mathf.Abs(y - center);
+                    pixels[y * size + x] = dx + dy <= radius ? color : Color.clear;
+                }
+            }
             tex.SetPixels(pixels);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
