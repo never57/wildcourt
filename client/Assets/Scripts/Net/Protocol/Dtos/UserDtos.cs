@@ -35,6 +35,7 @@ namespace WildCourt.Net.Protocol
         public int provinceId;
         public int cityId;
         public int level;
+        public int exp;           // 玩家经验（详情展示用，服务端已返回）
         public long shell;        // 庭贝
         public long coupon;       // 邮券（仅活动产出，文档 09 §9.1.1）
         public string token;      // 会话 token，登录后注入 NetManager

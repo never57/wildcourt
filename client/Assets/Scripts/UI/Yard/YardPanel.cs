@@ -46,6 +46,7 @@ namespace WildCourt.UI.Yard
         private GameObject _actionBar;
         private GameObject _panelRoot;
         private GameObject _expandButton;
+        private PlayerInfoEntry _infoEntry;
         private Button _prevButton;
         private Button _nextButton;
 
@@ -61,6 +62,7 @@ namespace WildCourt.UI.Yard
 
             var panel = canvasGo.AddComponent<YardPanel>();
             panel.Init(yard);
+            panel._infoEntry = PlayerInfoEntry.Create(canvasGo.transform, null);
             return panel;
         }
 
@@ -101,6 +103,7 @@ namespace WildCourt.UI.Yard
             if (data == null) return;
             _shell = (int)data.shell;
             UpdateShellText();
+            if (_infoEntry != null) _infoEntry.UpdateProfile(data);
         }
 
         public void OnInventoryLoaded(InventoryResponse data)
