@@ -72,5 +72,7 @@ crashlytics-build.properties
 
 # 服务端运行时日志（dotnet run 重定向输出）
 server/*.log
-
+#策划文档
 docs/
+#XLua源码备份
+temp_backup/
