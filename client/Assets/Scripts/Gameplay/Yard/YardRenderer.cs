@@ -278,33 +278,37 @@ namespace WildCourt.Gameplay.Yard
             var go = new GameObject("deco_" + d.id);
             go.transform.SetParent(transform, false);
             var sr = go.AddComponent<SpriteRenderer>();
-            var sprite = DecorationSprites.Get(d.id);
-            sr.sprite = sprite != null ? sprite : _diamondSprite;
-            sr.color = sprite != null ? Color.white : GetCategoryColor(d.category);
+            sr.sprite = _diamondSprite;
+            sr.color = GetCategoryColor(d.category);
             sr.sortingOrder = (x + y) * 10;
             var (w, h) = GetSize(d, rotation);
             go.transform.localPosition = IsoToWorld(x, y);
 
             // 网格单元规格 = 宽 1、高 0.5（2:1 菱形）：占位按 (w, h×0.5)；真实图等比适配进该矩形，不拉伸
             float cellH = h * 0.5f;
-            float scaleX = w * (mirror ? -1f : 1f);
-            float scaleY = cellH;
-            if (sprite != null)
+            float baseScaleX = w * (mirror ? -1f : 1f);
+            go.transform.localScale = new Vector3(baseScaleX, cellH, 1f);
+
+            // 商品图异步加载（StreamingAssets/ui/Decorations/{id}.png）：成功后换图并按原图比例适配
+            GoodsSprites.Request(d.id, (loadedId, sprite) =>
             {
+                if (sprite == null || sr == null) return;
                 var bounds = sprite.bounds.size;
                 float aspect = bounds.x / Mathf.Max(bounds.y, 0.0001f);
-                if (w / cellH > aspect)
+                float sx = baseScaleX;
+                float sy = cellH;
+                if (Mathf.Abs(baseScaleX) / cellH > aspect)
                 {
-                    scaleX = cellH * aspect * (mirror ? -1f : 1f);
-                    scaleY = cellH;
+                    sx = cellH * aspect * (mirror ? -1f : 1f);
                 }
                 else
                 {
-                    scaleX = w * (mirror ? -1f : 1f);
-                    scaleY = w / aspect;
+                    sy = Mathf.Abs(baseScaleX) / aspect;
                 }
-            }
-            go.transform.localScale = new Vector3(scaleX, scaleY, 1f);
+                sr.sprite = sprite;
+                sr.color = Color.white;
+                sr.transform.localScale = new Vector3(sx, sy, 1f);
+            });
 
             if (!string.IsNullOrEmpty(d.effect))
             {

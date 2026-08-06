@@ -393,12 +393,13 @@ namespace WildCourt.UI.Yard
 
             var cell = CreateUiObject("cell_" + d.id, _gridRoot);
             var img = AddImage(cell, owned > 0 ? YardRenderer.GetCategoryColor(d.category) : new Color(0.42f, 0.42f, 0.42f, 0.9f));
-            var icon = DecorationSprites.Get(d.id);
-            if (icon != null)
+            // 商品图异步加载（StreamingAssets/ui/Decorations/{id}.png）：有图换图，无图保持色块
+            GoodsSprites.Request(d.id, (loadedId, sprite) =>
             {
-                img.sprite = icon;
+                if (sprite == null || img == null) return;
+                img.sprite = sprite;
                 img.color = owned > 0 ? Color.white : new Color(0.62f, 0.62f, 0.62f, 0.9f);
-            }
+            });
 
             // 顶部：名称
             var nameGo = CreateUiObject("name", cell.transform);

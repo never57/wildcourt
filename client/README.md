@@ -60,6 +60,18 @@ GameManager.Awake（单例常驻）
 
 17 张表统一 `{ "rows": [...] }` 结构，由 `Excel2JSON.py` 导出（文档 16）。已建骨架：`Config_PlayerLevel.json`（Sheet17）、`Config_YardUnlock.json`（Sheet16），数值为文档上下界插值，**待策划表确认后覆盖**（详见 `config/README.md`）。
 
+## 美术资源形态
+
+资源形态约定（文档 14/19）：
+
+| 资源 | 形态 | 位置/加载 |
+| --- | --- | --- |
+| UI 相关图、地图/地面 | 美术预置静态图/预制体，**提前摆放**到场景或预制体（编辑器可见）；当前无美术时由代码生成占位（`YardPanel.BuildUI`、`YardRenderer.BuildGround`），替换点即这两处 | 场景/预制体 |
+| 商品图（装饰商品图标 + 庭院摆放装饰） | 静态图，有图用图、无图分类色块；**异步加载** | `StreamingAssets/ui/Decorations/{id}.png`，`GoodsSprites.Request(id, cb)`（UnityWebRequestTexture，可热更） |
+| 装饰帧动画 | 暂不做（商品图动态方案已取消） | - |
+
+> 商品图目录后续纳入热更 manifest 增量覆盖（文档 14）。`Resources/Decorations` 为早期占位目录，已不再引用，后续随美术清理。
+
 ## 下一步 TODO
 
 - [ ] 热更链路（文档 14）：`version.txt`/`manifest.json` MD5 对比 → 增量下载 → `LuaManager.HotReload`
