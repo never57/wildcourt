@@ -68,6 +68,9 @@ namespace WildCourt.Gameplay.Yard
         /// <summary>本地三槽缓存（未保存的改动保留在切换槽期间）。</summary>
         private readonly Dictionary<int, List<YardItemDto>> _localSlots = new();
 
+        /// <summary>背包拥有量：itemId → count。</summary>
+        private readonly Dictionary<string, int> _owned = new();
+
         private void Start()
         {
             _decorations = ConfigMgr.Instance.GetTable<DecorationConfig>("Decorations");
@@ -226,6 +229,16 @@ namespace WildCourt.Gameplay.Yard
                 (code, msg) => Error?.Invoke(msg));
         }
 
+        /// <summary>同步背包拥有量（UI 加载背包后调用）。</summary>
+        public void SetOwned(Dictionary<string, int> owned)
+        {
+            _owned.Clear();
+            if (owned != null)
+            {
+                foreach (var kv in owned) _owned[kv.Key] = kv.Value;
+            }
+        }
+
         /// <summary>读取装饰配置（UI 列表用）。</summary>
         public DecorationConfig[] GetDecorations() => _decorations;
 
@@ -253,7 +266,9 @@ namespace WildCourt.Gameplay.Yard
             if (Items.Count >= Cap.decorationLimit) return false;
             var d = GetDecoration(item.id);
             if (d == null) return false;
-            if (PlacedCount(item.id) >= d.maxCount) return false;
+            int owned = _owned.TryGetValue(item.id, out var c) ? c : 0;
+            int limit = Math.Min(owned, d.maxCount);
+            if (PlacedCount(item.id) >= limit) return false;
             var (w, h) = GetSize(d, item.rotation);
             if (item.x < 0 || item.y < 0 || item.x + w > YardWidth || item.y + h > YardHeight) return false;
             for (int i = 0; i < Items.Count; i++)

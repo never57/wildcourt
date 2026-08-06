@@ -81,6 +81,7 @@ namespace WildCourt.UI.Yard
             _yard.LayoutChanged += OnLayoutChanged;
 
             BuildUI();
+            LoadInventory();
             RefreshList();
         }
 
@@ -116,6 +117,7 @@ namespace WildCourt.UI.Yard
                     if (item != null) _owned[item.itemId] = item.count;
                 }
             }
+            if (_yard != null) _yard.SetOwned(_owned);
             RefreshList();
         }
 
