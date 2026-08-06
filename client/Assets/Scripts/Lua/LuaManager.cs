@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using UnityEngine;
 using WildCourt.Core;
 
@@ -20,6 +19,18 @@ namespace WildCourt.Lua
 
         public bool IsInited { get; private set; }
 
+        /// <summary>可热更 Lua 模块白名单（文档 14 §14.1；新增热更脚本需加入此清单）。</summary>
+        public static readonly string[] HotModules =
+        {
+            "Logic.Match.MatchMaker",
+            "Logic.MiniGame.Config_MiniGame",
+            "Logic.SignIn.Config_DailySignIn",
+            "Logic.Activity.Activity_MidAutumn",
+            "Localization.LetterTemplates",
+        };
+
+        private int _hotReloadFailures;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -37,10 +48,33 @@ namespace WildCourt.Lua
 #if USE_XLUA
             var env = LuaEnvHolder.Env;
             IsInited = env != null;
+            if (IsInited)
+            {
+                LoadHotModules();
+            }
             Debug.Log("[LuaManager] XLua 环境初始化完成");
 #else
             IsInited = false;
             Debug.Log("[LuaManager] 未定义 USE_XLUA，以 C# 桩模式运行（详见 client/README.md）");
+#endif
+        }
+
+        /// <summary>上线自检：逐个 require 热更模块并输出结果日志。</summary>
+        public void LoadHotModules()
+        {
+#if USE_XLUA
+            foreach (var module in HotModules)
+            {
+                try
+                {
+                    LuaEnvHolder.Env.DoString($"require('{module}')", "LuaManager.LoadHotModules");
+                    Debug.Log($"[LuaManager] 热更模块加载成功: {module}");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[LuaManager] 热更模块加载失败: {module} :: {e.Message}");
+                }
+            }
 #endif
         }
 
@@ -51,11 +85,31 @@ namespace WildCourt.Lua
         public void HotReload()
         {
             Debug.Log("[LuaManager] HotReload 开始 ...");
-            // TODO(文档 14): 
-            //   1. 卸载旧 Lua 模块（luaenv.Global 中移除重载表）
-            //   2. 重新 require 差异模块（失败 → 回滚上一版本，记录失败次数）
-            //   3. ConfigMgr.Instance.Reload() 重读配置表
-            //   4. 广播 ConfigReloadedEvent，UI 刷新
+#if USE_XLUA
+            bool ok = true;
+            var env = LuaEnvHolder.Env;
+            foreach (var module in HotModules)
+            {
+                try
+                {
+                    // 清 package.loaded 缓存强制重新 require（文件级版本回滚留待完整热更链路）
+                    env.DoString($"package.loaded['{module}'] = nil; require('{module}')", "LuaManager.HotReload");
+                }
+                catch (Exception e)
+                {
+                    ok = false;
+                    Debug.LogError($"[LuaManager] 重载失败: {module} :: {e.Message}");
+                }
+            }
+
+            _hotReloadFailures = ok ? 0 : _hotReloadFailures + 1;
+            if (_hotReloadFailures >= 3)
+            {
+                Debug.LogError("[LuaManager] 热更连续失败 3 次，请检查网络或资源");
+            }
+#else
+            Debug.LogWarning("[LuaManager] 桩模式，跳过 Lua 重载");
+#endif
             ConfigMgr.Instance.Reload();
             EventBus.Publish(new ConfigReloadedEvent());
         }
@@ -84,7 +138,9 @@ namespace WildCourt.Lua
             try
             {
                 var env = LuaEnvHolder.Env;
-                var table = env.Global.GetInPath<LuaTable>(module);
+                // 先 require（CustomLoader 按 . 转 / 查找 Lua 文件），返回值暂存全局便于取表
+                env.DoString($"__wc_module = require('{module}')", "LuaManager.CallFunc");
+                var table = env.Global.Get<LuaTable>("__wc_module");
                 if (table == null)
                 {
                     Debug.LogWarning($"[LuaManager] 模块不存在: {module}");
@@ -121,17 +177,6 @@ namespace WildCourt.Lua
         public void LoadConfig(string tableName)
         {
             ConfigMgr.Instance.GetRawJson(tableName); // 触发 C# 缓存（无则告警）
-        }
-
-        /// <summary>Lua require 自定义加载器（开发期读 Assets/LuaScripts，运行时读 StreamingAssets/lua/ + persistentDataPath）。</summary>
-        private static byte[] CustomLoader(ref string filepath)
-        {
-            string name = filepath.Replace('.', '/') + ".lua";
-            string devPath = Path.Combine(Application.dataPath, "LuaScripts", name);
-            if (File.Exists(devPath)) return File.ReadAllBytes(devPath);
-            string runtimePath = Path.Combine(Application.streamingAssetsPath, "lua", name);
-            if (File.Exists(runtimePath)) return File.ReadAllBytes(runtimePath);
-            return null;
         }
     }
 }

@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEngine;
 
 #if USE_XLUA
@@ -24,11 +25,32 @@ namespace WildCourt.Lua
                 if (_env == null)
                 {
                     _env = new LuaEnv();
-                    // 设置 require 搜索路径（开发期指向 Assets/LuaScripts，热更后优先 persistentDataPath）
-                    // _env.AddLoader(CustomLoader);
+                    // 设置 require 搜索路径：热更优先 persistentDataPath → StreamingAssets/lua → 开发期 Assets/LuaScripts
+                    _env.AddLoader(CustomLoader);
                 }
                 return _env;
             }
+        }
+
+        /// <summary>Lua require 自定义加载器（文档 14：热更后优先 persistentDataPath，其次包内 StreamingAssets，开发期读 Assets/LuaScripts）。</summary>
+        private static byte[] CustomLoader(ref string filepath)
+        {
+            string name = filepath.Replace('.', '/') + ".lua";
+            string[] roots =
+            {
+                Path.Combine(Application.persistentDataPath, "lua"),
+                Path.Combine(Application.streamingAssetsPath, "lua"),
+                Path.Combine(Application.dataPath, "LuaScripts"),
+            };
+            foreach (var root in roots)
+            {
+                string path = Path.Combine(root, name);
+                if (File.Exists(path))
+                {
+                    return File.ReadAllBytes(path);
+                }
+            }
+            return null;
         }
 #else
         /// <summary>未启用 XLua 时返回 null（桩模式）。</summary>
