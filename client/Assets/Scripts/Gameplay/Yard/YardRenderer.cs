@@ -284,7 +284,27 @@ namespace WildCourt.Gameplay.Yard
             sr.sortingOrder = (x + y) * 10;
             var (w, h) = GetSize(d, rotation);
             go.transform.localPosition = IsoToWorld(x, y);
-            go.transform.localScale = new Vector3(w * (mirror ? -1f : 1f), h, 1f);
+
+            // 网格单元规格 = 宽 1、高 0.5（2:1 菱形）：占位按 (w, h×0.5)；真实图等比适配进该矩形，不拉伸
+            float cellH = h * 0.5f;
+            float scaleX = w * (mirror ? -1f : 1f);
+            float scaleY = cellH;
+            if (sprite != null)
+            {
+                var bounds = sprite.bounds.size;
+                float aspect = bounds.x / Mathf.Max(bounds.y, 0.0001f);
+                if (w / cellH > aspect)
+                {
+                    scaleX = cellH * aspect * (mirror ? -1f : 1f);
+                    scaleY = cellH;
+                }
+                else
+                {
+                    scaleX = w * (mirror ? -1f : 1f);
+                    scaleY = w / aspect;
+                }
+            }
+            go.transform.localScale = new Vector3(scaleX, scaleY, 1f);
 
             if (!string.IsNullOrEmpty(d.effect))
             {
@@ -379,7 +399,7 @@ namespace WildCourt.Gameplay.Yard
             var (w, h) = GetSize(d, rotation);
             _ghostRenderer.color = valid ? GhostValidColor : GhostInvalidColor;
             _ghost.transform.localPosition = IsoToWorld(x, y);
-            _ghost.transform.localScale = new Vector3(w * (mirror ? -1f : 1f), h, 1f);
+            _ghost.transform.localScale = new Vector3(w * (mirror ? -1f : 1f), h * 0.5f, 1f);
         }
 
         private void HideGhost()
@@ -451,7 +471,7 @@ namespace WildCourt.Gameplay.Yard
                 var (w, h) = GetSize(d, item.rotation);
                 var center = IsoToWorld(item.x, item.y);
                 if (Mathf.Abs(wp.x - center.x) <= w * 0.5f &&
-                    Mathf.Abs(wp.y - center.y) <= h * 0.5f &&
+                    Mathf.Abs(wp.y - center.y) <= h * 0.25f &&
                     item.x + item.y > bestSum)
                 {
                     best = i;
