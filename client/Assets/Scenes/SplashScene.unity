@@ -529,6 +529,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   nextSceneName: LoginScence
+  loginUIPrefab: {fileID: 1908613855189890309, guid: 9042972aca7fcbd43af96b8c60af7fb5, type: 3}
 --- !u!1 &1525690544
 GameObject:
   m_ObjectHideFlags: 0
