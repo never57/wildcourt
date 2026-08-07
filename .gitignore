@@ -61,3 +61,18 @@ crashlytics-build.properties
 # Reasonix 工具目录（AI 协作配置/技能，不入库）
 .reasonix/
 
+# VSCode 工作区文件（本地个人配置）
+*.code-workspace
+
+# CodeBuddy 工具目录（AI 协作配置/技能，不入库）
+.codebuddy/
+
+# VSCode 本地配置目录
+.vscode/
+
+# 服务端运行时日志（dotnet run 重定向输出）
+server/*.log
+#策划文档
+docs/
+#XLua源码备份
+temp_backup/

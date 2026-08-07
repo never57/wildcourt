@@ -7,11 +7,29 @@
 - **服务端**：同步部署同一份 JSON（.NET 读取，数值与客户端一致）
 - 导出链路与字段定义：见 docs/design/16-数值配置表规范.md
 
-## 17 张表
+## JSON 结构约定
 
-Sheet1 Provinces · Sheet2 Cities · Sheet3 Crops · Sheet4 Fish · Sheet4.1 Bait
-Sheet5 ProcessRecipes · Sheet6 FoodRecipes · Sheet7 Nonfictions · Sheet8 HospitalityWeights
-Sheet9~12 Shop · Sheet13 FriendInteractions · Sheet14 StealMechanics · Sheet15 Badges
-Sheet16 YardUnlock · Sheet17 PlayerLevel
+所有表统一为 `{ "rows": [ { ... }, ... ] }`（与 `ConfigMgr` / `JsonUtil.FromJsonArray` 对齐）。
 
-> 示例：`Config_PlayerLevel.json`（玩家等级曲线，Sheet17）
+## 17 张表清单
+
+| 表 | 文件名 | 状态 |
+| --- | --- | --- |
+| Sheet1 Provinces | `Config_Provinces.json` | ⬜ 待导出 |
+| Sheet2 Cities | `Config_Cities.json` | ⬜ 待导出 |
+| Sheet3 Crops | `Config_Crops.json` | ⬜ 待导出 |
+| Sheet4 Fish | `Config_Fish.json` | ⬜ 待导出 |
+| Sheet4.1 Bait | `Config_Bait.json` | ⬜ 待导出 |
+| Sheet5 ProcessRecipes | `Config_ProcessRecipes.json` | ⬜ 待导出 |
+| Sheet6 FoodRecipes | `Config_FoodRecipes.json` | ⬜ 待导出 |
+| Sheet7 Nonfictions | `Config_Nonfictions.json` | ⬜ 待导出 |
+| Sheet8 HospitalityWeights | `Config_HospitalityWeights.json` | ⬜ 待导出 |
+| Sheet9~12 Shop | `Config_Shop*.json` | ⬜ 待导出 |
+| Sheet13 FriendInteractions | `Config_FriendInteractions.json` | ⬜ 待导出 |
+| Sheet14 StealMechanics | `Config_StealMechanics.json` | ⬜ 待导出 |
+| Sheet15 Badges | `Config_Badges.json` | ⬜ 待导出 |
+| Sheet16 YardUnlock | `Config_YardUnlock.json` | ✅ 已建骨架（数值待策划确认） |
+| Sheet17 PlayerLevel | `Config_PlayerLevel.json` | ✅ 已建骨架（经验曲线待策划确认） |
+
+> 已建骨架的两张表（Sheet16/17）为玩家等级与庭院容量的前置依赖（文档 06 §6.4），
+> 数值为文档约定的上下界插值，正式值由 Excel2JSON.py 导出后覆盖。

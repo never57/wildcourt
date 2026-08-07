@@ -1,0 +1,28 @@
+{
+  "rows": [
+    {
+      "level": 1,
+      "totalExp": 0,
+      "yardProgress": 1,
+      "note": "初始等级"
+    },
+    {
+      "level": 2,
+      "totalExp": 200,
+      "yardProgress": 2,
+      "note": "与文档 03 §3.5.1 对齐"
+    },
+    {
+      "level": 3,
+      "totalExp": 600,
+      "yardProgress": 3,
+      "note": "与文档 03 §3.5.1 对齐"
+    },
+    {
+      "level": 4,
+      "totalExp": 1500,
+      "yardProgress": 4,
+      "note": "满级（与文档 03 §3.5.1 对齐，1500 EXP）"
+    }
+  ]
+}
