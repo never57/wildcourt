@@ -73,7 +73,6 @@ GameManager.Awake（单例常驻）
 > 商品图目录后续纳入热更 manifest 增量覆盖（文档 14）。`Resources/Decorations` 为早期占位目录，已不再引用，后续随美术清理。
 
 ## 下一步 TODO
-
 - [ ] 热更链路（文档 14）：`version.txt`/`manifest.json` MD5 对比 → 增量下载 → `LuaManager.HotReload`
 - [ ] 接入 SignalR 客户端库并注册 ChatHub 回调
 - [ ] 登录/注册流程（`UserController` → `NetManager.SetToken`）
