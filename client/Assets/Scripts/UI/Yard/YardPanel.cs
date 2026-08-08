@@ -39,16 +39,28 @@ namespace WildCourt.UI.Yard
         private string _category = "全部";
         private int _selectedIndex = -1;
 
-        private Text _shellText;
-        private Text _hintText;
-        private Text _pageText;
-        private Transform _gridRoot;
-        private GameObject _actionBar;
-        private GameObject _panelRoot;
-        private GameObject _expandButton;
+        [Header("预制体绑定（有预制体时使用；无预制体走代码生成回退）")]
+        [SerializeField] private Text _shellText;
+        [SerializeField] private Text _hintText;
+        [SerializeField] private Text _pageText;
+        [SerializeField] private Transform _gridRoot;
+        [SerializeField] private GameObject _cellPrefab;
+        [SerializeField] private GameObject _actionBar;
+        [SerializeField] private Button _rotateButton;
+        [SerializeField] private Button _mirrorButton;
+        [SerializeField] private Button _deleteButton;
+        [SerializeField] private GameObject _panelRoot;
+        [SerializeField] private GameObject _expandButton;
+        [SerializeField] private Button _collapseButton;
+        [SerializeField] private Button _prevButton;
+        [SerializeField] private Button _nextButton;
+        [SerializeField] private Button _saveButton;
+        [SerializeField] private Button[] _slotButtons;
+        [SerializeField] private Button _zoomOutButton;
+        [SerializeField] private Button _zoomInButton;
+        [SerializeField] private Button[] _tabButtonsArray;
+        [SerializeField] private Image[] _tabImagesArray;
         private PlayerInfoEntry _infoEntry;
-        private Button _prevButton;
-        private Button _nextButton;
 
         public static YardPanel Create(YardManager yard)
         {
@@ -66,12 +78,106 @@ namespace WildCourt.UI.Yard
             return panel;
         }
 
+        /// <summary>入口：有 YardPanel 预制体则实例化走预制体（提前摆放），否则回退代码生成。</summary>
+        public static YardPanel CreateOrInstantiate(YardManager yard)
+        {
+            var prefab = Resources.Load<GameObject>("Yard/YardPanel");
+            if (prefab != null)
+            {
+                var go = Instantiate(prefab);
+                var panel = go.GetComponent<YardPanel>();
+                if (panel != null)
+                {
+                    panel.InitFromPrefab(yard);
+                    return panel;
+                }
+                Destroy(go);
+            }
+            return Create(yard);
+        }
+
+        /// <summary>预制体路径初始化：UI 结构已在预制体中搭好，这里只做数据绑定与事件接线。</summary>
+        private void InitFromPrefab(YardManager yard)
+        {
+            Instance = this;
+            _yard = yard;
+            _font = LoadFont();
+
+            SubscribeCore();
+
+            if (_tabButtonsArray != null && _tabImagesArray != null)
+            {
+                _tabButtons.Clear();
+                for (int i = 0; i < _tabButtonsArray.Length && i < Categories.Length; i++)
+                {
+                    var cat = Categories[i];
+                    var b = _tabButtonsArray[i];
+                    var im = i < _tabImagesArray.Length ? _tabImagesArray[i] : null;
+                    b.onClick.AddListener(() =>
+                    {
+                        _category = cat;
+                        _page = 0;
+                        RefreshList();
+                    });
+                    _tabButtons.Add((b, im, cat));
+                }
+            }
+
+            _prevButton?.onClick.AddListener(() => ChangePage(-1));
+            _nextButton?.onClick.AddListener(() => ChangePage(1));
+            _saveButton?.onClick.AddListener(() => _yard.SaveLayout());
+            if (_slotButtons != null)
+            {
+                for (int i = 0; i < _slotButtons.Length; i++)
+                {
+                    int slot = i + 1;
+                    var b = _slotButtons[i];
+                    b.onClick.AddListener(() =>
+                    {
+                        _yard.SwitchSlot(slot);
+                        SetHint("当前方案槽 " + slot);
+                    });
+                }
+            }
+            _rotateButton?.onClick.AddListener(() =>
+            {
+                if (_selectedIndex >= 0) _yard.RotateItem(_selectedIndex);
+            });
+            _mirrorButton?.onClick.AddListener(() =>
+            {
+                if (_selectedIndex >= 0) _yard.MirrorItem(_selectedIndex);
+            });
+            _deleteButton?.onClick.AddListener(() =>
+            {
+                if (_selectedIndex >= 0) _yard.RemoveItem(_selectedIndex);
+            });
+            _collapseButton?.onClick.AddListener(() => TogglePanel(false));
+            if (_expandButton != null)
+            {
+                _expandButton.GetComponent<Button>()?.onClick.AddListener(() => TogglePanel(true));
+                _expandButton.SetActive(false);
+            }
+            _zoomOutButton?.onClick.AddListener(() => Zoom(-1));
+            _zoomInButton?.onClick.AddListener(() => Zoom(1));
+
+            LoadInventory();
+            RefreshList();
+        }
         private void Init(YardManager yard)
         {
             Instance = this;
             _yard = yard;
             _font = LoadFont();
 
+            SubscribeCore();
+
+            BuildUI();
+            LoadInventory();
+            RefreshList();
+        }
+
+        private void SubscribeCore()
+        {
             if (YardRenderer.Instance != null)
             {
                 YardRenderer.Instance.ItemSelected += OnItemSelected;
@@ -79,10 +185,6 @@ namespace WildCourt.UI.Yard
             }
             _yard.Error += OnYardError;
             _yard.LayoutChanged += OnLayoutChanged;
-
-            BuildUI();
-            LoadInventory();
-            RefreshList();
         }
 
         private void OnDestroy()
@@ -229,7 +331,7 @@ namespace WildCourt.UI.Yard
             collapseRt.pivot = new Vector2(1f, 0.5f);
             collapseRt.anchoredPosition = new Vector2(-4f, 0f);
             collapseRt.sizeDelta = new Vector2(60f, 20f);
-            AddButton(collapseGo, "收起", () => TogglePanel(false));
+            _collapseButton = AddButton(collapseGo, "收起", () => TogglePanel(false));
 
             var tabRow = CreateUiObject("Tabs", root.transform);
             SetAnchors(tabRow, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(10f, -56f), new Vector2(-10f, -34f));
@@ -275,21 +377,21 @@ namespace WildCourt.UI.Yard
             var actionLayout = _actionBar.AddComponent<HorizontalLayoutGroup>();
             actionLayout.spacing = 6f;
             actionLayout.childAlignment = TextAnchor.MiddleLeft;
-            var rotateBtn = AddButton(CreateUiObject("Rotate", _actionBar.transform), "旋转", () =>
+            _rotateButton = AddButton(CreateUiObject("Rotate", _actionBar.transform), "旋转", () =>
             {
                 if (_selectedIndex >= 0) _yard.RotateItem(_selectedIndex);
             });
-            SetButtonWidth(rotateBtn, 80f);
-            var mirrorBtn = AddButton(CreateUiObject("Mirror", _actionBar.transform), "镜像", () =>
+            SetButtonWidth(_rotateButton, 80f);
+            _mirrorButton = AddButton(CreateUiObject("Mirror", _actionBar.transform), "镜像", () =>
             {
                 if (_selectedIndex >= 0) _yard.MirrorItem(_selectedIndex);
             });
-            SetButtonWidth(mirrorBtn, 80f);
-            var deleteBtn = AddButton(CreateUiObject("Delete", _actionBar.transform), "删除", () =>
+            SetButtonWidth(_mirrorButton, 80f);
+            _deleteButton = AddButton(CreateUiObject("Delete", _actionBar.transform), "删除", () =>
             {
                 if (_selectedIndex >= 0) _yard.RemoveItem(_selectedIndex);
             });
-            SetButtonWidth(deleteBtn, 80f);
+            SetButtonWidth(_deleteButton, 80f);
             _actionBar.SetActive(false);
 
             var footer = CreateUiObject("Footer", root.transform);
@@ -317,8 +419,8 @@ namespace WildCourt.UI.Yard
                 SetButtonWidth(slotBtn, 64f);
             }
 
-            var saveBtn = AddButton(CreateUiObject("Save", footer.transform), "保存", () => _yard.SaveLayout());
-            SetButtonWidth(saveBtn, 80f);
+            _saveButton = AddButton(CreateUiObject("Save", footer.transform), "保存", () => _yard.SaveLayout());
+            SetButtonWidth(_saveButton, 80f);
 
             // 展开按钮（收起后常驻左下角）
             _expandButton = CreateUiObject("Expand", transform);
@@ -329,10 +431,10 @@ namespace WildCourt.UI.Yard
             // 缩放按钮（右上角，不受面板收起影响）
             var zoomOut = CreateUiObject("ZoomOut", transform);
             SetAnchors(zoomOut, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-92f, -12f), new Vector2(-62f, -42f));
-            AddButton(zoomOut, "－", () => Zoom(-1));
+            _zoomOutButton = AddButton(zoomOut, "－", () => Zoom(-1));
             var zoomIn = CreateUiObject("ZoomIn", transform);
             SetAnchors(zoomIn, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-56f, -12f), new Vector2(-26f, -42f));
-            AddButton(zoomIn, "＋", () => Zoom(1));
+            _zoomInButton = AddButton(zoomIn, "＋", () => Zoom(1));
         }
 
         private void TogglePanel(bool show)
@@ -391,6 +493,27 @@ namespace WildCourt.UI.Yard
 
         private void CreateCell(DecorationConfig d)
         {
+            // 预制体路径：格子模板 Instantiate + YardCell 绑定
+            if (_cellPrefab != null && _gridRoot != null)
+            {
+                var cellGo = Instantiate(_cellPrefab, _gridRoot);
+                var cellComp = cellGo.GetComponent<YardCell>();
+                if (cellComp != null)
+                {
+                    int prefOwned = _owned.TryGetValue(d.id, out var prefCnt) ? prefCnt : 0;
+                    int prefBuilt = CountBuilt(d.id);
+                    int prefRemain = d.maxCount - prefOwned;
+                    bool ownedFlag = prefOwned > 0;
+                    cellComp.Bind(d, prefOwned, prefBuilt, prefRemain,
+                        () => BuyItem(d),
+                        ownedFlag ? YardRenderer.GetCategoryColor(d.category) : new Color(0.42f, 0.42f, 0.42f, 0.9f),
+                        ownedFlag);
+                    return;
+                }
+                Destroy(cellGo);
+            }
+
+            // —— 回退：代码建格 ——
             int owned = _owned.TryGetValue(d.id, out var cnt) ? cnt : 0;
             int built = CountBuilt(d.id);
             int remain = d.maxCount - owned;

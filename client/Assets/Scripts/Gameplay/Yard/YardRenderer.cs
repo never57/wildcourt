@@ -348,6 +348,9 @@ namespace WildCourt.Gameplay.Yard
 
         private void BuildGround()
         {
+            // 场景预置地面（挂 YardGround 组件）时不再生成地面/围墙，尊重“提前摆放”
+            if (FindObjectOfType<YardGround>() != null) return;
+
             if (_ground != null) Destroy(_ground);
 
             _ground = new GameObject("yard_ground");
