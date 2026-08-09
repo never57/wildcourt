@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 71c1514a6bd24e1e882cebbe1904ce04, type: 3}
   m_Name: "\u4E91\u5CF0\u9759\u9F99\u884C\u4E66\u5B57\u4F53 SDF"
   m_EditorClassIdentifier: 
-  hashCode: 0
+  hashCode: 1355918558
   material: {fileID: 4755676562072339473}
-  materialHashCode: 0
+  materialHashCode: 1554392126
   m_Version: 1.1.0
   m_SourceFontFileGUID: e427a1ad855a09042940499d101932b0
   m_SourceFontFile_EditorRef: {fileID: 12800000, guid: e427a1ad855a09042940499d101932b0, type: 3}
@@ -417,9 +417,9 @@ Material:
     - _OutlineWidth: 0
     - _PerspectiveFilter: 0.875
     - _Reflectivity: 10
-    - _ScaleRatioA: 1
-    - _ScaleRatioB: 1
-    - _ScaleRatioC: 1
+    - _ScaleRatioA: 0.8333333
+    - _ScaleRatioB: 0.6770833
+    - _ScaleRatioC: 0.6770833
     - _ScaleX: 1
     - _ScaleY: 1
     - _ShaderFlags: 0

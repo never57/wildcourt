@@ -1022,6 +1022,7 @@ MonoBehaviour:
   gotoLoginLink: {fileID: 3879760041607435002}
   statusText: {fileID: 2591508325011012163}
   gameSceneName: MainScene
+  yardPanelPrefab: {fileID: 3786910468004182874, guid: 521f009911fb6404cb1370dbf0574840, type: 3}
 --- !u!114 &7466341717583054709
 MonoBehaviour:
   m_ObjectHideFlags: 0
