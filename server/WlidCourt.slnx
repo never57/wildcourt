@@ -1,7 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/WlidCourt.Api/WlidCourt.Api.csproj" />
-    <Project Path="src/WlidCourt.Data/WlidCourt.Data.csproj" />
-    <Project Path="src/WlidCourt.Tests/WlidCourt.Tests.csproj" />
-  </Folder>
-</Solution>

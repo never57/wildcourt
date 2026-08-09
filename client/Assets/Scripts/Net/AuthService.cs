@@ -3,7 +3,7 @@ using UnityEngine;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
 
-namespace WlidCourt.UI
+namespace WildCourt.UI
 {
     /// <summary>
     /// 认证服务：封装登录/注册 API 请求（.NET 10 Web API：api/v1/user/*）。

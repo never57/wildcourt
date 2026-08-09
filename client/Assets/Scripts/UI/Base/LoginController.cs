@@ -4,7 +4,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using WildCourt.Core;
 
-namespace WlidCourt.UI
+namespace WildCourt.UI
 {
     /// <summary>
     /// 登录/注册控制器。

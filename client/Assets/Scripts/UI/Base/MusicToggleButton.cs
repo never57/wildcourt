@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace WlidCourt.UI
+namespace WildCourt.UI
 {
     /// <summary>
     /// 音乐开关按钮。

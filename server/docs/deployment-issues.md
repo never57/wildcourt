@@ -13,7 +13,7 @@
 | 服务名匹配 | ✅ | `Server=mysql`、`redis:6379` 与 compose 服务名一致 |
 | 端口隔离 | ✅ | MySQL(3306)/Redis(6379) 仅绑定 `127.0.0.1`；api 当前 `5000:5000` 测试期公网直连（云防火墙放行 5000），正式上线收口 `127.0.0.1:5000:5000` 走 Nginx+HTTPS |
 | 启动顺序 | ✅ | `depends_on: service_healthy` 等 MySQL 就绪 → api 启动 → `Migrate()`（失败降级启动，不再崩溃循环） |
-| 配置挂载 | ✅ | `./config:/app/config:ro` + `WLIDCOURT_CONFIG_DIR=/app/config` |
+| 配置挂载 | ✅ | `./config:/app/config:ro` + `WILDCOURT_CONFIG_DIR=/app/config` |
 | 密钥 | ✅ | Production 配置全 `CHANGE_ME` 占位，真实值经 `.env` 注入，不入库不镜像 |
 
 ## 二、上线前必须处理 ⚠️
