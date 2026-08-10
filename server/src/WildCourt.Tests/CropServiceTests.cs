@@ -27,8 +27,15 @@ public class CropServiceTests : IDisposable
             "{\"rows\":[{\"level\":1,\"farmlandCount\":6,\"processorSlots\":2,\"foodBowlCapacity\":10,\"decorationLimit\":3,\"showcaseSlots\":3,\"mailboxCapacity\":20,\"unlockCond\":\"Lv1\"}]}");
         File.WriteAllText(Path.Combine(_configDir, "Config_Crops.json"),
             "{\"rows\":[" +
-            "{\"id\":\"C01\",\"name\":\"小麦\",\"growTime\":5,\"yield\":2,\"sellPrice\":8,\"processTo\":\"\",\"processTime\":0}," +
-            "{\"id\":\"C02\",\"name\":\"玉米\",\"growTime\":10,\"yield\":2,\"sellPrice\":12,\"processTo\":\"\",\"processTime\":0}" +
+            "{\"id\":\"C01\",\"name\":\"小麦\",\"growTime\":20,\"yield\":12,\"sellPrice\":5,\"processTo\":\"面粉\",\"processTime\":3}," +
+            "{\"id\":\"C02\",\"name\":\"胡萝卜\",\"growTime\":30,\"yield\":8,\"sellPrice\":8,\"processTo\":\"\",\"processTime\":0}," +
+            "{\"id\":\"C03\",\"name\":\"棉花\",\"growTime\":40,\"yield\":8,\"sellPrice\":12,\"processTo\":\"丝绸\",\"processTime\":8}" +
+            "]}");
+        File.WriteAllText(Path.Combine(_configDir, "Config_Shop.json"),
+            "{\"rows\":[" +
+            "{\"id\":\"seed_wheat\",\"itemName\":\"小麦种子\",\"category\":\"seed\",\"buyPrice\":2,\"sellPrice\":0,\"unlockCond\":\"商店\",\"effect\":\"\",\"cropId\":\"C01\"}," +
+            "{\"id\":\"seed_carrot\",\"itemName\":\"胡萝卜种子\",\"category\":\"seed\",\"buyPrice\":5,\"sellPrice\":0,\"unlockCond\":\"商店\",\"effect\":\"\",\"cropId\":\"C02\"}," +
+            "{\"id\":\"seed_cotton\",\"itemName\":\"棉花种子\",\"category\":\"seed\",\"buyPrice\":8,\"sellPrice\":0,\"unlockCond\":\"商店\",\"effect\":\"\",\"cropId\":\"C03\"}" +
             "]}");
 
         var options = new DbContextOptionsBuilder<WildCourtDbContext>()
@@ -44,6 +51,9 @@ public class CropServiceTests : IDisposable
             Level = 1,
             CreatedAt = DateTime.UtcNow,
         });
+        _db.Inventories.AddRange(
+            new InventoryEntity { UserId = UserId, ItemId = "seed_wheat", Count = 5 },
+            new InventoryEntity { UserId = UserId, ItemId = "seed_carrot", Count = 1 });
         _db.SaveChanges();
 
         _service = new CropService(_db, new ConfigService(_configDir));
@@ -142,5 +152,47 @@ public class CropServiceTests : IDisposable
         Assert.Equal(2, resp.Plots.Count);
         Assert.Equal("mature", resp.Plots[0].State);  // cell 0 已过期
         Assert.Equal("growing", resp.Plots[1].State); // cell 1 未到期
+    }
+
+    [Fact]
+    public async Task Plant_WithoutSeed_Throws()
+    {
+        // C03 棉花：玩家未持有 seed_cotton
+        var ex = await Assert.ThrowsAsync<BusinessException>(() =>
+            _service.PlantAsync(UserId, 0, "C03", FutureReadyAt(40)));
+
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+        Assert.Contains("种子不足", ex.Message);
+        Assert.Empty(_db.FarmPlots);
+    }
+
+    [Fact]
+    public async Task Plant_WithSeed_DeductsOneAndRecordsTransaction()
+    {
+        await _service.PlantAsync(UserId, 0, "C01", FutureReadyAt(20));
+
+        var inv = await _db.Inventories.SingleAsync(i => i.UserId == UserId && i.ItemId == "seed_wheat");
+        Assert.Equal(4, inv.Count); // 5 - 1
+
+        var tx = Assert.Single(_db.Transactions);
+        Assert.Equal("plant", tx.Type);
+        Assert.Equal("seed_wheat", tx.ItemId);
+        Assert.Equal(-1, tx.Count);
+        Assert.Equal(0, tx.Price);
+    }
+
+    [Fact]
+    public async Task Plant_SeedCountZero_Throws()
+    {
+        var inv = await _db.Inventories.SingleAsync(i => i.UserId == UserId && i.ItemId == "seed_carrot");
+        inv.Count = 0;
+        await _db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() =>
+            _service.PlantAsync(UserId, 0, "C02", FutureReadyAt(30)));
+
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+        Assert.Contains("种子不足", ex.Message);
+        Assert.Empty(_db.FarmPlots);
     }
 }

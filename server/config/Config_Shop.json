@@ -1,0 +1,18 @@
+{
+  "rows": [
+    { "id": "seed_wheat",      "itemName": "小麦种子", "category": "seed", "buyPrice": 2,  "sellPrice": 0, "unlockCond": "商店", "effect": "种出小麦",   "cropId": "C01" },
+    { "id": "seed_carrot",     "itemName": "胡萝卜种子", "category": "seed", "buyPrice": 5,  "sellPrice": 0, "unlockCond": "商店", "effect": "种出胡萝卜", "cropId": "C02" },
+    { "id": "seed_cotton",     "itemName": "棉花种子", "category": "seed", "buyPrice": 8,  "sellPrice": 0, "unlockCond": "商店", "effect": "种出棉花",   "cropId": "C03" },
+    { "id": "seed_bamboo",     "itemName": "竹子种子", "category": "seed", "buyPrice": 10, "sellPrice": 0, "unlockCond": "商店", "effect": "种出竹子",   "cropId": "C04" },
+    { "id": "seed_indigo",     "itemName": "蓝草种子", "category": "seed", "buyPrice": 8,  "sellPrice": 0, "unlockCond": "商店", "effect": "种出蓝草",   "cropId": "C05" },
+    { "id": "seed_mulberry",   "itemName": "桑树种子", "category": "seed", "buyPrice": 12, "sellPrice": 0, "unlockCond": "商店", "effect": "种出桑树",   "cropId": "C06" },
+    { "id": "seed_paulownia",  "itemName": "桐树苗",   "category": "seed", "buyPrice": 15, "sellPrice": 0, "unlockCond": "商店", "effect": "种出桐树",   "cropId": "C07" },
+    { "id": "seed_tea",        "itemName": "茶树种子", "category": "seed", "buyPrice": 18, "sellPrice": 0, "unlockCond": "商店", "effect": "种出茶树",   "cropId": "C08" },
+    { "id": "seed_rice",       "itemName": "水稻种子", "category": "seed", "buyPrice": 12, "sellPrice": 0, "unlockCond": "商店", "effect": "种出水稻",   "cropId": "C09" },
+    { "id": "seed_sugarcane",  "itemName": "甘蔗种子", "category": "seed", "buyPrice": 10, "sellPrice": 0, "unlockCond": "商店", "effect": "种出甘蔗",   "cropId": "C10" },
+    { "id": "seed_flax",       "itemName": "亚麻种子", "category": "seed", "buyPrice": 8,  "sellPrice": 0, "unlockCond": "商店", "effect": "种出亚麻",   "cropId": "C11" },
+    { "id": "seed_citrus",     "itemName": "柑橘种子", "category": "seed", "buyPrice": 20, "sellPrice": 0, "unlockCond": "商店", "effect": "种出柑橘",   "cropId": "C12" },
+    { "id": "seed_blueberry",  "itemName": "蓝莓种子", "category": "seed", "buyPrice": 15, "sellPrice": 0, "unlockCond": "商店", "effect": "种出蓝莓",   "cropId": "C13" },
+    { "id": "seed_grape",      "itemName": "葡萄种子", "category": "seed", "buyPrice": 16, "sellPrice": 0, "unlockCond": "商店", "effect": "种出葡萄",   "cropId": "C14" }
+  ]
+}

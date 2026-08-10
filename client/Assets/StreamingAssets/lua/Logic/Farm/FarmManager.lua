@@ -255,7 +255,7 @@ local function AutoBind()
     local bound = false
     if type(WC) == "table" and type(WC.config) == "table" and WC.config.getRowById then
         provider.getCrop = function(cropId)
-            return WC.config.getRowById("Crop", cropId)
+            return WC.config.getRowById("Crops", cropId)
         end
         bound = true
     end

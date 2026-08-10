@@ -147,14 +147,15 @@ resp = {
 | `getRowById` | `WC.config.getRowById(name, id) -> table|nil` | 按 `id` 字段快速取行（常用快捷方式） |
 
 ```lua
--- 示例：查作物 1001 的配置
-local crop = WC.config.getRowById("Crop", 1001)
+-- 示例：查作物 C01 的配置
+local crop = WC.config.getRowById("Crops", "C01")
 if crop then
-    print("作物名:", crop.name, "生长周期(s):", crop.growSeconds)
+    print("作物名:", crop.name, "生长时间(分钟):", crop.growTime)
 end
 ```
 
 > `name` 与 `Config_*.json` 文件名（去 `Config_` 前缀、`json` 后缀）对应。新增数值表时同时在 `ConfigMgr` 注册加载并登记到本文档。
+> 当前已登记表：`Crops`（Config_Crops.json）、`Shop`（Config_Shop.json）、`Decorations` / `PlayerLevel` / `YardUnlock`。
 
 ---
 
@@ -226,6 +227,25 @@ WC.ui.open("ShopPanel", { shelfId = 1 })
 local h = WC.push.on("CurrencyChanged", function(data)
     print("货币变化:", data.currency, data.delta, "当前:", data.total)
 end)
+```
+
+---
+
+## 5.5 `WC.timer` — 计时器
+
+毫秒级定时器（协程实现，主线程安全），供 Lua 侧做倒计时/延迟回调。
+
+| 方法 | 签名 | 说明 |
+|---|---|---|
+| `setTimeout` | `WC.timer.setTimeout(cb, ms) -> handle` | `ms` 毫秒后执行 `cb`，返回句柄 |
+| `clearTimeout` | `WC.timer.clearTimeout(handle)` | 取消定时器（已执行/已取消时静默） |
+
+```lua
+local handle = WC.timer.setTimeout(function()
+    print("作物成熟！")
+end, 5 * 60 * 1000)
+-- 不再需要时
+WC.timer.clearTimeout(handle)
 ```
 
 ---
@@ -350,6 +370,7 @@ end)
 { "itemId": "D001", "count": 1, "currency": "coin" }
 ```
 > `currency`：`coin`(庭贝) / `ticket`(邮券)。
+> 阶段 B 起 `/buy` 同时支持装饰（Config_Decorations.json）与种子（Config_Shop.json，`category=seed`）；种子无数量上限，装饰仍按 `maxCount` 限制。
 
 ### 7.6 信件 LetterController `api/v1/letter`（骨架，待实现）
 
@@ -481,7 +502,8 @@ LuaManager.Instance.DoFile("Main");  // 对应 Assets/LuaScripts/Main.lua
 
 ## 9. 待办（骨架阶段）
 
-- [ ] `WC` 全局表与 `WC.net` / `WC.config` / `WC.event` / `WC.ui` / `WC.push` 在 `LuaManager` 注册（桥接实现）
+- [x] `WC.net` / `WC.config` / `WC.timer` 桥接已实现（`Scripts/Lua/WCBridge.cs` + `LuaTimerService.cs`，`LuaManager.Init` 自动挂载）
+- [ ] `WC.event` / `WC.ui` / `WC.push` 桥接（待实现）
 - [ ] 各系统 Lua 脚本（匹配 / 签到 / 活动 / 信件）接入上述 API
 - [ ] 服务端 `api.yaml` 补全端点（与 §1.2 / §7 对齐），并启用 Swagger 以便联调
 - [ ] 待实现 Controller（Letter/SignIn/Pet/Friend/Activity/MiniGame/Admin）落地 Service

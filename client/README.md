@@ -59,7 +59,7 @@ GameManager.Awake（单例常驻）
 
 ## 配置表（StreamingAssets/config）
 
-17 张表统一 `{ "rows": [...] }` 结构，由 `Excel2JSON.py` 导出（文档 16）。已建骨架：`Config_PlayerLevel.json`（Sheet17）、`Config_YardUnlock.json`（Sheet16），数值为文档上下界插值，**待策划表确认后覆盖**（详见 `config/README.md`）。
+17 张表统一 `{ "rows": [...] }` 结构，由 `Excel2JSON.py` 导出（文档 16）。已落地：`Config_Crops.json`（Sheet3，14 种作物）、`Config_Shop.json`（Sheet9~12 种子部分）；已建骨架：`Config_PlayerLevel.json`（Sheet17）、`Config_YardUnlock.json`（Sheet16），数值为文档上下界插值，**待策划表确认后覆盖**（详见 `config/README.md`）。
 
 ## 美术资源形态
 

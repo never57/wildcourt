@@ -51,6 +51,7 @@ namespace WildCourt.Lua
             IsInited = env != null;
             if (IsInited)
             {
+                WCBridge.Bind(env);
                 LoadHotModules();
             }
             Debug.Log("[LuaManager] XLua 环境初始化完成");

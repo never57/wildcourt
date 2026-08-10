@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using WildCourt.Core;
+using WildCourt.Lua;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
 using WildCourt.UI.Yard;
@@ -73,6 +74,12 @@ namespace WildCourt.Gameplay.Yard
             else
             {
                 Debug.LogWarning("[Yard] NetManager 不存在，跳过初始数据拉取（请从 Splash/Login 正常进入）");
+            }
+
+            // 种田 Lua 模块：恢复服务端种植并重建倒计时（WC 桥接就绪后生效；桩模式仅日志）
+            if (LuaManager.Instance != null)
+            {
+                LuaManager.Instance.CallFunc<object>("Logic.Farm.FarmManager", "Init");
             }
         }
 

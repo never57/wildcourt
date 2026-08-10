@@ -13,9 +13,11 @@ namespace WildCourt.Api.Services;
 public class CropService
 {
     private const string CropsFile = "Config_Crops.json";
+    private const string ShopFile = "Config_Shop.json";
     private const string YardUnlockFile = "Config_YardUnlock.json";
     private const string GrowingState = "growing";
     private const string MatureState = "mature";
+    private const string SeedCategory = "seed";
 
     private readonly WildCourtDbContext _db;
     private readonly ConfigService _config;
@@ -64,6 +66,20 @@ public class CropService
             throw new BusinessException(ApiCodes.BadRequest, "该农田格已有作物在生长");
         }
 
+        // 种子校验：按作物查商店配置（Config_Shop.json），有种子映射则必须持有 ≥1 个
+        var seed = _config.GetRows<ShopItemConfigRow>(ShopFile)
+            .FirstOrDefault(s => string.Equals(s.CropId, crop.Id, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(s.Category, SeedCategory, StringComparison.OrdinalIgnoreCase));
+        InventoryEntity? seedInventory = null;
+        if (seed != null)
+        {
+            seedInventory = await _db.Inventories.FirstOrDefaultAsync(i => i.UserId == userId && i.ItemId == seed.Id);
+            if (seedInventory == null || seedInventory.Count <= 0)
+            {
+                throw new BusinessException(ApiCodes.BadRequest, $"种子不足（需要 {seed.ItemName}）");
+            }
+        }
+
         var ready = DateTimeOffset.FromUnixTimeSeconds(readyAt).UtcDateTime;
         if (existing == null)
         {
@@ -85,6 +101,20 @@ public class CropService
             existing.ReadyAt = ready;
             existing.State = GrowingState;
             existing.UpdatedAt = now.UtcDateTime;
+        }
+
+        // 消耗 1 颗种子并记账，与种植写入同一次 SaveChangesAsync 原子提交
+        if (seed != null && seedInventory != null)
+        {
+            seedInventory.Count -= 1;
+            _db.Transactions.Add(new TransactionEntity
+            {
+                UserId = userId,
+                Type = "plant",
+                ItemId = seed.Id,
+                Count = -1, // 负值表示消耗
+                Price = 0,
+            });
         }
         await _db.SaveChangesAsync();
 
