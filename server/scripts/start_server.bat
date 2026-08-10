@@ -30,7 +30,7 @@ if errorlevel 1 (
 cd /d "%SERVER_DIR%"
 set "ASPNETCORE_ENVIRONMENT=Development"
 echo [Server] starting on http://localhost:5000 ... (Ctrl+C to stop)
-"%DOTNET_CMD%" run --project src\WlidCourt.Api
+"%DOTNET_CMD%" run --project src\WildCourt.Api
 
 echo.
 echo [Server] stopped. Press any key to close this window...

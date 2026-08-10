@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WildCourt.Api/WildCourt.Api.csproj" />
+    <Project Path="src/WildCourt.Data/WildCourt.Data.csproj" />
+    <Project Path="src/WildCourt.Tests/WildCourt.Tests.csproj" />
+  </Folder>
+</Solution>

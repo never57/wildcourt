@@ -3,8 +3,9 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using WildCourt.Core;
+using WildCourt.UI.Yard;
 
-namespace WlidCourt.UI
+namespace WildCourt.UI
 {
     /// <summary>
     /// 登录/注册控制器。
@@ -38,6 +39,10 @@ namespace WlidCourt.UI
         [Header("跳转场景名")]
         [Tooltip("登录成功后跳转到的场景")]
         public string gameSceneName = "MainScene";
+
+        [Header("预加载")]
+        [Tooltip("拖入 YardPanel Prefab，登录成功后注入 YardPanel.YardPanelPrefab（支持热更）")]
+        public GameObject yardPanelPrefab;
 
         private AuthService _auth;
 
@@ -96,6 +101,7 @@ namespace WlidCourt.UI
                 onSuccess: token =>
                 {
                     ShowStatus("登录成功，正在进入游戏...", new Color(0.4f, 0.8f, 0.4f));
+                    PreloadYardPanel();
                     LoadGameScene();
                 },
                 onError: err =>
@@ -179,6 +185,16 @@ namespace WlidCourt.UI
         }
 
         // ---- 场景跳转 ----
+
+        /// <summary>
+        /// 注入庭院面板预制体引用：仅使用 Inspector 拖入的引用（支持热更）。
+        /// 未拖入则不注入，YardPanel 切场景时视为资源损坏并退出游戏。
+        /// </summary>
+        private void PreloadYardPanel()
+        {
+            if (YardPanel.YardPanelPrefab != null) return;
+            if (yardPanelPrefab != null) YardPanel.YardPanelPrefab = yardPanelPrefab;
+        }
 
         /// <summary>
         /// 登录成功后加载主游戏场景（SampleScene）。

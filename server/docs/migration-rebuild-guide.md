@@ -25,12 +25,12 @@ dotnet tool install --global dotnet-ef
 # 或更新到最新：dotnet tool update --global dotnet-ef
 
 # 删除旧迁移（EF9 + PascalCase）
-Remove-Item -Recurse -Force src/WlidCourt.Data/Migrations
+Remove-Item -Recurse -Force src/WildCourt.Data/Migrations
 
 # 重新生成迁移（snake_case 列名）
 dotnet ef migrations add InitSchema `
-    --project src/WlidCourt.Data `
-    --startup-project src/WlidCourt.Api
+    --project src/WildCourt.Data `
+    --startup-project src/WildCourt.Api
 
 # 构建 + 跑单测（登录闭环测试应全绿）
 dotnet build
@@ -44,11 +44,11 @@ dotnet test
 ```bash
 # 3.1 停服 + 删数据卷（重建库；测试号无需保留，重建后重新注册即可）
 docker compose down
-docker volume ls | grep mysql_data        # 查实际卷名（通常 wlidcourt_mysql_data）
-docker volume rm wlidcourt_mysql_data
+docker volume ls | grep mysql_data        # 查实际卷名（通常 wildcourt_mysql_data）
+docker volume rm wildcourt_mysql_data
 
 # 3.2 上传新代码并重建
-#   （本地把更新后的 server/ 上传到 /opt/wlidcourt/server，含新迁移、csproj、源码）
+#   （本地把更新后的 server/ 上传到 /opt/wildcourt/server，含新迁移、csproj、源码）
 bash cloud_deploy.sh                      # 构建镜像 + 启动 + 自动 Migrate（新表结构）
 ```
 

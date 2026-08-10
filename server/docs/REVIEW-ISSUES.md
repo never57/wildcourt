@@ -39,4 +39,4 @@
 - `ChatHub` 两方法（Hubs/ChatHub.cs）——实现时按文档 02 §2.5 补私聊/通知；鉴权在 Hub 内取 `context.Items["UserId"]`/token
 - `scripts/init_db.sql`：仅建库无建表（建表以 EF Core 迁移为准）
 - 其余 6 张表实体（nonfiction_collections / badges / match_pools / operation_logs / daily_settlements / sign_in_records）
-- `WlidCourt.Tests` 中 Friend/Match/Settlement/Yard 四个占位测试待业务实现后补全
+- `WildCourt.Tests` 中 Friend/Match/Settlement/Yard 四个占位测试待业务实现后补全

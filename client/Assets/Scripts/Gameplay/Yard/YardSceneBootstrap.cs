@@ -48,7 +48,7 @@ namespace WildCourt.Gameplay.Yard
             var host = new GameObject("YardRuntimeHost");
             var yard = host.AddComponent<YardManager>();
             host.AddComponent<YardRenderer>();
-            YardPanel.Create(yard);
+            YardPanel.CreateOrInstantiate(yard);
 
             // 初始数据：余额 → 背包 → 庭院布局
             var net = NetManager.Instance;

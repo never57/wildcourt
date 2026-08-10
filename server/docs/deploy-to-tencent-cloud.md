@@ -6,7 +6,7 @@
 ## 0. 本地现状（已完成）
 
 - .NET 10.0.302 SDK 已安装到 `C:\Users\StarDream\.dotnet`（用户目录，无需管理员权限）。
-- `server/WlidCourt.sln` restore + build 通过（0 错误 0 警告）。
+- `server/WildCourt.sln` restore + build 通过（0 错误 0 警告）。
 - 服务可启动并监听 `http://localhost:5000`（Development/Production 均可，骨架阶段不连库）。
 
 本地日常启动：
@@ -15,7 +15,7 @@
 # Windows 终端（把 .NET 加进 PATH 后可省略完整路径）
 cd server
 set PATH=%USERPROFILE%\.dotnet;%PATH%
-dotnet run --project src/WlidCourt.Api
+dotnet run --project src/WildCourt.Api
 # 或指定环境：set ASPNETCORE_ENVIRONMENT=Development
 ```
 
@@ -26,7 +26,7 @@ dotnet run --project src/WlidCourt.Api
 | 测试 / 几百人在线 | 轻量应用服务器 2核4G | 60~90 元 | 快速起步，自带防火墙/快照 |
 | 正式上线 / 几千人在线 | CVM 4核8G | 200~300 元 | 文档 17.3 建议 |
 
-- 系统：**Ubuntu 22.04/24.04 LTS**（.NET 10 官方支持；`appsettings.Production.json` 的 `/opt/wlidcourt` 路径即 Linux 惯例）。
+- 系统：**Ubuntu 22.04/24.04 LTS**（.NET 10 官方支持；`appsettings.Production.json` 的 `/opt/wildcourt` 路径即 Linux 惯例）。
 - 建议在控制台把系统时区设为 UTC+8（每日结算 Job 04:00 触发）。
 
 ## 2. 中间件（MySQL / Redis）
@@ -46,14 +46,14 @@ dotnet run --project src/WlidCourt.Api
 ```bash
 # 本机（Windows）交叉发布到 linux-x64
 cd server
-dotnet publish src/WlidCourt.Api -c Release -r linux-x64 --self-contained false -o ./publish
+dotnet publish src/WildCourt.Api -c Release -r linux-x64 --self-contained false -o ./publish
 # 或 --self-contained true（服务器免装 .NET，体积更大）
 
 # 上传
-scp -r publish/* user@<服务器IP>:/opt/wlidcourt/
+scp -r publish/* user@<服务器IP>:/opt/wildcourt/
 ```
 
-- 数值配置：`client/Assets/StreamingAssets/config/` 下的 JSON（`Config_PlayerLevel.json`、`Config_YardUnlock.json` 等）同步到 `/opt/wlidcourt/config/`。
+- 数值配置：`client/Assets/StreamingAssets/config/` 下的 JSON（`Config_PlayerLevel.json`、`Config_YardUnlock.json` 等）同步到 `/opt/wildcourt/config/`。
 - 运行依赖 .NET：服务器上安装 SDK 或运行时：`apt install dotnet-sdk-10.0`（微软源）或使用自包含发布。
 
 ## 4. 配置
@@ -64,11 +64,11 @@ scp -r publish/* user@<服务器IP>:/opt/wlidcourt/
   - `Aliyun.AccessKeyId/Secret`：内容审核密钥（继续用阿里云 API 可跨厂商调用；若改用腾讯云内容安全需改 `Utils/AliyunAudit.cs`）
 - 部署时设置环境变量：
   - `ASPNETCORE_ENVIRONMENT=Production`
-  - `WLIDCOURT_CONFIG_DIR=/opt/wlidcourt/config`（Program.cs 已支持覆盖配置目录）
+  - `WILDCOURT_CONFIG_DIR=/opt/wildcourt/config`（Program.cs 已支持覆盖配置目录）
 
 ## 5. 进程托管（systemd）
 
-`/etc/systemd/system/wlidcourt.service`：
+`/etc/systemd/system/wildcourt.service`：
 
 ```ini
 [Unit]
@@ -76,10 +76,10 @@ Description=WildCourt Server
 After=network.target
 
 [Service]
-WorkingDirectory=/opt/wlidcourt
-ExecStart=/usr/bin/dotnet /opt/wlidcourt/WlidCourt.Api.dll
+WorkingDirectory=/opt/wildcourt
+ExecStart=/usr/bin/dotnet /opt/wildcourt/WildCourt.Api.dll
 Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=WLIDCOURT_CONFIG_DIR=/opt/wlidcourt/config
+Environment=WILDCOURT_CONFIG_DIR=/opt/wildcourt/config
 Restart=always
 RestartSec=5
 
@@ -88,7 +88,7 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-systemctl daemon-reload && systemctl enable --now wlidcourt
+systemctl daemon-reload && systemctl enable --now wildcourt
 ```
 
 ## 6. 对外暴露（Nginx + HTTPS）
@@ -131,7 +131,7 @@ server {
 - [ ] `dotnet test` 全绿（业务实现后）
 - [ ] MySQL/Redis 连通性校验通过（Program.cs 目标态步骤 5）
 - [ ] `init_db.sql` / EF Core 迁移已执行
-- [ ] 数值配置 JSON 已同步到 `/opt/wlidcourt/config/`
+- [ ] 数值配置 JSON 已同步到 `/opt/wildcourt/config/`
 - [ ] 时区 UTC+8（每日结算 Job）
 - [ ] Nginx WebSocket 升级头（SignalR ChatHub）
 - [ ] 安全组最小化开放端口
@@ -147,7 +147,7 @@ server {
 # 1) 把 server/ 整个目录（含 Dockerfile、docker-compose.yml、config/）打成包
 #    在项目根：git 已忽略 bin/obj，可直接复制 server/ 目录
 # 2) 上传到服务器（任选其一）
-scp -r server user@<公网IP>:/opt/wlidcourt/          # 若本地有 scp
+scp -r server user@<公网IP>:/opt/wildcourt/          # 若本地有 scp
 # 或本机打包后从控制台/终端上传
 ```
 
@@ -160,13 +160,13 @@ scp -r server user@<公网IP>:/opt/wlidcourt/          # 若本地有 scp
 - **SSH**：本机 `ssh root@<公网IP>`（密码为控制台设置的实例密码；忘记可在控制台重置）
 
 ```bash
-cd /opt/wlidcourt/server
+cd /opt/wildcourt/server
 cp .env.example .env && vim .env          # 改 MYSQL_ROOT_PASSWORD / MYSQL_APP_PASSWORD（强密码）
 docker compose up -d --build              # 构建并启动 mysql + redis + api
 docker compose ps                         # 三个服务都 Up 即成功
 ```
 
-> 上传 `server/` 目录：网页终端可拖拽上传（OrcaTerm 支持），或本机 `scp -r server root@<IP>:/opt/wlidcourt/`。
+> 上传 `server/` 目录：网页终端可拖拽上传（OrcaTerm 支持），或本机 `scp -r server root@<IP>:/opt/wildcourt/`。
 
 ### 9.3 首次建库
 
