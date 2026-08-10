@@ -87,6 +87,7 @@ namespace WildCourt.Gameplay.Crop
                     Debug.Log($"[DebugSceneAutoLogin] 登录成功 user={TestUsername} userId={resp.data.userId}");
                     Debug.Log("[DebugSceneAutoLogin] 可执行调试 Lua（如 require('Logic.Farm.FarmDebug') 后调 Init()/Plant()）");
                     OnLoggedIn?.Invoke(resp.data.token);
+                    EnsureFarmPanelPrefab();
                     FarmPanel.CreateOrInstantiate();
                 },
                 onError: (code, msg) =>
@@ -119,6 +120,20 @@ namespace WildCourt.Gameplay.Crop
                         Debug.LogError($"[DebugSceneAutoLogin] 登录失败 code={code} msg={msg}");
                     }
                 });
+        }
+
+        /// <summary>
+        /// DebugScene 无登录流程（LoginController 不存在），直接注入 FarmPanel 预制体引用
+        /// （Resources 下手工搭建的 FarmPanel.prefab），保证 CreateOrInstantiate 可打开面板。
+        /// </summary>
+        private static void EnsureFarmPanelPrefab()
+        {
+            if (FarmPanel.FarmPanelPrefab != null) return;
+            FarmPanel.FarmPanelPrefab = Resources.Load<GameObject>("Prefabs/UI/Farm/FarmPanel");
+            if (FarmPanel.FarmPanelPrefab == null)
+            {
+                Debug.LogWarning("[DebugSceneAutoLogin] 未找到 FarmPanel 预制体（Resources/Prefabs/UI/Farm/FarmPanel）");
+            }
         }
     }
 }
