@@ -54,11 +54,12 @@ GameManager.Awake（单例常驻）
 | `Logic/MiniGame/Config_MiniGame.lua` | 小游戏配置（文档 10 §10.7） |
 | `Logic/SignIn/Config_DailySignIn.lua` | 签到配置（文档 11 §11.6） |
 | `Logic/Activity/Activity_MidAutumn.lua` | 活动配置示例（文档 13 §13.3） |
+| `Logic/Farm/FarmManager.lua` | 种田逻辑：识别作物/时长、上报结束时间、倒计时成熟提醒（文档 04） |
 | `Localization/LetterTemplates.lua` | 信件模板 T01~T05（文档 07 §7.10） |
 
 ## 配置表（StreamingAssets/config）
 
-17 张表统一 `{ "rows": [...] }` 结构，由 `Excel2JSON.py` 导出（文档 16）。已建骨架：`Config_PlayerLevel.json`（Sheet17）、`Config_YardUnlock.json`（Sheet16），数值为文档上下界插值，**待策划表确认后覆盖**（详见 `config/README.md`）。
+17 张表统一 `{ "rows": [...] }` 结构，由 `Excel2JSON.py` 导出（文档 16）。已落地：`Config_Crops.json`（Sheet3，14 种作物）、`Config_Shop.json`（Sheet9~12 种子部分）；已建骨架：`Config_PlayerLevel.json`（Sheet17）、`Config_YardUnlock.json`（Sheet16），数值为文档上下界插值，**待策划表确认后覆盖**（详见 `config/README.md`）。
 
 ## 美术资源形态
 

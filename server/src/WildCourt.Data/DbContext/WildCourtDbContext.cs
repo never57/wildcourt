@@ -33,6 +33,8 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public DbSet<TransactionEntity> Transactions => Set<TransactionEntity>();
 
+    public DbSet<FarmPlotEntity> FarmPlots => Set<FarmPlotEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureUser(modelBuilder);
@@ -42,6 +44,7 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
         ConfigureInventory(modelBuilder);
         ConfigureYard(modelBuilder);
         ConfigureTransaction(modelBuilder);
+        ConfigureFarmPlot(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -147,6 +150,22 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.ItemId).HasColumnName("item_id").HasMaxLength(64).IsRequired();
             e.Property(x => x.Count).HasColumnName("count").IsRequired();
             e.Property(x => x.Price).HasColumnName("price").IsRequired();
+        });
+    }
+
+    private static void ConfigureFarmPlot(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<FarmPlotEntity>(e =>
+        {
+            e.ToTable("farm_plots");
+            e.HasKey(x => new { x.UserId, x.CellId });
+            e.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            e.Property(x => x.CellId).HasColumnName("cell_id").IsRequired();
+            e.Property(x => x.CropId).HasColumnName("crop_id").HasMaxLength(32).IsRequired();
+            e.Property(x => x.PlantedAt).HasColumnName("planted_at").IsRequired();
+            e.Property(x => x.ReadyAt).HasColumnName("ready_at").IsRequired();
+            e.Property(x => x.State).HasColumnName("state").HasMaxLength(16).IsRequired();
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         });
     }
 }

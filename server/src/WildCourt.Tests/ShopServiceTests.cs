@@ -26,6 +26,10 @@ public class ShopServiceTests : IDisposable
             "{\"id\":\"D001\",\"name\":\"枫树\",\"category\":\"景观\",\"price\":100,\"sizeX\":1,\"sizeY\":1,\"rotatable\":true,\"acquire\":\"商店\",\"description\":\"\",\"maxCount\":2,\"effect\":\"leaves\"}," +
             "{\"id\":\"D013\",\"name\":\"红灯笼\",\"category\":\"节日限定\",\"price\":300,\"sizeX\":1,\"sizeY\":1,\"rotatable\":false,\"acquire\":\"春节活动\",\"description\":\"\",\"maxCount\":2,\"effect\":\"\"}" +
             "]}");
+        File.WriteAllText(Path.Combine(_configDir, "Config_Shop.json"),
+            "{\"rows\":[" +
+            "{\"id\":\"seed_wheat\",\"itemName\":\"小麦种子\",\"category\":\"seed\",\"buyPrice\":2,\"sellPrice\":0,\"unlockCond\":\"商店\",\"effect\":\"种出小麦\",\"cropId\":\"C01\"}" +
+            "]}");
 
         var options = new DbContextOptionsBuilder<WildCourtDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
@@ -56,10 +60,20 @@ public class ShopServiceTests : IDisposable
     {
         var shelves = await _service.GetShelvesAsync();
 
-        var item = Assert.Single(shelves);
-        Assert.Equal("D001", item.Id);
+        var item = shelves.Single(s => s.Id == "D001");
         Assert.Equal("枫树", item.ItemName);
         Assert.Equal(100, item.BuyPrice);
+    }
+
+    [Fact]
+    public async Task GetShelves_ReturnsSeeds()
+    {
+        var shelves = await _service.GetShelvesAsync();
+
+        var seed = shelves.Single(s => s.Id == "seed_wheat");
+        Assert.Equal("小麦种子", seed.ItemName);
+        Assert.Equal("seed", seed.Category);
+        Assert.Equal(2, seed.BuyPrice);
     }
 
     [Fact]
@@ -135,5 +149,44 @@ public class ShopServiceTests : IDisposable
     {
         var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.BuyAsync(UserId, "D001", 0, "shell"));
         Assert.Equal(ApiCodes.BadRequest, ex.Code);
+    }
+
+    [Fact]
+    public async Task Buy_Seed_DeductsShell_AddsInventory()
+    {
+        var result = await _service.BuyAsync(UserId, "seed_wheat", 3, "shell");
+
+        Assert.Equal(994, result.Shell);
+        var inv = await _db.Inventories.SingleAsync(i => i.UserId == UserId && i.ItemId == "seed_wheat");
+        Assert.Equal(3, inv.Count);
+        var tx = Assert.Single(_db.Transactions);
+        Assert.Equal("shop", tx.Type);
+        Assert.Equal("seed_wheat", tx.ItemId);
+        Assert.Equal(6, tx.Price);
+    }
+
+    [Fact]
+    public async Task Buy_Seed_NoMaxCountCap()
+    {
+        var result = await _service.BuyAsync(UserId, "seed_wheat", 100, "shell");
+
+        Assert.Equal(800, result.Shell);
+        var inv = await _db.Inventories.SingleAsync(i => i.UserId == UserId && i.ItemId == "seed_wheat");
+        Assert.Equal(100, inv.Count);
+    }
+
+    [Fact]
+    public async Task Buy_Seed_InsufficientShell_ThrowsAndKeepsState()
+    {
+        (await _db.Users.FindAsync(UserId))!.Shell = 5;
+        await _db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() =>
+            _service.BuyAsync(UserId, "seed_wheat", 3, "shell"));
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+
+        Assert.Equal(5, (await _db.Users.FindAsync(UserId))!.Shell);
+        Assert.Empty(_db.Inventories);
+        Assert.Empty(_db.Transactions);
     }
 }

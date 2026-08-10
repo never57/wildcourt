@@ -35,6 +35,7 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<YardService>();
 builder.Services.AddScoped<PlayerService>();
 builder.Services.AddScoped<ShopService>();
+builder.Services.AddScoped<CropService>();
 
 // 统一 JSON 信封：camelCase 输出 + 大小写不敏感反序列化（对齐客户端小写字段 DTO）
 builder.Services.AddControllers()
