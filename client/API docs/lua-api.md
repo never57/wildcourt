@@ -84,6 +84,8 @@ end)
 |---|---|---|
 | `YardGet` | `/api/v1/yard` | GET |
 | `YardLayout` | `/api/v1/yard/layout` | PUT |
+| `YardPlant` | `/api/v1/yard/plant` | POST |
+| `YardPlots` | `/api/v1/yard/plots` | GET |
 | `YardVisit(id)` | `/api/v1/yard/visit/{id}` | GET |
 
 **活动 ActivityController**
@@ -298,7 +300,19 @@ curl -H "Authorization: Bearer <token>" \
 |---|---|---|---|
 | `GET /` | 我的庭院（3 槽布局+容量） | — | `YardResponse` |
 | `PUT /layout` | 保存某槽布局（服务端校验容量/重叠） | `SaveLayoutRequest`（见下） | `YardResponse` |
+| `POST /plant` | 种植作物（客户端 Lua 计算并上报结束时间） | `PlantCropRequest`（见下） | `FarmPlotDto` |
+| `GET /plots` | 我的农田种植状态（恢复本地倒计时） | — | `FarmPlotsResponse` |
 | `GET /visit/{userId}` | 互访他人庭院 | — | `YardResponse` |
+
+**`PlantCropRequest` 结构**
+```json
+{
+  "cellId": 0,
+  "cropId": "C01",
+  "readyAt": 1789999999
+}
+```
+> `cellId`：农田格（0 起，上限为玩家等级对应的 `farmlandCount`）；`readyAt`：作物结束时间（Unix 秒，客户端按 `now + growTime*60` 计算）。响应 `FarmPlotDto`：`{ cellId, cropId, readyAt, state }`，`state` 为 `growing` / `mature`。
 
 **`SaveLayoutRequest` 结构**
 ```json

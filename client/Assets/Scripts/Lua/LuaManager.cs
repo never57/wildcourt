@@ -26,6 +26,7 @@ namespace WildCourt.Lua
             "Logic.MiniGame.Config_MiniGame",
             "Logic.SignIn.Config_DailySignIn",
             "Logic.Activity.Activity_MidAutumn",
+            "Logic.Farm.FarmManager",
             "Localization.LetterTemplates",
         };
 

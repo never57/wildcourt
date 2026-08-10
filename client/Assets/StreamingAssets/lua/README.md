@@ -22,6 +22,7 @@
 | `Logic.MiniGame.Config_MiniGame` | `lua/Logic/MiniGame/Config_MiniGame.lua` |
 | `Logic.SignIn.Config_DailySignIn` | `lua/Logic/SignIn/Config_DailySignIn.lua` |
 | `Logic.Activity.Activity_MidAutumn` | `lua/Logic/Activity/Activity_MidAutumn.lua` |
+| `Logic.Farm.FarmManager` | `lua/Logic/Farm/FarmManager.lua` |
 | `Localization.LetterTemplates` | `lua/Localization/LetterTemplates.lua` |
 
 新增热更脚本时：放入 `Assets/LuaScripts/` 对应目录并同步到本目录，同时在 `LuaManager.HotModules` 清单中登记 require 路径。

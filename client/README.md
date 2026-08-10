@@ -54,6 +54,7 @@ GameManager.Awake（单例常驻）
 | `Logic/MiniGame/Config_MiniGame.lua` | 小游戏配置（文档 10 §10.7） |
 | `Logic/SignIn/Config_DailySignIn.lua` | 签到配置（文档 11 §11.6） |
 | `Logic/Activity/Activity_MidAutumn.lua` | 活动配置示例（文档 13 §13.3） |
+| `Logic/Farm/FarmManager.lua` | 种田逻辑：识别作物/时长、上报结束时间、倒计时成熟提醒（文档 04） |
 | `Localization/LetterTemplates.lua` | 信件模板 T01~T05（文档 07 §7.10） |
 
 ## 配置表（StreamingAssets/config）

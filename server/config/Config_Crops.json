@@ -1,0 +1,8 @@
+{
+  "rows": [
+    { "id": "C01", "name": "小麦", "growTime": 5,  "yield": 2, "sellPrice": 8,  "processTo": "", "processTime": 0 },
+    { "id": "C02", "name": "玉米", "growTime": 10, "yield": 2, "sellPrice": 12, "processTo": "", "processTime": 0 },
+    { "id": "C03", "name": "番茄", "growTime": 20, "yield": 3, "sellPrice": 15, "processTo": "", "processTime": 0 },
+    { "id": "C04", "name": "草莓", "growTime": 40, "yield": 3, "sellPrice": 25, "processTo": "", "processTime": 0 }
+  ]
+}
