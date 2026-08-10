@@ -10,7 +10,7 @@ namespace WildCourt.Gameplay.Crop
 {
     /// <summary>
     /// DebugScene 自动登录引导（开发用）：进入 Play Mode 时自动注册/登录测试账号并注入 token，
-    /// 让开发者无需登录 UI 即可直接跑 FarmDebug / 种田冒烟。
+    /// 让开发者无需登录 UI 即可在 DebugScene 直接做调试/联调（例如跑 FarmDebug 种田链路、接口联调、庭院调试）。
     /// <para>流程：确保 NetManager/ConfigMgr/LuaManager 就绪 → 登录测试账号
     /// （不存在则先注册）→ SetToken → 触发 <see cref="OnLoggedIn"/>。</para>
     /// <para>使用：Play DebugScene 即可；改账号改 <see cref="TestUsername"/> / <see cref="TestPassword"/>，
@@ -84,7 +84,7 @@ namespace WildCourt.Gameplay.Crop
                 {
                     net.SetToken(resp.data.token);
                     Debug.Log($"[DebugSceneAutoLogin] 登录成功 user={TestUsername} userId={resp.data.userId}");
-                    Debug.Log("[DebugSceneAutoLogin] 可执行: require('Logic.Farm.FarmDebug') 后调 Init()/Plant()");
+                    Debug.Log("[DebugSceneAutoLogin] 可执行调试 Lua（如 require('Logic.Farm.FarmDebug') 后调 Init()/Plant()）");
                     OnLoggedIn?.Invoke(resp.data.token);
                 },
                 onError: (code, msg) =>
