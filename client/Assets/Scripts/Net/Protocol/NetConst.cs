@@ -39,6 +39,8 @@ namespace WildCourt.Net.Protocol
         // YardController
         public const string YardGet = Base + "/yard";
         public const string YardLayout = Base + "/yard/layout";
+        public const string YardPlant = Base + "/yard/plant";
+        public const string YardPlots = Base + "/yard/plots";
         public static string YardVisit(long userId) => Base + $"/yard/visit/{userId}";
 
         // ActivityController

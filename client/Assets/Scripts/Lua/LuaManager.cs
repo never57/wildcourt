@@ -26,6 +26,7 @@ namespace WildCourt.Lua
             "Logic.MiniGame.Config_MiniGame",
             "Logic.SignIn.Config_DailySignIn",
             "Logic.Activity.Activity_MidAutumn",
+            "Logic.Farm.FarmManager",
             "Localization.LetterTemplates",
         };
 
@@ -50,6 +51,7 @@ namespace WildCourt.Lua
             IsInited = env != null;
             if (IsInited)
             {
+                WCBridge.Bind(env);
                 LoadHotModules();
             }
             Debug.Log("[LuaManager] XLua 环境初始化完成");

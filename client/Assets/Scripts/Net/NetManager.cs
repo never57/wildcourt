@@ -89,6 +89,23 @@ namespace WildCourt.Net
             StartCoroutine(SendRequest<T>("PUT", path, bodyJson, onSuccess, onError, maxRetry));
         }
 
+        // ---- 原始文本请求（WC.net 桥接用：Lua 侧自行解析信封，无需预知 DTO 类型） ----
+
+        public void GetRaw(string path, Action<string> onSuccess, Action<int, string> onError = null)
+        {
+            StartCoroutine(SendRaw("GET", path, null, onSuccess, onError, maxRetry));
+        }
+
+        public void PostRaw(string path, string bodyJson, Action<string> onSuccess, Action<int, string> onError = null)
+        {
+            StartCoroutine(SendRaw("POST", path, bodyJson, onSuccess, onError, maxRetry));
+        }
+
+        public void PutRaw(string path, string bodyJson, Action<string> onSuccess, Action<int, string> onError = null)
+        {
+            StartCoroutine(SendRaw("PUT", path, bodyJson, onSuccess, onError, maxRetry));
+        }
+
         private IEnumerator SendRequest<T>(string method, string path, string bodyJson,
             Action<ApiResponse<T>> onSuccess, Action<int, string> onError, int retryLeft)
         {
@@ -161,6 +178,55 @@ namespace WildCourt.Net
                 {
                     onError?.Invoke(envelope.code, envelope.message);
                 }
+            }
+        }
+
+        /// <summary>原始文本请求：token 注入 / 幂等 / 重试与 SendRequest 一致，成功回调返回响应文本。</summary>
+        private IEnumerator SendRaw(string method, string path, string bodyJson,
+            Action<string> onSuccess, Action<int, string> onError, int retryLeft)
+        {
+            using (UnityWebRequest req = new UnityWebRequest(ServerUrl + path, method))
+            {
+                req.certificateHandler = new InsecureCertificateHandler();
+                req.downloadHandler = new DownloadHandlerBuffer();
+                req.timeout = (int)timeoutSeconds;
+                req.SetRequestHeader("Accept", "application/json");
+                if (!string.IsNullOrEmpty(Token))
+                {
+                    req.SetRequestHeader("Authorization", "Bearer " + Token);
+                }
+                if (bodyJson != null)
+                {
+                    req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(bodyJson));
+                    req.SetRequestHeader("Content-Type", "application/json");
+                    req.SetRequestHeader("Idempotency-Key", Guid.NewGuid().ToString("N"));
+                }
+
+                yield return req.SendWebRequest();
+
+                if (req.result == UnityWebRequest.Result.ConnectionError ||
+                    req.result == UnityWebRequest.Result.ProtocolError && req.responseCode == 0)
+                {
+                    EventBus.Publish(new NetDisconnectedEvent { Reason = req.error });
+                    if (retryLeft > 0)
+                    {
+                        StartCoroutine(SendRaw(method, path, bodyJson, onSuccess, onError, retryLeft - 1));
+                        yield break;
+                    }
+                    onError?.Invoke(ApiCodes.NetworkError, req.error);
+                    yield break;
+                }
+
+                string text = req.downloadHandler == null ? null : req.downloadHandler.text;
+                if (req.responseCode < 200 || req.responseCode >= 300)
+                {
+                    var env = string.IsNullOrEmpty(text) ? null : JsonUtil.FromJson<ApiEnvelope>(text);
+                    onError?.Invoke((int)req.responseCode,
+                        env != null && !string.IsNullOrEmpty(env.message) ? env.message : req.error);
+                    yield break;
+                }
+
+                onSuccess?.Invoke(text ?? string.Empty);
             }
         }
 
