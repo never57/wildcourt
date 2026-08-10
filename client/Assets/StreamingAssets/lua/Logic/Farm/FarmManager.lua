@@ -32,6 +32,10 @@ local defaultProvider = {
     sendPlant = nil,
     -- 拉取已有种植：function(cb)，cb(resp)；resp.data = { plots = {...} } 或数组
     fetchPlots = nil,
+    -- 上报收获：function(req, cb)，cb(resp)
+    sendHarvest = nil,
+    -- 上报出售：function(req, cb)，cb(resp)
+    sendSell = nil,
     -- 定时器：function(cb, ms) -> handle（毫秒）
     setTimeout = nil,
     -- 取消定时器：function(handle)
@@ -226,7 +230,7 @@ function M.Init(cb)
     end)
 end
 
---- 收获（本地占位）：清除成熟格子；服务端收获 / 结算留后续接入。
+--- 收获成熟作物：上报服务端（产量入背包并清空格子），成功后清本地状态。
 function M.Harvest(cellId, cb)
     cb = cb or function() end
     cellId = normalizeCellId(cellId)
@@ -234,10 +238,43 @@ function M.Harvest(cellId, cb)
     local p = plots[cellId]
     if not p then return cb(false, "该农田格没有作物") end
     if p.state ~= "mature" then return cb(false, "作物尚未成熟") end
-    if p._timer and provider.clearTimeout then provider.clearTimeout(p._timer) end
-    plots[cellId] = nil
-    provider.log("[FarmManager] 已收获: 格子 " .. cellId)
-    cb(true)
+
+    local send = provider.sendHarvest
+    if not send then
+        return cb(false, "未接入网络层（sendHarvest 未注入）")
+    end
+    send({ cellId = cellId }, function(resp)
+        if not resp or resp.code ~= 0 then
+            return cb(false, (resp and resp.msg) or "收获失败")
+        end
+        if p._timer and provider.clearTimeout then provider.clearTimeout(p._timer) end
+        plots[cellId] = nil
+        provider.log("[FarmManager] 收获成功: 格子 " .. cellId)
+        cb(true, resp.data)
+    end)
+end
+
+--- 出售原始作物换庭贝（服务端校验，仅 Config_Crops 内作物可售）。
+function M.SellCrop(itemId, count, cb)
+    cb = cb or function() end
+    if type(itemId) ~= "string" or itemId == "" then
+        return cb(false, "itemId 不能为空")
+    end
+    count = tonumber(count)
+    if not count or count <= 0 then
+        return cb(false, "出售数量必须大于 0")
+    end
+    local send = provider.sendSell
+    if not send then
+        return cb(false, "未接入网络层（sendSell 未注入）")
+    end
+    send({ itemId = itemId, count = count }, function(resp)
+        if not resp or resp.code ~= 0 then
+            return cb(false, (resp and resp.msg) or "出售失败")
+        end
+        provider.log(string.format("[FarmManager] 出售成功: %s x%d", itemId, count))
+        cb(true, resp.data)
+    end)
 end
 
 --- 推进倒计时（无 setTimeout 注入时由外部每帧调用；有计时器时可省略）。
@@ -260,12 +297,19 @@ local function AutoBind()
         bound = true
     end
     if type(WC) == "table" and type(WC.net) == "table" and WC.net.post
-        and type(WC.net.API) == "table" and WC.net.API.YardPlant and WC.net.API.YardPlots then
+        and type(WC.net.API) == "table" and WC.net.API.YardPlant and WC.net.API.YardPlots
+        and WC.net.API.YardHarvest and WC.net.API.ShopSell then
         provider.sendPlant = function(req, cb)
             WC.net.post(WC.net.API.YardPlant, req, cb)
         end
         provider.fetchPlots = function(cb)
             WC.net.get(WC.net.API.YardPlots, nil, cb)
+        end
+        provider.sendHarvest = function(req, cb)
+            WC.net.post(WC.net.API.YardHarvest, req, cb)
+        end
+        provider.sendSell = function(req, cb)
+            WC.net.post(WC.net.API.ShopSell, req, cb)
         end
         bound = true
     end

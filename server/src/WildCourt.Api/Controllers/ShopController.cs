@@ -34,6 +34,14 @@ public class ShopController : ControllerBase
         return ApiResponse<BuyResponse>.Ok(result);
     }
 
+    /// <summary>出售原始作物换庭贝（文档 09 §9.2：仅原始作物可售）。</summary>
+    [HttpPost("sell")]
+    public async Task<ApiResponse<BuyResponse>> Sell([FromBody] SellRequest request)
+    {
+        var result = await _shopService.SellAsync(GetUserId(), request.ItemId, request.Count);
+        return ApiResponse<BuyResponse>.Ok(result);
+    }
+
     /// <summary>鱼饵货架</summary>
     [HttpGet("bait-shelf")]
     public Task<ApiResponse<List<object>>> GetBaitShelf()

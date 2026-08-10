@@ -77,6 +77,7 @@ end)
 |---|---|---|
 | `ShopShelves` | `/api/v1/shop/shelves` | GET |
 | `ShopBuy` | `/api/v1/shop/buy` | POST |
+| `ShopSell` | `/api/v1/shop/sell` | POST |
 | `ShopBaitShelf` | `/api/v1/shop/bait-shelf` | GET |
 
 **庭院 YardController**
@@ -86,6 +87,7 @@ end)
 | `YardLayout` | `/api/v1/yard/layout` | PUT |
 | `YardPlant` | `/api/v1/yard/plant` | POST |
 | `YardPlots` | `/api/v1/yard/plots` | GET |
+| `YardHarvest` | `/api/v1/yard/harvest` | POST |
 | `YardVisit(id)` | `/api/v1/yard/visit/{id}` | GET |
 
 **活动 ActivityController**
@@ -322,6 +324,7 @@ curl -H "Authorization: Bearer <token>" \
 | `PUT /layout` | 保存某槽布局（服务端校验容量/重叠） | `SaveLayoutRequest`（见下） | `YardResponse` |
 | `POST /plant` | 种植作物（客户端 Lua 计算并上报结束时间） | `PlantCropRequest`（见下） | `FarmPlotDto` |
 | `GET /plots` | 我的农田种植状态（恢复本地倒计时） | — | `FarmPlotsResponse` |
+| `POST /harvest` | 收获成熟作物（产量入背包、清空格子） | `HarvestCropRequest`（见下） | `HarvestResultDto` |
 | `GET /visit/{userId}` | 互访他人庭院 | — | `YardResponse` |
 
 **`PlantCropRequest` 结构**
@@ -333,6 +336,12 @@ curl -H "Authorization: Bearer <token>" \
 }
 ```
 > `cellId`：农田格（0 起，上限为玩家等级对应的 `farmlandCount`）；`readyAt`：作物结束时间（Unix 秒，客户端按 `now + growTime*60` 计算）。响应 `FarmPlotDto`：`{ cellId, cropId, readyAt, state }`，`state` 为 `growing` / `mature`。
+
+**`HarvestCropRequest` 结构**
+```json
+{ "cellId": 0 }
+```
+> 响应 `HarvestResultDto`：`{ cellId, cropId, count }`，`count` 为作物配置产量（Config_Crops.yield），收获后该格立即清空可重种。
 
 **`SaveLayoutRequest` 结构**
 ```json
@@ -363,6 +372,7 @@ end)
 |---|---|---|---|
 | `GET /shelves` | 货架列表（装饰+庭贝） | — | `List<ShelfItem>` |
 | `POST /buy` | 购买（双货币：庭贝/邮券） | `BuyRequest`（见下） | `BuyResponse` |
+| `POST /sell` | 出售原始作物换庭贝 | `SellRequest`（见下） | `BuyResponse` |
 | `GET /bait-shelf` | 鱼饵货架 | — | （待实现） |
 
 **`BuyRequest` 结构**
@@ -371,6 +381,12 @@ end)
 ```
 > `currency`：`coin`(庭贝) / `ticket`(邮券)。
 > 阶段 B 起 `/buy` 同时支持装饰（Config_Decorations.json）与种子（Config_Shop.json，`category=seed`）；种子无数量上限，装饰仍按 `maxCount` 限制。
+
+**`SellRequest` 结构**
+```json
+{ "itemId": "C01", "count": 10 }
+```
+> 仅 `Config_Crops.json` 中的原始作物可出售（种子/装饰/加工产物不可售），售价取 `sellPrice`，响应复用 `BuyResponse`（返回最新庭贝）。
 
 ### 7.6 信件 LetterController `api/v1/letter`（骨架，待实现）
 

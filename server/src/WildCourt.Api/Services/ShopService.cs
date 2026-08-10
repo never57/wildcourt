@@ -11,6 +11,7 @@ namespace WildCourt.Api.Services;
 /// </summary>
 public class ShopService
 {
+    private const string CropsFile = "Config_Crops.json";
     private const string DecorationsFile = "Config_Decorations.json";
     private const string ShopFile = "Config_Shop.json";
     private const string ShopAcquire = "商店";
@@ -137,6 +138,54 @@ public class ShopService
             Shell = user.Shell,
             Coupon = user.Coupon,
             ItemId = itemId,
+            Count = count,
+        };
+    }
+
+    /// <summary>出售原始作物换庭贝（文档 09 §9.2：仅原始作物可售，加工产物不在 Config_Crops）。</summary>
+    public async Task<BuyResponse> SellAsync(long userId, string itemId, int count)
+    {
+        if (count <= 0)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "出售数量必须大于 0");
+        }
+
+        var crop = _config.GetRows<CropConfigRow>(CropsFile)
+            .FirstOrDefault(c => string.Equals(c.Id, itemId, StringComparison.OrdinalIgnoreCase));
+        if (crop == null)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "只能出售原始作物");
+        }
+
+        var inventory = await _db.Inventories.FirstOrDefaultAsync(i => i.UserId == userId && i.ItemId == crop.Id);
+        if (inventory == null || inventory.Count < count)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "背包中该作物数量不足");
+        }
+
+        var user = await _db.Users.FindAsync(userId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "用户不存在");
+
+        var total = crop.SellPrice * count;
+        user.Shell += total;
+        inventory.Count -= count;
+
+        _db.Transactions.Add(new TransactionEntity
+        {
+            UserId = userId,
+            Type = "sell",
+            ItemId = crop.Id,
+            Count = -count, // 负值表示消耗
+            Price = total,
+        });
+
+        await _db.SaveChangesAsync();
+
+        return new BuyResponse
+        {
+            Shell = user.Shell,
+            Coupon = user.Coupon,
+            ItemId = crop.Id,
             Count = count,
         };
     }

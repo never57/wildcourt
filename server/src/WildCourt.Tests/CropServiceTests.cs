@@ -195,4 +195,66 @@ public class CropServiceTests : IDisposable
         Assert.Contains("种子不足", ex.Message);
         Assert.Empty(_db.FarmPlots);
     }
+
+    [Fact]
+    public async Task Harvest_NoPlot_Throws()
+    {
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.HarvestAsync(UserId, 3));
+
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+        Assert.Contains("没有作物", ex.Message);
+    }
+
+    [Fact]
+    public async Task Harvest_NotMature_Throws()
+    {
+        _db.FarmPlots.Add(new FarmPlotEntity
+        {
+            UserId = UserId,
+            CellId = 0,
+            CropId = "C01",
+            PlantedAt = DateTime.UtcNow,
+            ReadyAt = DateTime.UtcNow.AddMinutes(10),
+            State = "growing",
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.HarvestAsync(UserId, 0));
+
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+        Assert.Contains("尚未成熟", ex.Message);
+    }
+
+    [Fact]
+    public async Task Harvest_Mature_AddsYieldAndClearsPlot()
+    {
+        _db.FarmPlots.Add(new FarmPlotEntity
+        {
+            UserId = UserId,
+            CellId = 0,
+            CropId = "C01",
+            PlantedAt = DateTime.UtcNow.AddMinutes(-30),
+            ReadyAt = DateTime.UtcNow.AddMinutes(-1), // 已成熟
+            State = "growing",
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+
+        var result = await _service.HarvestAsync(UserId, 0);
+
+        Assert.Equal(0, result.CellId);
+        Assert.Equal("C01", result.CropId);
+        Assert.Equal(12, result.Count); // 测试配置 C01 yield=12
+
+        var inv = await _db.Inventories.SingleAsync(i => i.UserId == UserId && i.ItemId == "C01");
+        Assert.Equal(12, inv.Count);
+        Assert.Empty(_db.FarmPlots.Where(p => p.UserId == UserId));
+
+        var tx = Assert.Single(_db.Transactions);
+        Assert.Equal("harvest", tx.Type);
+        Assert.Equal("C01", tx.ItemId);
+        Assert.Equal(12, tx.Count);
+        Assert.Equal(0, tx.Price);
+    }
 }

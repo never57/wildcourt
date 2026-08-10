@@ -34,6 +34,7 @@ namespace WildCourt.Net.Protocol
         // ShopController
         public const string ShopShelves = Base + "/shop/shelves";
         public const string ShopBuy = Base + "/shop/buy";
+        public const string ShopSell = Base + "/shop/sell";
         public const string ShopBaitShelf = Base + "/shop/bait-shelf";
 
         // YardController
@@ -41,6 +42,7 @@ namespace WildCourt.Net.Protocol
         public const string YardLayout = Base + "/yard/layout";
         public const string YardPlant = Base + "/yard/plant";
         public const string YardPlots = Base + "/yard/plots";
+        public const string YardHarvest = Base + "/yard/harvest";
         public static string YardVisit(long userId) => Base + $"/yard/visit/{userId}";
 
         // ActivityController

@@ -7,8 +7,8 @@ namespace WildCourt.Api.Services;
 
 /// <summary>
 /// 种田业务（文档 04）：种植上报（客户端 Lua 识别作物并计算结束时间后 POST）、
-/// 种植状态查询。v1 信任客户端上报的 readyAt（仅做合法性校验），
-/// 反作弊重算 / 收获结算留后续。
+/// 种植状态查询、成熟收获（产量入背包并清空格子）。v1 信任客户端上报的 readyAt
+/// （仅做合法性校验），反作弊重算 / 偷菜结算留后续。
 /// </summary>
 public class CropService
 {
@@ -145,6 +145,48 @@ public class CropService
         }).ToList();
 
         return new FarmPlotsResponse { Plots = plots };
+    }
+
+    /// <summary>
+    /// 收获：成熟（readyAt 已过）作物产量入背包并删除种植记录（格子立即可重种），
+    /// 与流水同一次 SaveChangesAsync 原子提交。
+    /// </summary>
+    public async Task<HarvestResultDto> HarvestAsync(long userId, int cellId)
+    {
+        var plot = await _db.FarmPlots.FindAsync(userId, cellId)
+            ?? throw new BusinessException(ApiCodes.BadRequest, "该农田格没有作物");
+        if (plot.ReadyAt > DateTime.UtcNow)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "作物尚未成熟");
+        }
+
+        var crop = _config.GetRows<CropConfigRow>(CropsFile)
+            .FirstOrDefault(c => string.Equals(c.Id, plot.CropId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new BusinessException(ApiCodes.BadRequest, $"作物配置缺失: {plot.CropId}");
+
+        var inventory = await _db.Inventories.FirstOrDefaultAsync(i => i.UserId == userId && i.ItemId == crop.Id);
+        if (inventory == null)
+        {
+            _db.Inventories.Add(new InventoryEntity { UserId = userId, ItemId = crop.Id, Count = crop.Yield });
+        }
+        else
+        {
+            inventory.Count += crop.Yield;
+        }
+
+        _db.Transactions.Add(new TransactionEntity
+        {
+            UserId = userId,
+            Type = "harvest",
+            ItemId = crop.Id,
+            Count = crop.Yield,
+            Price = 0,
+        });
+
+        _db.FarmPlots.Remove(plot);
+        await _db.SaveChangesAsync();
+
+        return new HarvestResultDto { CellId = cellId, CropId = crop.Id, Count = crop.Yield };
     }
 
     /// <summary>按玩家等级取庭院/农田容量（Config_YardUnlock.json；查不到按满级兜底）。</summary>

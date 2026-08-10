@@ -23,6 +23,14 @@ public class BuyResponse
     public int Count { get; set; }
 }
 
+/// <summary>出售请求（POST /api/v1/shop/sell，仅 Config_Crops 原始作物可售）。</summary>
+public class SellRequest
+{
+    public string ItemId { get; set; } = string.Empty;
+
+    public int Count { get; set; } = 1;
+}
+
 /// <summary>货架商品（Sheet9~12 Shop；阶段 B 只实现装饰货架）。</summary>
 public class ShelfItem
 {
