@@ -1,0 +1,5 @@
+{
+  "rows": [
+    { "stealRatio": 0.3, "dailyLimitPerCrop": 1, "dailyLimitTotal": 20, "matureOnly": true, "protectionDuration": 24 }
+  ]
+}

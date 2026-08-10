@@ -52,6 +52,14 @@ public class YardController : ControllerBase
         return ApiResponse<FarmPlotDto>.Ok(plot);
     }
 
+    /// <summary>收获成熟作物：产量入背包并清空格子。</summary>
+    [HttpPost("harvest")]
+    public async Task<ApiResponse<HarvestResultDto>> Harvest([FromBody] HarvestCropRequest request)
+    {
+        var result = await _cropService.HarvestAsync(GetUserId(), request.CellId);
+        return ApiResponse<HarvestResultDto>.Ok(result);
+    }
+
     /// <summary>我的农田种植状态（客户端恢复本地倒计时用）。</summary>
     [HttpGet("plots")]
     public async Task<ApiResponse<FarmPlotsResponse>> GetPlots()

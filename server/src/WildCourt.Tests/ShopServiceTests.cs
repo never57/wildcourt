@@ -30,6 +30,10 @@ public class ShopServiceTests : IDisposable
             "{\"rows\":[" +
             "{\"id\":\"seed_wheat\",\"itemName\":\"小麦种子\",\"category\":\"seed\",\"buyPrice\":2,\"sellPrice\":0,\"unlockCond\":\"商店\",\"effect\":\"种出小麦\",\"cropId\":\"C01\"}" +
             "]}");
+        File.WriteAllText(Path.Combine(_configDir, "Config_Crops.json"),
+            "{\"rows\":[" +
+            "{\"id\":\"C01\",\"name\":\"小麦\",\"growTime\":20,\"yield\":12,\"sellPrice\":5,\"processTo\":\"面粉\",\"processTime\":3}" +
+            "]}");
 
         var options = new DbContextOptionsBuilder<WildCourtDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
@@ -188,5 +192,65 @@ public class ShopServiceTests : IDisposable
         Assert.Equal(5, (await _db.Users.FindAsync(UserId))!.Shell);
         Assert.Empty(_db.Inventories);
         Assert.Empty(_db.Transactions);
+    }
+
+    [Fact]
+    public async Task Sell_Crop_AddsShell_RemovesInventory()
+    {
+        _db.Inventories.Add(new InventoryEntity { UserId = UserId, ItemId = "C01", Count = 10 });
+        await _db.SaveChangesAsync();
+
+        var result = await _service.SellAsync(UserId, "C01", 3);
+
+        Assert.Equal(1015, result.Shell); // 1000 + 5*3
+        var inv = await _db.Inventories.SingleAsync(i => i.UserId == UserId && i.ItemId == "C01");
+        Assert.Equal(7, inv.Count);
+
+        var tx = Assert.Single(_db.Transactions);
+        Assert.Equal("sell", tx.Type);
+        Assert.Equal("C01", tx.ItemId);
+        Assert.Equal(-3, tx.Count);
+        Assert.Equal(15, tx.Price);
+    }
+
+    [Fact]
+    public async Task Sell_NotRawCrop_Throws()
+    {
+        var exSeed = await Assert.ThrowsAsync<BusinessException>(() => _service.SellAsync(UserId, "seed_wheat", 1));
+        Assert.Equal(ApiCodes.BadRequest, exSeed.Code);
+
+        var exDeco = await Assert.ThrowsAsync<BusinessException>(() => _service.SellAsync(UserId, "D001", 1));
+        Assert.Equal(ApiCodes.BadRequest, exDeco.Code);
+        Assert.Equal(1000, (await _db.Users.FindAsync(UserId))!.Shell);
+    }
+
+    [Fact]
+    public async Task Sell_InsufficientCount_Throws()
+    {
+        _db.Inventories.Add(new InventoryEntity { UserId = UserId, ItemId = "C01", Count = 2 });
+        await _db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.SellAsync(UserId, "C01", 3));
+
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+        Assert.Equal(1000, (await _db.Users.FindAsync(UserId))!.Shell);
+        Assert.Equal(2, (await _db.Inventories.SingleAsync(i => i.UserId == UserId && i.ItemId == "C01")).Count);
+    }
+
+    [Fact]
+    public async Task Sell_NotOwned_Throws()
+    {
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.SellAsync(UserId, "C01", 1));
+
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+        Assert.Equal(1000, (await _db.Users.FindAsync(UserId))!.Shell);
+    }
+
+    [Fact]
+    public async Task Sell_InvalidCount_Throws()
+    {
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.SellAsync(UserId, "C01", 0));
+
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
     }
 }

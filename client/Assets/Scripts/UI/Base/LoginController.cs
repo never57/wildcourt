@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using WildCourt.Core;
 using WildCourt.UI.Yard;
+using WildCourt.UI.Farm;
 
 namespace WildCourt.UI
 {
@@ -43,6 +44,9 @@ namespace WildCourt.UI
         [Header("预加载")]
         [Tooltip("拖入 YardPanel Prefab，登录成功后注入 YardPanel.YardPanelPrefab（支持热更）")]
         public GameObject yardPanelPrefab;
+
+        [Tooltip("拖入 FarmPanel Prefab，登录成功后注入 FarmPanel.FarmPanelPrefab（支持热更）")]
+        public GameObject farmPanelPrefab;
 
         private AuthService _auth;
 
@@ -194,6 +198,7 @@ namespace WildCourt.UI
         {
             if (YardPanel.YardPanelPrefab != null) return;
             if (yardPanelPrefab != null) YardPanel.YardPanelPrefab = yardPanelPrefab;
+            if (farmPanelPrefab != null) FarmPanel.FarmPanelPrefab = farmPanelPrefab;
         }
 
         /// <summary>

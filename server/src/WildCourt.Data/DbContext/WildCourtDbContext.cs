@@ -35,6 +35,8 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public DbSet<FarmPlotEntity> FarmPlots => Set<FarmPlotEntity>();
 
+    public DbSet<StealRecordEntity> StealRecords => Set<StealRecordEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureUser(modelBuilder);
@@ -45,6 +47,7 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
         ConfigureYard(modelBuilder);
         ConfigureTransaction(modelBuilder);
         ConfigureFarmPlot(modelBuilder);
+        ConfigureStealRecord(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -165,7 +168,24 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.PlantedAt).HasColumnName("planted_at").IsRequired();
             e.Property(x => x.ReadyAt).HasColumnName("ready_at").IsRequired();
             e.Property(x => x.State).HasColumnName("state").HasMaxLength(16).IsRequired();
+            e.Property(x => x.StolenCount).HasColumnName("stolen_count").IsRequired();
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        });
+    }
+
+    private static void ConfigureStealRecord(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<StealRecordEntity>(e =>
+        {
+            e.ToTable("steal_records");
+            e.HasKey(x => x.RecordId);
+            e.Property(x => x.RecordId).HasColumnName("record_id").ValueGeneratedOnAdd();
+            e.Property(x => x.StealerUserId).HasColumnName("stealer_user_id").IsRequired();
+            e.Property(x => x.TargetUserId).HasColumnName("target_user_id").IsRequired();
+            e.Property(x => x.CropId).HasColumnName("crop_id").HasMaxLength(32).IsRequired();
+            e.Property(x => x.CellId).HasColumnName("cell_id").IsRequired();
+            e.Property(x => x.Count).HasColumnName("count").IsRequired();
+            e.Property(x => x.StolenAt).HasColumnName("stolen_at").IsRequired();
         });
     }
 }

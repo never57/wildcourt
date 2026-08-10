@@ -26,7 +26,7 @@
 | Sheet8 HospitalityWeights | `Config_HospitalityWeights.json` | ⬜ 待导出 |
 | Sheet9~12 Shop | `Config_Shop.json` | ✅ 种子货架已落地（装饰仍走 Config_Decorations.json） |
 | Sheet13 FriendInteractions | `Config_FriendInteractions.json` | ⬜ 待导出 |
-| Sheet14 StealMechanics | `Config_StealMechanics.json` | ⬜ 待导出 |
+| Sheet14 StealMechanics | `Config_StealMechanics.json` | ✅ 已落地 |
 | Sheet15 Badges | `Config_Badges.json` | ⬜ 待导出 |
 | Sheet16 YardUnlock | `Config_YardUnlock.json` | ✅ 已建骨架（数值待策划确认） |
 | Sheet17 PlayerLevel | `Config_PlayerLevel.json` | ✅ 已建骨架（经验曲线待策划确认） |

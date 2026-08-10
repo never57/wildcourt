@@ -35,3 +35,20 @@ public class FarmPlotsResponse
 {
     public List<FarmPlotDto> Plots { get; set; } = new();
 }
+
+/// <summary>收获请求（POST /api/v1/yard/harvest）。</summary>
+public class HarvestCropRequest
+{
+    public int CellId { get; set; }
+}
+
+/// <summary>收获结果（count = 作物配置 yield）。</summary>
+public class HarvestResultDto
+{
+    public int CellId { get; set; }
+
+    public string CropId { get; set; } = string.Empty;
+
+    /// <summary>收获数量（= Config_Crops.yield）。</summary>
+    public int Count { get; set; }
+}
