@@ -21,8 +21,8 @@ namespace WildCourt.Gameplay.Crop
     {
         private const string TargetScene = "DebugScene";
 
-        /// <summary>登录成功后目标服务端（联调线上；本地调试可改为 http://localhost:5000）。</summary>
-        private const string ServerUrl = "http://43.138.133.137:5000";
+        /// <summary>登录成功后目标服务端（生产走 nginx 80 端口；本地调试可改为 http://localhost:5000）。</summary>
+        private const string ServerUrl = "http://43.138.133.137";
 
         /// <summary>测试账号（不存在时自动注册；密码为开发约定值，勿用于正式环境）。</summary>
         private const string TestUsername = "wc_debug";

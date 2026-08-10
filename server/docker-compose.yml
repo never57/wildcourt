@@ -1,13 +1,19 @@
 # WildCourt 服务端部署（docker compose）
-# 用法（在 server/ 目录）：
+# 用法（在 server/ 目录，即宿主代码根目录 /opt/wildcourt/server 下）：
 #   1. 复制 .env.example 为 .env 并填写密码
 #   2. docker compose up -d --build
 #
 # 注意：
 #   - MySQL/Redis 为"服务器自装"方案（容器内）；若改用腾讯云托管版，
 #     删除 mysql/redis 两个服务，在 .env 里改连接串指向托管实例即可。
-#   - 测试期 api 映射 5000 到公网便于直连验证；正式上线建议改
-#     "127.0.0.1:5000:5000" 并用 Nginx 反代（见 docs 部署文档）。
+#   - nginx 服务托管管理后台前端（admin-web 多阶段构建）并反代 /api、/hub 到 api。
+#     api 只绑 127.0.0.1:5000，公网 80 统一走 nginx；HTTPS 上线时挂证书加 443。
+#   - API 容器挂载要求（管理后台"服务器监控/部署"依赖，勿随意移除）：
+#       · /var/run/docker.sock   → docker CLI 与宿主 daemon 通信（容器监控/日志/重启/部署）
+#       · /  → /host（只读）     → 宿主磁盘 df 统计
+#       · /proc → /host/proc     → 宿主内存/负载读取（必须覆盖在 /host 之上挂载）
+#       · /opt/wildcourt/server  → 宿主代码根目录同路径挂载（DeployService 在此执行 compose 部署）
+#     安全提醒：docker.sock 等于宿主 root 权限，管理后台务必绑定内网/Nginx+鉴权使用。
 
 services:
   mysql:
@@ -58,11 +64,32 @@ services:
       TZ: Asia/Shanghai   # 每日结算 Job 按 UTC+8 计算（04:00 结算边界）
       # 覆盖 config/appsettings.Production.json 中的连接串（Program.cs 已支持环境变量）
       ConnectionStrings__MySql: "Server=mysql;Port=3306;Database=wildcourt;User=wildcourt_app;Password=${MYSQL_APP_PASSWORD};CharSet=utf8mb4;"
+      # 数据库管理（可视化/SQL）连接串：appsettings.Production.json 里的占位符不可用，必须用环境变量覆盖
+      AdminDatabase__ConnectionString: "Server=mysql;Port=3306;Database=wildcourt;User=wildcourt_app;Password=${MYSQL_APP_PASSWORD};CharSet=utf8mb4;"
       Redis__ConnectionString: "redis:6379"
+      # 管理后台安全配置（务必在 .env 里改为强随机值，否则 JWT 可伪造）
+      Admin__JwtSecret: ${ADMIN_JWT_SECRET:-CHANGE_ME_please_set_a_long_random_secret_in_production}
+      Admin__DefaultUsername: ${ADMIN_DEFAULT_USERNAME:-admin}
+      Admin__DefaultPassword: ${ADMIN_DEFAULT_PASSWORD:-CHANGE_ME_admin_password}
     volumes:
       - ./config:/app/config:ro   # 生产配置目录（含数值配置 JSON 也可放这里）
+      # ---- 管理后台依赖的挂载（见文件头说明，勿随意移除） ----
+      - /var/run/docker.sock:/var/run/docker.sock   # docker CLI 与宿主 daemon 通信
+      - /:/host:ro                                  # 宿主根目录（磁盘 df 统计）
+      - /proc:/host/proc:ro                         # 宿主 /proc（内存/负载），需覆盖在 /host 之上
+      - /opt/wildcourt/server:/opt/wildcourt/server # 宿主代码根目录同路径挂载（部署服务用）
     ports:
-      - "5000:5000"   # 测试期公网直连（需云防火墙放行 5000）；正式上线改回 "127.0.0.1:5000:5000" 走 Nginx+HTTPS
+      - "127.0.0.1:5000:5000"   # 仅本机可达；公网访问统一走 nginx:80
+
+  nginx:
+    build:
+      context: ./admin-web
+    container_name: wildcourt-nginx
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "80:80"   # 管理后台前端 + API 统一入口；HTTPS 启用时挂证书加 443
 
 volumes:
   redis_data:

@@ -22,6 +22,97 @@ namespace WildCourt.Data.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
+            modelBuilder.Entity("WildCourt.Data.Entities.AdminEntity", b =>
+                {
+                    b.Property<long>("AdminId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("admin_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("AdminId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("display_name");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("last_login_at");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("username");
+
+                    b.HasKey("AdminId");
+
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasDatabaseName("uk_admin_username");
+
+                    b.ToTable("admins", (string)null);
+                });
+
+            modelBuilder.Entity("WildCourt.Data.Entities.AnnouncementEntity", b =>
+                {
+                    b.Property<long>("AnnouncementId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("announcement_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("AnnouncementId"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("title");
+
+                    b.HasKey("AnnouncementId");
+
+                    b.ToTable("announcements", (string)null);
+                });
+
             modelBuilder.Entity("WildCourt.Data.Entities.FarmPlotEntity", b =>
                 {
                     b.Property<long>("UserId")
@@ -272,6 +363,10 @@ namespace WildCourt.Data.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("UserId"));
 
+                    b.Property<string>("AvatarUrl")
+                        .HasColumnType("longtext")
+                        .HasColumnName("avatar_url");
+
                     b.Property<int>("CityId")
                         .HasColumnType("int")
                         .HasColumnName("city_id");
@@ -287,6 +382,10 @@ namespace WildCourt.Data.Migrations
                     b.Property<int>("Exp")
                         .HasColumnType("int")
                         .HasColumnName("exp");
+
+                    b.Property<bool>("IsBanned")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_banned");
 
                     b.Property<DateTime?>("LastLogin")
                         .HasColumnType("datetime(6)")

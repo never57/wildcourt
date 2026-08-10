@@ -1,0 +1,436 @@
+namespace WildCourt.Api.Models;
+
+// ============ 认证 ============
+
+public class AdminLoginRequest
+{
+    public string Username { get; set; } = string.Empty;
+
+    /// <summary>客户端 SHA256 hex（与玩家登录约定一致）。</summary>
+    public string Password { get; set; } = string.Empty;
+}
+
+public class AdminLoginResponse
+{
+    public string Token { get; set; } = string.Empty;
+
+    public string Username { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public DateTime ExpireAt { get; set; }
+}
+
+public class AdminProfileResponse
+{
+    public long AdminId { get; set; }
+
+    public string Username { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public DateTime? LastLoginAt { get; set; }
+}
+
+public class ChangeAdminPasswordRequest
+{
+    public string OldPassword { get; set; } = string.Empty;
+
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+/// <summary>管理员重置指定账号密码（需管理员权限，不需要旧密码）。</summary>
+public class ResetAdminPasswordRequest
+{
+    /// <summary>新密码（客户端 SHA256 hex）。</summary>
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+// ============ 仪表盘 ============
+
+public class DashboardSummaryResponse
+{
+    public long TotalPlayers { get; set; }
+
+    public long TodayNewPlayers { get; set; }
+
+    public long OnlinePlayers { get; set; }
+
+    public long TodayActivePlayers { get; set; }
+
+    public long TotalShell { get; set; }
+
+    public long TotalCoupon { get; set; }
+
+    /// <summary>近 7 日注册趋势（按天）。</summary>
+    public List<DailyCountDto> RegistrationTrend { get; set; } = new();
+}
+
+public class DailyCountDto
+{
+    public string Date { get; set; } = string.Empty;
+
+    public long Count { get; set; }
+}
+
+// ============ 服务器监控 ============
+
+public class ServerOverviewResponse
+{
+    public string HostName { get; set; } = string.Empty;
+
+    public string DockerVersion { get; set; } = string.Empty;
+
+    public double LoadAvg1 { get; set; }
+
+    public double LoadAvg5 { get; set; }
+
+    public double LoadAvg15 { get; set; }
+
+    /// <summary>宿主机内存（字节）。</summary>
+    public long MemTotal { get; set; }
+
+    /// <summary>宿主机已用内存（字节）。</summary>
+    public long MemUsed { get; set; }
+
+    /// <summary>宿主机内存使用率（0~1）。</summary>
+    public double MemUsagePercent { get; set; }
+
+    /// <summary>宿主机磁盘已用（字节，Docker 根目录所在挂载点）。</summary>
+    public long DiskUsed { get; set; }
+
+    /// <summary>宿主机磁盘总量（字节）。</summary>
+    public long DiskTotal { get; set; }
+
+    /// <summary>宿主机磁盘使用率（0~1）。</summary>
+    public double DiskUsagePercent { get; set; }
+
+    public string DiskMountPoint { get; set; } = string.Empty;
+
+    public List<ContainerInfoDto> Containers { get; set; } = new();
+
+    /// <summary>镜像/容器等 Docker 占用（docker system df 摘要）。</summary>
+    public string DockerDiskSummary { get; set; } = string.Empty;
+}
+
+public class ContainerInfoDto
+{
+    public string ContainerId { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Image { get; set; } = string.Empty;
+
+    /// <summary>running / exited / restarting / created / paused / dead。</summary>
+    public string State { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public double? CpuPercent { get; set; }
+
+    public long? MemUsage { get; set; }
+
+    public long? MemLimit { get; set; }
+
+    public string Ports { get; set; } = string.Empty;
+
+    public string RunningFor { get; set; } = string.Empty;
+}
+
+public class ContainerLogsResponse
+{
+    public string ContainerName { get; set; } = string.Empty;
+
+    public string Log { get; set; } = string.Empty;
+}
+
+// ============ 玩家管理 ============
+
+public class PlayerAdminDto
+{
+    public long UserId { get; set; }
+
+    public string Username { get; set; } = string.Empty;
+
+    public string Nickname { get; set; } = string.Empty;
+
+    public string? AvatarUrl { get; set; }
+
+    public int Level { get; set; }
+
+    public int Shell { get; set; }
+
+    public int Coupon { get; set; }
+
+    public int Exp { get; set; }
+
+    public bool IsBanned { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime? LastLogin { get; set; }
+}
+
+public class PagedResult<T>
+{
+    public List<T> Items { get; set; } = new();
+
+    public long Total { get; set; }
+}
+
+public class PlayerDetailDto
+{
+    public PlayerAdminDto Player { get; set; } = new();
+
+    /// <summary>宠物列表。</summary>
+    public List<PetAdminDto> Pets { get; set; } = new();
+
+    /// <summary>背包（count &gt; 0）。</summary>
+    public List<InventoryItemDto> Inventory { get; set; } = new();
+
+    public int FriendCount { get; set; }
+}
+
+public class PetAdminDto
+{
+    public long PetId { get; set; }
+
+    public string Type { get; set; } = string.Empty;
+
+    public int Level { get; set; }
+
+    public int Exp { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+}
+
+public class UpdatePlayerCurrencyRequest
+{
+    public int? Shell { get; set; }
+
+    public int? Coupon { get; set; }
+
+    public int? Level { get; set; }
+
+    public int? Exp { get; set; }
+}
+
+/// <summary>修改玩家昵称/头像等基础资料（字段为 null 表示不修改）。</summary>
+public class UpdatePlayerProfileRequest
+{
+    public string? Nickname { get; set; }
+
+    public string? AvatarUrl { get; set; }
+}
+
+public class AdminPlayerSearchRequest
+{
+    public string? Keyword { get; set; }
+
+    public int Page { get; set; } = 1;
+
+    public int PageSize { get; set; } = 20;
+}
+
+// ============ 审核 ============
+
+public class ReviewQueueItemDto
+{
+    public long LetterId { get; set; }
+
+    public long FromUser { get; set; }
+
+    public string FromNickname { get; set; } = string.Empty;
+
+    public long ToUser { get; set; }
+
+    public string ToNickname { get; set; } = string.Empty;
+
+    public string Content { get; set; } = string.Empty;
+
+    public string? ItemId { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    public DateTime CreatedAt { get; set; }
+}
+
+public class ReviewLetterRequest
+{
+    public long LetterId { get; set; }
+
+    /// <summary>true 通过 / false 拒绝。</summary>
+    public bool Approve { get; set; }
+}
+
+public class BanRequest
+{
+    public string? Reason { get; set; }
+}
+
+// ============ 公告 ============
+
+public class AnnouncementDto
+{
+    public long AnnouncementId { get; set; }
+
+    public string Title { get; set; } = string.Empty;
+
+    public string Content { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public string CreatorName { get; set; } = string.Empty;
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime? PublishedAt { get; set; }
+}
+
+public class AnnouncementRequest
+{
+    public string Title { get; set; } = string.Empty;
+
+    public string Content { get; set; } = string.Empty;
+
+    public string Status { get; set; } = "draft";
+}
+
+// ============ 数据库 ============
+
+public class ExecuteSqlRequest
+{
+    /// <summary>直接提交的 SQL（与 SqlFile 二选一）。</summary>
+    public string? Sql { get; set; }
+
+    /// <summary>上传的 .sql 文件内容。</summary>
+    public string? SqlFile { get; set; }
+}
+
+public class ExecuteSqlResultDto
+{
+    public int StatementCount { get; set; }
+
+    public long AffectedRows { get; set; }
+
+    public double DurationMs { get; set; }
+
+    public string Message { get; set; } = string.Empty;
+}
+
+// ============ 数据库可视化 ============
+
+public class DatabaseInfoDto
+{
+    public string Name { get; set; } = string.Empty;
+}
+
+public class TableInfoDto
+{
+    public string Name { get; set; } = string.Empty;
+
+    public string Comment { get; set; } = string.Empty;
+
+    public long Rows { get; set; }
+}
+
+public class ColumnInfoDto
+{
+    public string Name { get; set; } = string.Empty;
+
+    public string ColumnType { get; set; } = string.Empty;
+
+    public bool Nullable { get; set; }
+
+    public bool IsPrimaryKey { get; set; }
+
+    public string? DefaultValue { get; set; }
+
+    public string Comment { get; set; } = string.Empty;
+}
+
+public class TableDataResultDto
+{
+    public List<ColumnInfoDto> Columns { get; set; } = new();
+
+    public List<Dictionary<string, object?>> Rows { get; set; } = new();
+
+    public long Total { get; set; }
+
+    public int Page { get; set; }
+
+    public int PageSize { get; set; }
+}
+
+public class RowChangeRequest
+{
+    /// <summary>数据库名；为空时使用连接串默认库。</summary>
+    public string? Database { get; set; }
+
+    public string Table { get; set; } = string.Empty;
+
+    /// <summary>变更的列值；值为 null 表示 SQL NULL。</summary>
+    public Dictionary<string, object?> Values { get; set; } = new();
+
+    /// <summary>主键列名（更新/删除时定位行）。</summary>
+    public string? PrimaryKey { get; set; }
+
+    /// <summary>主键值。</summary>
+    public object? PrimaryKeyValue { get; set; }
+}
+
+// ============ 部署 ============
+
+public class DeployStatusResponse
+{
+    public bool Enabled { get; set; }
+
+    public string HostCodeRoot { get; set; } = string.Empty;
+
+    public string ComposeFile { get; set; } = string.Empty;
+
+    public string ServiceName { get; set; } = string.Empty;
+
+    public string Status { get; set; } = "idle";
+
+    public DateTime? LastDeployAt { get; set; }
+
+    public string LastDeployResult { get; set; } = string.Empty;
+
+    public bool Building { get; set; }
+}
+
+public class DeployBuildRequest
+{
+    /// <summary>可选：指定服务名（docker compose 的 service），默认空 = 全部。</summary>
+    public string? Service { get; set; }
+
+    /// <summary>是否强制重建镜像（--build / --no-cache）。</summary>
+    public bool NoCache { get; set; }
+}
+
+// ============ 管理员账号 ============
+
+public class AdminItemDto
+{
+    public long AdminId { get; set; }
+
+    public string Username { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public bool IsActive { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime? LastLoginAt { get; set; }
+}
+
+public class CreateAdminRequest
+{
+    public string Username { get; set; } = string.Empty;
+
+    public string Password { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+}

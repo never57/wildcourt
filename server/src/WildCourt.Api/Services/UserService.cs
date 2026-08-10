@@ -86,6 +86,10 @@ public partial class UserService
         {
             throw new BusinessException(ApiCodes.Unauthorized, "账号或密码错误");
         }
+        if (entity.IsBanned)
+        {
+            throw new BusinessException(ApiCodes.Forbidden, "账号已被封禁，请联系客服");
+        }
 
         entity.LastLogin = DateTime.UtcNow;
         await _db.SaveChangesAsync();

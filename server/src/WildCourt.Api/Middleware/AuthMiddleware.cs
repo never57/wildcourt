@@ -11,24 +11,31 @@ namespace WildCourt.Api.Middleware;
 /// </summary>
 public class AuthMiddleware
 {
+    /// <summary>实时在线滑动窗口：TTL 内有任意请求即视为在线，无请求则视为离线。</summary>
+    private static readonly TimeSpan OnlineTtl = TimeSpan.FromMinutes(5);
+
     private readonly RequestDelegate _next;
     private readonly ISessionStore _sessions;
+    private readonly RedisUtil _redis;
 
-    public AuthMiddleware(RequestDelegate next, ISessionStore sessions)
+    public AuthMiddleware(RequestDelegate next, ISessionStore sessions, RedisUtil redis)
     {
         _next = next;
         _sessions = sessions;
+        _redis = redis;
     }
 
     public async Task InvokeAsync(HttpContext context)
     {
         var path = context.Request.Path.Value ?? string.Empty;
-        // 放行：登录/注册、根路径、favicon、SignalR Hub（negotiate 握手 + WebSocket 升级）
+        // 放行：登录/注册、根路径、favicon、SignalR Hub（negotiate 握手 + WebSocket 升级）、
+        // 运营后台（/api/v1/admin/*，由 AdminAuthMiddleware 独立鉴权，需注册在本中间件之前）
         if (path.EndsWith("/user/login", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith("/user/register", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/favicon.ico", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith("/hub/", StringComparison.OrdinalIgnoreCase))
+            path.StartsWith("/hub/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/v1/admin", StringComparison.OrdinalIgnoreCase))
         {
             await _next(context);
             return;
@@ -42,6 +49,8 @@ public class AuthMiddleware
             {
                 context.Items["UserId"] = userId.Value;
                 context.Items["Token"] = token;
+                // 刷新实时在线标记（滑动窗口，管理后台"实时在线"按此统计）
+                await _redis.TouchOnlineAsync(userId.Value, OnlineTtl);
                 await _next(context);
                 return;
             }

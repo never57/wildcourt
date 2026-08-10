@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using WildCourt.Api.Hubs;
 using WildCourt.Api.Middleware;
@@ -38,6 +40,15 @@ builder.Services.AddScoped<ShopService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<FriendService>();
 
+// 运营后台：令牌服务 + 业务服务 + 监控/部署
+var adminSecret = builder.Configuration["Admin:JwtSecret"] ?? "wildcourt-admin-secret-change-me";
+var adminTtlHours = double.TryParse(builder.Configuration["Admin:JwtExpireHours"], out var h) ? h : 24;
+builder.Services.AddSingleton(new AdminTokenService(adminSecret, TimeSpan.FromHours(adminTtlHours)));
+builder.Services.AddScoped<AdminService>();
+builder.Services.AddSingleton<DockerService>();
+builder.Services.AddSingleton<DeployService>();
+builder.Services.AddScoped<DatabaseAdminService>();
+
 // 统一 JSON 信封：camelCase 输出 + 大小写不敏感反序列化（对齐客户端小写字段 DTO）
 builder.Services.AddControllers()
     .AddJsonOptions(opt =>
@@ -64,9 +75,26 @@ using (var scope = app.Services.CreateScope())
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "数据库迁移失败：服务以降级模式启动（MySQL 不可用）");
     }
+
+    // 5. 初始化默认管理员（仅当 admins 表为空，密码取配置，生产务必修改）
+    try
+    {
+        var adminService = scope.ServiceProvider.GetRequiredService<AdminService>();
+        var username = builder.Configuration["Admin:DefaultUsername"] ?? "admin";
+        var rawPassword = builder.Configuration["Admin:DefaultPassword"] ?? "admin888";
+        var passwordSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawPassword))).ToLowerInvariant();
+        var displayName = builder.Configuration["Admin:DefaultDisplayName"] ?? "运营管理员";
+        await adminService.CreateAdminAsync(username, passwordSha256, displayName);
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("默认管理员初始化跳过：{Message}", ex.Message);
+    }
 }
 
 app.UseMiddleware<ExceptionMiddleware>();
+app.UseMiddleware<AdminAuthMiddleware>();
 app.UseMiddleware<AuthMiddleware>();
 app.UseMiddleware<LogMiddleware>();
 

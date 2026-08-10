@@ -1,33 +1,42 @@
 using Microsoft.AspNetCore.Mvc;
 using WildCourt.Api.Models;
+using WildCourt.Api.Services;
 
 namespace WildCourt.Api.Controllers;
 
 /// <summary>
-/// 运营后台：人工审核、公告、封禁（文档 02 §2.2）。
+/// 运营后台：信件人工审核、封禁（文档 02 §2.2）。
+/// 玩家封禁细节（踢会话等）见 <see cref="AdminService"/>，本控制器保留原始路由兼容。
 /// </summary>
-[ApiController]
-[Route("api/v1/admin")]
-public class AdminController : ControllerBase
+public class AdminController : AdminControllerBase
 {
-    /// <summary>信件人工审核</summary>
+    private readonly AdminService _adminService;
+
+    public AdminController(AdminService adminService)
+    {
+        _adminService = adminService;
+    }
+
+    /// <summary>信件人工审核：通过/退回。</summary>
     [HttpPost("letter/review")]
-    public Task<ApiResponse<object>> ReviewLetter([FromBody] object request)
+    public async Task<ApiResponse<object>> ReviewLetter([FromBody] ReviewLetterRequest request)
     {
-        throw new NotImplementedException();
+        await _adminService.ReviewLetterAsync(request.LetterId, request.Approve);
+        return ApiResponse<object>.Ok(new object());
     }
 
-    /// <summary>审核队列</summary>
+    /// <summary>审核队列：待审核信件列表。</summary>
     [HttpGet("audit-queue")]
-    public Task<ApiResponse<List<object>>> GetAuditQueue()
+    public async Task<ApiResponse<List<ReviewQueueItemDto>>> GetAuditQueue()
     {
-        throw new NotImplementedException();
+        return ApiResponse<List<ReviewQueueItemDto>>.Ok(await _adminService.GetAuditQueueAsync());
     }
 
-    /// <summary>封禁用户</summary>
+    /// <summary>封禁用户（原始路由：POST /api/v1/admin/ban/{userId}）。</summary>
     [HttpPost("ban/{userId}")]
-    public Task<ApiResponse<object>> BanUser(long userId)
+    public async Task<ApiResponse<object>> BanUser(long userId)
     {
-        throw new NotImplementedException();
+        var changed = await _adminService.BanAsync(userId);
+        return ApiResponse<object>.Ok(new { Changed = changed });
     }
 }

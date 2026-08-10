@@ -37,6 +37,10 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public DbSet<StealRecordEntity> StealRecords => Set<StealRecordEntity>();
 
+    public DbSet<AdminEntity> Admins => Set<AdminEntity>();
+
+    public DbSet<AnnouncementEntity> Announcements => Set<AnnouncementEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureUser(modelBuilder);
@@ -48,6 +52,8 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
         ConfigureTransaction(modelBuilder);
         ConfigureFarmPlot(modelBuilder);
         ConfigureStealRecord(modelBuilder);
+        ConfigureAdmin(modelBuilder);
+        ConfigureAnnouncement(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -62,14 +68,49 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.HasIndex(x => x.Username).HasDatabaseName("uk_username").IsUnique();
             e.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(128).IsRequired();
             e.Property(x => x.Nickname).HasColumnName("nickname").HasMaxLength(20).IsRequired();
+            e.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasColumnType("longtext");
             e.Property(x => x.ProvinceId).HasColumnName("province_id").IsRequired();
             e.Property(x => x.CityId).HasColumnName("city_id").IsRequired();
             e.Property(x => x.Level).HasColumnName("level").IsRequired();
             e.Property(x => x.Shell).HasColumnName("shell").IsRequired();
             e.Property(x => x.Coupon).HasColumnName("coupon").IsRequired();
             e.Property(x => x.Exp).HasColumnName("exp").IsRequired();
+            e.Property(x => x.IsBanned).HasColumnName("is_banned").IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
             e.Property(x => x.LastLogin).HasColumnName("last_login");
+        });
+    }
+
+    private static void ConfigureAdmin(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AdminEntity>(e =>
+        {
+            e.ToTable("admins");
+            e.HasKey(x => x.AdminId);
+            e.Property(x => x.AdminId).HasColumnName("admin_id").ValueGeneratedOnAdd();
+            e.Property(x => x.Username).HasColumnName("username").HasMaxLength(32).IsRequired();
+            e.HasIndex(x => x.Username).HasDatabaseName("uk_admin_username").IsUnique();
+            e.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(128).IsRequired();
+            e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(32).IsRequired();
+            e.Property(x => x.IsActive).HasColumnName("is_active").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.Property(x => x.LastLoginAt).HasColumnName("last_login_at");
+        });
+    }
+
+    private static void ConfigureAnnouncement(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AnnouncementEntity>(e =>
+        {
+            e.ToTable("announcements");
+            e.HasKey(x => x.AnnouncementId);
+            e.Property(x => x.AnnouncementId).HasColumnName("announcement_id").ValueGeneratedOnAdd();
+            e.Property(x => x.Title).HasColumnName("title").HasMaxLength(100).IsRequired();
+            e.Property(x => x.Content).HasColumnName("content").HasColumnType("longtext").IsRequired();
+            e.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
+            e.Property(x => x.CreatedBy).HasColumnName("created_by").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.Property(x => x.PublishedAt).HasColumnName("published_at");
         });
     }
 

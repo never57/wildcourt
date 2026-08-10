@@ -6,3 +6,8 @@ obj/
 .vs/
 # 本地配置覆盖（含密钥）
 config/appsettings.*.local.json
+# Node / 前端构建产物
+node_modules/
+dist/
+# 打包产物
+*.zip

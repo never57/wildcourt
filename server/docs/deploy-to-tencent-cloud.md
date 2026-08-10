@@ -1,7 +1,7 @@
 # 腾讯云部署方案（从本地迁移）
 
 > 依据：`docs/design/17-开发环境与运维.md`（成本估算）、`config/appsettings.Production.json`、`Program.cs` 配置目录机制。
-> 当前状态：服务端为骨架阶段（业务未实现、不依赖 MySQL/Redis）；本文为迁移到腾讯云的完整步骤清单。
+> 当前状态：业务 API + 管理后台（Vue 前端、服务器监控、部署功能）均已具备；**推荐使用 §9 Docker 方案**（mysql/redis/api/nginx 一体编排），§3~§6 为传统 systemd 方案，保留作参考。
 
 ## 0. 本地现状（已完成）
 
@@ -139,19 +139,24 @@ server {
 
 ## 9. Docker 部署（推荐：腾讯云轻量 + Ubuntu 24.04 + 预装 Docker 27.5.1）
 
-部署文件已就位：`server/Dockerfile`、`server/docker-compose.yml`、`server/.env.example`（MySQL/Redis 容器自装方案；若改用腾讯云托管版，删除 compose 里 mysql/redis 服务并在 .env 改连接串）。
+部署文件已就位：`server/Dockerfile`、`server/docker-compose.yml`、`server/.env.example`、`server/admin-web/Dockerfile`（nginx 托管前端）。
+- compose 服务：`mysql` + `redis` + `api`（内置 docker CLI 的管理后台）+ `nginx`（托管管理后台前端并反代 `/api`、`/hub`）。
+- 若改用腾讯云托管版 MySQL/Redis：删除 compose 里 mysql/redis 服务并在 .env 改连接串。
+- **代码根目录约定**：宿主 `/opt/wildcourt/server` ↔ 容器内 `/opt/wildcourt/server` 同路径挂载（管理后台"部署"功能依赖，勿改）。
 
 ### 9.1 本地发布并上传（在本地 Windows 的 server/ 目录）
 
-```powershell
-# 1) 把 server/ 整个目录（含 Dockerfile、docker-compose.yml、config/）打成包
-#    在项目根：git 已忽略 bin/obj，可直接复制 server/ 目录
-# 2) 上传到服务器（任选其一）
-scp -r server user@<公网IP>:/opt/wildcourt/          # 若本地有 scp
-# 或本机打包后从控制台/终端上传
+```bash
+# 服务器端先建目录（SSH）
+ssh root@<公网IP> "mkdir -p /opt/wildcourt/server"
+
+# 本机 server/ 目录内执行（把 server/ 全部内容上传到 /opt/wildcourt/server/）
+scp -r . root@<公网IP>:/opt/wildcourt/server/
 ```
 
 > 源码级部署即可，镜像在服务器上构建（轻量服务器 2 核可承受）。
+> `admin-web/node_modules` 已被 `.dockerignore` 排除，无需上传，镜像构建时自动 `npm ci`。
+> 网页终端（OrcaTerm）也支持拖拽上传整个目录。
 
 ### 9.2 服务器端首次配置（SSH 登录后）
 
@@ -161,46 +166,66 @@ scp -r server user@<公网IP>:/opt/wildcourt/          # 若本地有 scp
 
 ```bash
 cd /opt/wildcourt/server
-cp .env.example .env && vim .env          # 改 MYSQL_ROOT_PASSWORD / MYSQL_APP_PASSWORD（强密码）
-docker compose up -d --build              # 构建并启动 mysql + redis + api
-docker compose ps                         # 三个服务都 Up 即成功
+cp .env.example .env && vim .env
+# .env 必改项：
+#   MYSQL_ROOT_PASSWORD / MYSQL_APP_PASSWORD → 数据库强密码
+#   ADMIN_JWT_SECRET   → openssl rand -hex 32 生成强随机值（否则 JWT 可伪造！）
+#   ADMIN_DEFAULT_PASSWORD → 管理后台初始密码（登录后到后台修改）
+#   ADMIN_DEFAULT_USERNAME → 管理员用户名（默认 admin，可改）
+
+docker compose up -d --build              # 构建并启动 mysql + redis + api + nginx
+docker compose ps                         # 四个服务都 Up 即成功
 ```
 
-> 上传 `server/` 目录：网页终端可拖拽上传（OrcaTerm 支持），或本机 `scp -r server root@<IP>:/opt/wildcourt/`。
+> 国内服务器若镜像构建（npm ci / 拉取基础镜像）慢，可：
+> `docker compose build --build-arg NPM_REGISTRY=https://registry.npmmirror.com nginx`
 
-### 9.3 首次建库
+### 9.3 首次建库与管理后台
 
-EF Core 迁移在 api 容器启动时自动执行（`db.Database.Migrate()`），无需手工建表。
+- EF Core 迁移在 api 容器启动时自动执行（`db.Database.Migrate()`），无需手工建表。
+- 首次启动自动创建默认管理员（用户名/密码来自 `.env` 的 `ADMIN_DEFAULT_USERNAME` / `ADMIN_DEFAULT_PASSWORD`）。
+- **管理后台入口**：浏览器打开 `http://<公网IP>/`（nginx 托管前端，登录后请立即改默认密码）。
 
 ### 9.4 防火墙（腾讯云轻量控制台 → 实例 → 防火墙标签页）
 
-- 测试期：放行 **5000**（直连验证 `http://<公网IP>:5000`）、**22**（SSH）
-- 正式上线：只放行 **80/443/22**，5000 改由 Nginx 反代
-- 注意：轻量用的是"防火墙"（不是 CVM 的安全组），加规则后立即生效
+- 只放行 **80**（管理后台/API 入口）、**443**（HTTPS 上线时）、**22**（SSH）。
+- api 的 5000 仅绑 `127.0.0.1`（compose 内网由 nginx 反代），**无需放行**。
+- 注意：轻量用的是"防火墙"（不是 CVM 的安全组），加规则后立即生效。
 
 ### 9.5 验证
 
 ```bash
-curl http://localhost:5000/api/v1/user/register -X POST -H "Content-Type: application/json" -d '{}'
+# API 经 nginx 反代（80 端口）
+curl http://localhost/api/v1/user/register -X POST -H "Content-Type: application/json" -d '{}'
 # 预期 {"code":400,"message":"密码不能为空"} → 服务正常
-# 再用与本地一致的方式注册/登录（SHA256 密码）
+
+# 管理后台页面
+curl -I http://localhost/                  # 预期 200，返回 index.html
+
+# 浏览器打开 http://<公网IP>/ 用 .env 里配置的 admin 账号登录管理后台
+# 后台可查看：服务器监控（内存/磁盘/容器）、玩家、审核、数据库、部署
 ```
 
 ### 9.6 日志与运维
 
 ```bash
 docker compose logs -f api        # 服务端日志
+docker compose logs -f nginx      # 前端/反代日志
 docker compose logs mysql         # 数据库日志
 docker compose restart api        # 重启 api
 docker compose down && docker compose up -d   # 全量重启
+# 更新代码后重新构建：
+docker compose build && docker compose up -d
 ```
 
 ### 9.7 域名 + HTTPS（正式上线时）
 
 1. 域名解析 A 记录 → 服务器公网 IP
-2. 腾讯云申请免费 SSL 证书（SSL 证书控制台）
-3. compose 增加 nginx 服务或宿主机装 Nginx，反代 `api:5000`，配置 WebSocket 升级头（SignalR ChatHub，见 §6）
-4. 安全组只留 80/443/22
+2. 腾讯云申请免费 SSL 证书（SSL 证书控制台），将 `fullchain.pem` / `privkey.pem` 放到 `server/nginx-ssl/`
+3. 在 `server/admin-web/nginx.conf` 增加 443 server 块（`listen 443 ssl`，证书路径 `/etc/nginx/ssl/...`，反代配置同 80；SignalR WebSocket 升级头见 §6）
+4. 在 compose 的 nginx 服务挂载 `./nginx-ssl:/etc/nginx/ssl:ro` 并映射 `443:443`
+5. `docker compose build nginx && docker compose up -d`
+6. 防火墙放行 443
 
 ### 9.8 数值配置 JSON（客户端 StreamingAssets/config）
 

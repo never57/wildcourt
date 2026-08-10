@@ -1,0 +1,6 @@
+# 前端镜像构建上下文排除（node_modules 超大，绝不可进 context）
+node_modules
+dist
+.git
+*.log
+.env

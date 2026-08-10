@@ -26,8 +26,8 @@ namespace WildCourt.Net
         public string ServerUrl { get; private set; }
 
         [Header("服务端（文档 17 §17.4 联调）")]
-        [Tooltip("REST 服务地址，需与服务端端口一致（测试期：腾讯云公网 http://43.138.133.137:5000；本地 localhost:5000）")]
-        [SerializeField] private string serverUrl = "http://43.138.133.137:5000";
+        [Tooltip("REST 服务地址，需与服务端端口一致（生产：http://43.138.133.137 走 nginx 80；本地 localhost:5000）")]
+        [SerializeField] private string serverUrl = "http://43.138.133.137";
 
         public string Token { get; private set; }
 

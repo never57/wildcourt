@@ -63,4 +63,122 @@ public class RedisUtil
     {
         await _db.ListRightPushAsync(key, value);
     }
+
+    // ---- Key 统计 / 批量删除（运营后台用） ----
+
+    /// <summary>
+    /// 统计匹配 pattern 的 key 数量（如 "user_session:*"）。用 SCAN 遍历，勿在生产大库使用频繁。
+    /// </summary>
+    public async Task<long> CountKeysAsync(string pattern)
+    {
+        var server = GetServer();
+        if (server is null) return 0;
+        long count = 0;
+        await foreach (var key in server.KeysAsync(_db.Database, pattern, pageSize: 500))
+        {
+            count++;
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// 删除匹配 pattern 的所有 key，返回删除数量（用于封禁时清理该用户的全部会话）。
+    /// </summary>
+    public async Task<long> DeleteByPatternAsync(string pattern)
+    {
+        var server = GetServer();
+        if (server is null) return 0;
+        long deleted = 0;
+        var batch = _db.CreateBatch();
+        var tasks = new List<Task>();
+        await foreach (var key in server.KeysAsync(_db.Database, pattern, pageSize: 500))
+        {
+            tasks.Add(batch.KeyDeleteAsync(key));
+            if (tasks.Count >= 200)
+            {
+                batch.Execute();
+                deleted += tasks.Count;
+                tasks.Clear();
+                batch = _db.CreateBatch();
+            }
+        }
+        if (tasks.Count > 0)
+        {
+            batch.Execute();
+            deleted += tasks.Count;
+        }
+        return deleted;
+    }
+
+    /// <summary>Redis 在线会话 key 前缀（与 SessionStore 保持一致）。</summary>
+    public const string SessionKeyPrefix = "user_session:";
+
+    /// <summary>
+    /// Redis 实时在线标记 key 前缀：user_online:{userId}，短 TTL 滑动续期。
+    /// 仅用于管理后台"实时在线"统计（区别于 7 天长效的 user_session）。
+    /// </summary>
+    public const string OnlineKeyPrefix = "user_online:";
+
+    /// <summary>刷新实时在线标记（鉴权通过的每次请求调用），TTL 内无请求视为离线。</summary>
+    public async Task TouchOnlineAsync(long userId, TimeSpan ttl)
+    {
+        await _db.StringSetAsync(OnlineKeyPrefix + userId, DateTime.UtcNow.ToString("O"), ttl);
+    }
+
+    /// <summary>
+    /// 删除指定用户的全部在线会话（封禁踢下线用）。
+    /// key = user_session:{token}，value = userId，需 SCAN + GET 过滤后删除。
+    /// </summary>
+    public async Task<long> DeleteSessionsOfUserAsync(long userId)
+    {
+        var server = GetServer();
+        if (server is null) return 0;
+        var userStr = userId.ToString();
+        long deleted = 0;
+        var batch = _db.CreateBatch();
+        var tasks = new List<Task>();
+        var pending = new List<RedisKey>();
+        await foreach (var key in server.KeysAsync(_db.Database, SessionKeyPrefix + "*", pageSize: 500))
+        {
+            pending.Add(key);
+            if (pending.Count >= 200)
+            {
+                var values = await _db.StringGetAsync(pending.ToArray());
+                for (var i = 0; i < values.Length; i++)
+                {
+                    if (values[i] == userStr) tasks.Add(batch.KeyDeleteAsync(pending[i]));
+                }
+                if (tasks.Count > 0)
+                {
+                    batch.Execute();
+                    deleted += tasks.Count;
+                    tasks.Clear();
+                    batch = _db.CreateBatch();
+                }
+                pending.Clear();
+            }
+        }
+        if (pending.Count > 0)
+        {
+            var values = await _db.StringGetAsync(pending.ToArray());
+            for (var i = 0; i < values.Length; i++)
+            {
+                if (values[i] == userStr) tasks.Add(batch.KeyDeleteAsync(pending[i]));
+            }
+            if (tasks.Count > 0)
+            {
+                batch.Execute();
+                deleted += tasks.Count;
+            }
+        }
+        return deleted;
+    }
+
+    private IServer? GetServer()
+    {
+        var endpoints = _redis.GetEndPoints();
+        if (endpoints.Length == 0) return null;
+        var server = _redis.GetServer(endpoints[0]);
+        return server.IsConnected ? server : null;
+    }
 }

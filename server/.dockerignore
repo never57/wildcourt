@@ -6,3 +6,5 @@ docs/
 .git/
 .gitignore
 README.md
+# API 镜像用不到前端源码（前端有自己的 Dockerfile，单独在 admin-web/ 目录构建）
+admin-web/

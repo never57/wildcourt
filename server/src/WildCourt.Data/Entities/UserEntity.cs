@@ -17,6 +17,9 @@ public class UserEntity
 
     public string Nickname { get; set; } = string.Empty;
 
+    /// <summary>头像 URL（运营后台可修改；客户端上传后回填）。</summary>
+    public string? AvatarUrl { get; set; }
+
     public int ProvinceId { get; set; }
 
     public int CityId { get; set; }
@@ -31,6 +34,9 @@ public class UserEntity
 
     /// <summary>玩家经验（等级由经验驱动，文档 03 §3.5；经验不设上限存储，等级封顶 4）。</summary>
     public int Exp { get; set; } = 0;
+
+    /// <summary>是否被封禁（管理后台封禁后禁止登录，并踢出全部会话）。</summary>
+    public bool IsBanned { get; set; } = false;
 
     public DateTime CreatedAt { get; set; }
 

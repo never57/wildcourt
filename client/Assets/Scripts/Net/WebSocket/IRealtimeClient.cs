@@ -15,7 +15,7 @@ namespace WildCourt.Net.WebSocket
         /// <summary>收到服务端推送事件（NetEvent + 负载 JSON）。</summary>
         event Action<NetEvent, string> OnPush;
 
-        /// <summary>建立连接（ws://host/chat，带 token 鉴权）。</summary>
+        /// <summary>建立连接（ws://host/hub/chat，带 token 鉴权）。</summary>
         void Connect(string wsUrl, string token);
 
         /// <summary>主动断开（登出/切账号）。</summary>
