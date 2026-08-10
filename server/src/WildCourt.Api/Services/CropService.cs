@@ -164,14 +164,20 @@ public class CropService
             .FirstOrDefault(c => string.Equals(c.Id, plot.CropId, StringComparison.OrdinalIgnoreCase))
             ?? throw new BusinessException(ApiCodes.BadRequest, $"作物配置缺失: {plot.CropId}");
 
+        int harvestCount = crop.Yield - plot.StolenCount;
+        if (harvestCount <= 0)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "没有可收获产量（已被偷光）");
+        }
+
         var inventory = await _db.Inventories.FirstOrDefaultAsync(i => i.UserId == userId && i.ItemId == crop.Id);
         if (inventory == null)
         {
-            _db.Inventories.Add(new InventoryEntity { UserId = userId, ItemId = crop.Id, Count = crop.Yield });
+            _db.Inventories.Add(new InventoryEntity { UserId = userId, ItemId = crop.Id, Count = harvestCount });
         }
         else
         {
-            inventory.Count += crop.Yield;
+            inventory.Count += harvestCount;
         }
 
         _db.Transactions.Add(new TransactionEntity
@@ -179,14 +185,14 @@ public class CropService
             UserId = userId,
             Type = "harvest",
             ItemId = crop.Id,
-            Count = crop.Yield,
+            Count = harvestCount,
             Price = 0,
         });
 
         _db.FarmPlots.Remove(plot);
         await _db.SaveChangesAsync();
 
-        return new HarvestResultDto { CellId = cellId, CropId = crop.Id, Count = crop.Yield };
+        return new HarvestResultDto { CellId = cellId, CropId = crop.Id, Count = harvestCount };
     }
 
     /// <summary>按玩家等级取庭院/农田容量（Config_YardUnlock.json；查不到按满级兜底）。</summary>

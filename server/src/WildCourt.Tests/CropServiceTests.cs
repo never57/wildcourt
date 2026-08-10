@@ -257,4 +257,49 @@ public class CropServiceTests : IDisposable
         Assert.Equal(12, tx.Count);
         Assert.Equal(0, tx.Price);
     }
+
+    [Fact]
+    public async Task Harvest_AfterSteal_ReturnsRemaining()
+    {
+        _db.FarmPlots.Add(new FarmPlotEntity
+        {
+            UserId = UserId,
+            CellId = 0,
+            CropId = "C01",
+            PlantedAt = DateTime.UtcNow.AddMinutes(-30),
+            ReadyAt = DateTime.UtcNow.AddMinutes(-1),
+            State = "growing",
+            StolenCount = 3, // 已被好友偷 3 个
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+
+        var result = await _service.HarvestAsync(UserId, 0);
+
+        Assert.Equal(9, result.Count); // 12 - 3
+        var inv = await _db.Inventories.SingleAsync(i => i.UserId == UserId && i.ItemId == "C01");
+        Assert.Equal(9, inv.Count);
+    }
+
+    [Fact]
+    public async Task Harvest_AllStolen_Throws()
+    {
+        _db.FarmPlots.Add(new FarmPlotEntity
+        {
+            UserId = UserId,
+            CellId = 0,
+            CropId = "C01",
+            PlantedAt = DateTime.UtcNow.AddMinutes(-30),
+            ReadyAt = DateTime.UtcNow.AddMinutes(-1),
+            State = "growing",
+            StolenCount = 12, // 全被偷光
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<BusinessException>(() => _service.HarvestAsync(UserId, 0));
+
+        Assert.Equal(ApiCodes.BadRequest, ex.Code);
+        Assert.Contains("已被偷光", ex.Message);
+    }
 }

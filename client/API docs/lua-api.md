@@ -408,7 +408,7 @@ end)
 ### 7.8 宠物 / 好友 / 活动 / 小游戏（端点见 §1.2）
 
 - `PetController` `api/v1/pet`：`GET /info`、`POST /dispatch`、`POST /recall`（骨架）
-- `FriendController` `api/v1/friend`：`POST /apply`、`POST /accept`、`POST /steal`、`POST /feed`、`GET /yard/{id}`（骨架）
+- `FriendController` `api/v1/friend`：`POST /steal` 已实现（偷取成熟作物 30% 产量，每好友每作物每天 1 次、每日 20 次；body `{ targetUserId, cellId }`，响应 `{ targetUserId, cropId, count }`）；`POST /apply` / `POST /accept` / `POST /feed` / `GET /yard/{id}`（骨架）
 - `ActivityController` `api/v1/activity`：`GET /list`、`POST /claim/{id}`（骨架）
 - `MiniGameController` `api/v1/minigame`：`POST /start/{id}`、`POST /finish`、`GET /daily-cap`（骨架）
 - `AdminController` `api/v1/admin`：管理端（骨架）

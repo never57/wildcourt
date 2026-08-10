@@ -23,5 +23,8 @@ public class FarmPlotEntity
     /// <summary>growing / mature（查询时计算）。</summary>
     public string State { get; set; } = "growing";
 
+    /// <summary>已被好友偷取的数量（收获时扣除，文档 08 §8.3：剩余 70%）。</summary>
+    public int StolenCount { get; set; }
+
     public DateTime UpdatedAt { get; set; }
 }

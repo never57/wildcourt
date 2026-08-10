@@ -63,14 +63,14 @@ namespace WildCourt.Net.Protocol
     public class StealRequest
     {
         public long targetUserId;
-        public string cropCellId; // 目标农田格
+        public int cellId; // 目标农田格（0 起）
     }
 
     [Serializable]
     public class StealResultResponse
     {
         public string cropId;
-        public int stolenCount;   // 0 = 未偷到（概率未中/已偷过/保护罩）
+        public int count;   // 偷取数量（floor(yield × 0.3)，受余量限制）
     }
 
     [Serializable]

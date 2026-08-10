@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using WildCourt.Api.Models;
+using WildCourt.Api.Services;
 
 namespace WildCourt.Api.Controllers;
 
@@ -10,6 +11,13 @@ namespace WildCourt.Api.Controllers;
 [Route("api/v1/friend")]
 public class FriendController : ControllerBase
 {
+    private readonly FriendService _friendService;
+
+    public FriendController(FriendService friendService)
+    {
+        _friendService = friendService;
+    }
+
     /// <summary>好友申请</summary>
     [HttpPost("apply")]
     public Task<ApiResponse<object>> Apply([FromBody] object request)
@@ -24,11 +32,12 @@ public class FriendController : ControllerBase
         throw new NotImplementedException();
     }
 
-    /// <summary>偷菜（30% 产量、每日上限）</summary>
+    /// <summary>偷菜（30% 产量向下取整、每好友每作物每天 1 次、每日 20 次，文档 08 §8.3）。</summary>
     [HttpPost("steal")]
-    public Task<ApiResponse<object>> Steal([FromBody] object request)
+    public async Task<ApiResponse<StealResultDto>> Steal([FromBody] StealCropRequest request)
     {
-        throw new NotImplementedException();
+        var result = await _friendService.StealAsync(GetUserId(), request.TargetUserId, request.CellId);
+        return ApiResponse<StealResultDto>.Ok(result);
     }
 
     /// <summary>喂食（3 次/天）</summary>
@@ -43,5 +52,12 @@ public class FriendController : ControllerBase
     public Task<ApiResponse<Yard>> GetYard(long userId)
     {
         throw new NotImplementedException();
+    }
+
+    private long GetUserId()
+    {
+        if (HttpContext.Items.TryGetValue("UserId", out var value) && value is long userId)
+            return userId;
+        throw new BusinessException(ApiCodes.Unauthorized, "未登录");
     }
 }

@@ -52,6 +52,10 @@ namespace WildCourt.Data.Migrations
                         .HasColumnType("varchar(16)")
                         .HasColumnName("state");
 
+                    b.Property<int>("StolenCount")
+                        .HasColumnType("int")
+                        .HasColumnName("stolen_count");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("updated_at");
@@ -179,6 +183,46 @@ namespace WildCourt.Data.Migrations
                     b.HasKey("PetId");
 
                     b.ToTable("pets", (string)null);
+                });
+
+            modelBuilder.Entity("WildCourt.Data.Entities.StealRecordEntity", b =>
+                {
+                    b.Property<long>("RecordId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("record_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("RecordId"));
+
+                    b.Property<int>("CellId")
+                        .HasColumnType("int")
+                        .HasColumnName("cell_id");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("int")
+                        .HasColumnName("count");
+
+                    b.Property<string>("CropId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("crop_id");
+
+                    b.Property<long>("StealerUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stealer_user_id");
+
+                    b.Property<DateTime>("StolenAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("stolen_at");
+
+                    b.Property<long>("TargetUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("target_user_id");
+
+                    b.HasKey("RecordId");
+
+                    b.ToTable("steal_records", (string)null);
                 });
 
             modelBuilder.Entity("WildCourt.Data.Entities.TransactionEntity", b =>
