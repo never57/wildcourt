@@ -329,7 +329,7 @@ namespace WildCourt.Lua
                     SkipWs();
                     string key = ParseString();
                     SkipWs();
-                    Expect(':');
+                    Expect(":");
                     object val = ParseValue();
                     t.Set(key, val);
                     SkipWs();
