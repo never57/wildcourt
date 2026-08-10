@@ -29,8 +29,20 @@ namespace WildCourt.Lua
             var wc = env.NewTable();
             wc.Set("config", BuildConfig(env));
             wc.Set("net", BuildNet(env));
+            wc.Set("event", BuildEvent(env));
             wc.Set("timer", BuildTimer(env));
             env.Global.Set("WC", wc);
+        }
+
+        // ---------- WC.event ----------
+
+        private static LuaTable BuildEvent(LuaEnv env)
+        {
+            var t = env.NewTable();
+            t.Set("on", new Func<string, LuaFunction, long>((name, cb) => LuaEventBridge.On(name, cb)));
+            t.Set("off", new Action<string, long>((name, handle) => LuaEventBridge.Off(name, handle)));
+            t.Set("publish", new Action<string, LuaTable>((name, payload) => LuaEventBridge.Publish(name, payload)));
+            return t;
         }
 
         // ---------- WC.config ----------

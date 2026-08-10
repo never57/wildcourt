@@ -5,6 +5,7 @@ using WildCourt.Lua;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
 using WildCourt.UI;
+using WildCourt.UI.Farm;
 
 namespace WildCourt.Gameplay.Crop
 {
@@ -86,6 +87,7 @@ namespace WildCourt.Gameplay.Crop
                     Debug.Log($"[DebugSceneAutoLogin] 登录成功 user={TestUsername} userId={resp.data.userId}");
                     Debug.Log("[DebugSceneAutoLogin] 可执行调试 Lua（如 require('Logic.Farm.FarmDebug') 后调 Init()/Plant()）");
                     OnLoggedIn?.Invoke(resp.data.token);
+                    FarmPanel.CreateOrInstantiate();
                 },
                 onError: (code, msg) =>
                 {

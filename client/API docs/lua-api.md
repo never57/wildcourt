@@ -164,6 +164,7 @@ end
 ## 3. `WC.event` — 全局事件（EventBus）
 
 发布 / 订阅 `EventBus` 全局事件（见 `client/Assets/Scripts/Core/EventBus.cs`）。事件名见 `Core/Events.cs` 中的常量。
+> 已实现（`LuaEventBridge`，`Scripts/Lua/LuaEventBridge.cs`）：Lua 与 C# 回调按事件名并存。
 
 | 方法 | 签名 | 说明 |
 |---|---|---|
@@ -181,6 +182,7 @@ WC.event.off("GameReady", h)
 ```
 
 > 常见事件名（与 `Core/Events.cs` 对齐）：`GameReady`、`ConfigLoaded`、`LoggedIn`、`CurrencyChanged` 等。新增全局事件请登记到 `Events.cs` 并补在此处。
+> 玩法事件（FarmManager 发布，`FarmPanel` 订阅）：`Farm.PlantResult` / `Farm.HarvestResult` / `Farm.SellResult` / `Farm.Mature`，载荷含 `cellId`/`cropId`/`ok`/`msg`/`count` 等字段。
 
 ---
 
@@ -519,7 +521,7 @@ LuaManager.Instance.DoFile("Main");  // 对应 Assets/LuaScripts/Main.lua
 ## 9. 待办（骨架阶段）
 
 - [x] `WC.net` / `WC.config` / `WC.timer` 桥接已实现（`Scripts/Lua/WCBridge.cs` + `LuaTimerService.cs`，`LuaManager.Init` 自动挂载）
-- [ ] `WC.event` / `WC.ui` / `WC.push` 桥接（待实现）
+- [x] `WC.event` 桥接已实现（`LuaEventBridge`）；`WC.ui` / `WC.push` 待实现
 - [ ] 各系统 Lua 脚本（匹配 / 签到 / 活动 / 信件）接入上述 API
 - [ ] 服务端 `api.yaml` 补全端点（与 §1.2 / §7 对齐），并启用 Swagger 以便联调
 - [ ] 待实现 Controller（Letter/SignIn/Pet/Friend/Activity/MiniGame/Admin）落地 Service

@@ -42,6 +42,8 @@ local defaultProvider = {
     clearTimeout = nil,
     -- 日志
     log = function(...) print(...) end,
+    -- 发布事件：function(name, payload)（WC.event.publish；缺失时 no-op）
+    publish = function() end,
 }
 
 local provider = {}
@@ -77,6 +79,7 @@ local function markMature(plot)
     plot._timer = nil
     provider.log(string.format("[FarmManager] 作物成熟: 格子 %d %s(%s)",
         plot.cellId, plot.cropId, tostring(plot.cropName)))
+    provider.publish("Farm.Mature", { cellId = plot.cellId, plot = clonePlot(plot) })
     if M.OnCropMature then
         local ok, err = pcall(M.OnCropMature, plot.cellId, clonePlot(plot))
         if not ok then
@@ -116,15 +119,19 @@ end
 -- @param cb 可选 function(ok, result|msg)
 function M.Plant(cellId, cropId, cb)
     cb = cb or function() end
+    local function fail(msg)
+        provider.publish("Farm.PlantResult", { cellId = cellId, cropId = cropId, ok = false, msg = msg })
+        return cb(false, msg)
+    end
     cellId = normalizeCellId(cellId)
-    if cellId == nil then return cb(false, "cellId 非法") end
+    if cellId == nil then return fail("cellId 非法") end
     if type(cropId) ~= "string" or cropId == "" then
-        return cb(false, "cropId 不能为空")
+        return fail("cropId 不能为空")
     end
 
     local existing = plots[cellId]
     if existing and existing.state == "growing" then
-        return cb(false, "该农田格已有作物在生长")
+        return fail("该农田格已有作物在生长")
     end
     if existing then
         -- 覆盖成熟/过期格：先清掉旧倒计时
@@ -137,23 +144,23 @@ function M.Plant(cellId, cropId, cb)
     -- 识别作物种类与时长
     local crop = provider.getCrop(cropId)
     if not crop then
-        return cb(false, "未知作物: " .. cropId)
+        return fail("未知作物: " .. cropId)
     end
     local growTimeMin = tonumber(crop.growTime)
     if not growTimeMin or growTimeMin <= 0 then
-        return cb(false, "作物生长时长非法: " .. cropId)
+        return fail("作物生长时长非法: " .. cropId)
     end
 
     local readyAt = provider.now() + growTimeMin * 60
 
     local send = provider.sendPlant
     if not send then
-        return cb(false, "未接入网络层（sendPlant 未注入）")
+        return fail("未接入网络层（sendPlant 未注入）")
     end
 
     send({ cellId = cellId, cropId = cropId, readyAt = readyAt }, function(resp)
         if not resp or resp.code ~= 0 then
-            return cb(false, (resp and resp.msg) or "上报种植失败")
+            return fail((resp and resp.msg) or "上报种植失败")
         end
         local plot = {
             cellId = cellId,
@@ -167,6 +174,7 @@ function M.Plant(cellId, cropId, cb)
         scheduleMature(plot)
         provider.log(string.format("[FarmManager] 种植成功: 格子 %d %s(%s) 结束时间 %d",
             cellId, cropId, tostring(crop.name), readyAt))
+        provider.publish("Farm.PlantResult", { cellId = cellId, cropId = cropId, ok = true, msg = "" })
         cb(true, clonePlot(plot))
     end)
 end
@@ -233,23 +241,31 @@ end
 --- 收获成熟作物：上报服务端（产量入背包并清空格子），成功后清本地状态。
 function M.Harvest(cellId, cb)
     cb = cb or function() end
+    local function fail(msg)
+        provider.publish("Farm.HarvestResult", { cellId = cellId, ok = false, msg = msg })
+        return cb(false, msg)
+    end
     cellId = normalizeCellId(cellId)
-    if cellId == nil then return cb(false, "cellId 非法") end
+    if cellId == nil then return fail("cellId 非法") end
     local p = plots[cellId]
-    if not p then return cb(false, "该农田格没有作物") end
-    if p.state ~= "mature" then return cb(false, "作物尚未成熟") end
+    if not p then return fail("该农田格没有作物") end
+    if p.state ~= "mature" then return fail("作物尚未成熟") end
 
     local send = provider.sendHarvest
     if not send then
-        return cb(false, "未接入网络层（sendHarvest 未注入）")
+        return fail("未接入网络层（sendHarvest 未注入）")
     end
     send({ cellId = cellId }, function(resp)
         if not resp or resp.code ~= 0 then
-            return cb(false, (resp and resp.msg) or "收获失败")
+            return fail((resp and resp.msg) or "收获失败")
         end
         if p._timer and provider.clearTimeout then provider.clearTimeout(p._timer) end
         plots[cellId] = nil
         provider.log("[FarmManager] 收获成功: 格子 " .. cellId)
+        provider.publish("Farm.HarvestResult", {
+            cellId = cellId, cropId = p.cropId, ok = true,
+            count = resp.data and resp.data.count or 0, msg = "",
+        })
         cb(true, resp.data)
     end)
 end
@@ -257,22 +273,27 @@ end
 --- 出售原始作物换庭贝（服务端校验，仅 Config_Crops 内作物可售）。
 function M.SellCrop(itemId, count, cb)
     cb = cb or function() end
+    local function fail(msg)
+        provider.publish("Farm.SellResult", { itemId = itemId, count = count, ok = false, msg = msg })
+        return cb(false, msg)
+    end
     if type(itemId) ~= "string" or itemId == "" then
-        return cb(false, "itemId 不能为空")
+        return fail("itemId 不能为空")
     end
     count = tonumber(count)
     if not count or count <= 0 then
-        return cb(false, "出售数量必须大于 0")
+        return fail("出售数量必须大于 0")
     end
     local send = provider.sendSell
     if not send then
-        return cb(false, "未接入网络层（sendSell 未注入）")
+        return fail("未接入网络层（sendSell 未注入）")
     end
     send({ itemId = itemId, count = count }, function(resp)
         if not resp or resp.code ~= 0 then
-            return cb(false, (resp and resp.msg) or "出售失败")
+            return fail((resp and resp.msg) or "出售失败")
         end
         provider.log(string.format("[FarmManager] 出售成功: %s x%d", itemId, count))
+        provider.publish("Farm.SellResult", { itemId = itemId, count = count, ok = true, shell = resp.data and resp.data.shell or 0, msg = "" })
         cb(true, resp.data)
     end)
 end
@@ -316,6 +337,12 @@ local function AutoBind()
     if type(WC) == "table" and type(WC.timer) == "table" and WC.timer.setTimeout then
         provider.setTimeout = WC.timer.setTimeout
         provider.clearTimeout = WC.timer.clearTimeout
+        bound = true
+    end
+    if type(WC) == "table" and type(WC.event) == "table" and WC.event.publish then
+        provider.publish = function(name, payload)
+            WC.event.publish(name, payload)
+        end
         bound = true
     end
     if bound then
