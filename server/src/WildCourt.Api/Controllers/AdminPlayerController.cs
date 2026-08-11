@@ -18,6 +18,7 @@ public class AdminPlayerController : AdminControllerBase
     [HttpGet("players")]
     public async Task<ApiResponse<PagedResult<PlayerAdminDto>>> List([FromQuery] AdminPlayerSearchRequest request)
     {
+        RequirePermission(AdminPermissions.PlayersView);
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
         return ApiResponse<PagedResult<PlayerAdminDto>>.Ok(
@@ -28,6 +29,7 @@ public class AdminPlayerController : AdminControllerBase
     [HttpGet("players/{userId}")]
     public async Task<ApiResponse<PlayerDetailDto>> Detail(long userId)
     {
+        RequirePermission(AdminPermissions.PlayersView);
         return ApiResponse<PlayerDetailDto>.Ok(await _adminService.GetPlayerDetailAsync(userId));
     }
 
@@ -35,6 +37,7 @@ public class AdminPlayerController : AdminControllerBase
     [HttpPut("players/{userId}/currency")]
     public async Task<ApiResponse<object>> UpdateCurrency(long userId, [FromBody] UpdatePlayerCurrencyRequest request)
     {
+        RequirePermission(AdminPermissions.PlayersEdit);
         await _adminService.UpdatePlayerCurrencyAsync(userId, request);
         return ApiResponse<object>.Ok(new object());
     }
@@ -43,6 +46,7 @@ public class AdminPlayerController : AdminControllerBase
     [HttpPut("players/{userId}/profile")]
     public async Task<ApiResponse<object>> UpdateProfile(long userId, [FromBody] UpdatePlayerProfileRequest request)
     {
+        RequirePermission(AdminPermissions.PlayersEdit);
         await _adminService.UpdatePlayerProfileAsync(userId, request);
         return ApiResponse<object>.Ok(new object());
     }
@@ -51,6 +55,7 @@ public class AdminPlayerController : AdminControllerBase
     [HttpPost("players/{userId}/ban")]
     public async Task<ApiResponse<object>> Ban(long userId)
     {
+        RequirePermission(AdminPermissions.PlayersBan);
         var changed = await _adminService.BanAsync(userId);
         return ApiResponse<object>.Ok(new { Changed = changed });
     }
@@ -59,6 +64,7 @@ public class AdminPlayerController : AdminControllerBase
     [HttpPost("players/{userId}/unban")]
     public async Task<ApiResponse<object>> Unban(long userId)
     {
+        RequirePermission(AdminPermissions.PlayersBan);
         var changed = await _adminService.UnbanAsync(userId);
         return ApiResponse<object>.Ok(new { Changed = changed });
     }

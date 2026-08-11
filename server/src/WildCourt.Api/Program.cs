@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using WildCourt.Api.Hubs;
 using WildCourt.Api.Middleware;
+using WildCourt.Api.Models;
 using WildCourt.Api.Services;
 using WildCourt.Api.Utils;
 using WildCourt.Data.DbContext;
@@ -44,6 +45,8 @@ builder.Services.AddScoped<FriendService>();
 var adminSecret = builder.Configuration["Admin:JwtSecret"] ?? "wildcourt-admin-secret-change-me";
 var adminTtlHours = double.TryParse(builder.Configuration["Admin:JwtExpireHours"], out var h) ? h : 24;
 builder.Services.AddSingleton(new AdminTokenService(adminSecret, TimeSpan.FromHours(adminTtlHours)));
+builder.Services.AddSingleton<CaptchaService>();
+builder.Services.AddSingleton<TotpService>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<AdminAuditService>();
 builder.Services.AddSingleton<DockerService>();
@@ -85,7 +88,7 @@ using (var scope = app.Services.CreateScope())
         var rawPassword = builder.Configuration["Admin:DefaultPassword"] ?? "admin888";
         var passwordSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawPassword))).ToLowerInvariant();
         var displayName = builder.Configuration["Admin:DefaultDisplayName"] ?? "运营管理员";
-        await adminService.CreateAdminAsync(username, passwordSha256, displayName);
+        await adminService.CreateAdminAsync(username, passwordSha256, displayName, AdminPermissions.RoleSuperAdmin);
     }
     catch (Exception ex)
     {

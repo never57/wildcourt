@@ -84,7 +84,7 @@
         <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openLogs(row)">日志</el-button>
-            <el-popconfirm title="确认重启该容器？" @confirm="restart(row)">
+            <el-popconfirm v-if="canRestart" title="确认重启该容器？" @confirm="restart(row)">
               <template #reference>
                 <el-button link type="warning" size="small">重启</el-button>
               </template>
@@ -113,6 +113,10 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { serverApi, type ContainerInfo, type ServerOverview } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canRestart = computed(() => authStore.hasPermission('server:restart'))
 
 const overview = ref<ServerOverview | null>(null)
 const containers = ref<ContainerInfo[]>([])

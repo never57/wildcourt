@@ -18,6 +18,7 @@ public class AdminDashboardController : AdminControllerBase
     [HttpGet("dashboard/summary")]
     public async Task<ApiResponse<DashboardSummaryResponse>> Summary()
     {
+        RequirePermission(AdminPermissions.DashboardView);
         return ApiResponse<DashboardSummaryResponse>.Ok(await _adminService.GetDashboardSummaryAsync());
     }
 }

@@ -1,5 +1,19 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { TOKEN_KEY } from '@/api/http'
+import { useAuthStore } from '@/stores/auth'
+
+// 各页面所需权限（任一满足即允许进入）
+const permMap: Record<string, string[]> = {
+  dashboard: ['dashboard:view'],
+  server: ['server:view'],
+  players: ['players:view'],
+  reviews: ['reviews:view'],
+  announcements: ['announcements:view'],
+  database: ['database:view'],
+  deploy: ['deploy:view'],
+  'audit-logs': ['audit:view'],
+  admins: ['admins:view'],
+}
 
 const routes: RouteRecordRaw[] = [
   {
@@ -24,6 +38,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'admins', name: 'admins', component: () => import('@/views/Admins.vue'), meta: { title: '管理员账号' } },
     ],
   },
+  { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 
 const router = createRouter({
@@ -31,13 +46,29 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   document.title = to.meta.title ? `${to.meta.title} · WildCourt 运营后台` : 'WildCourt 运营后台'
   const token = localStorage.getItem(TOKEN_KEY)
   if (!token && to.path !== '/login') {
     return '/login'
   }
   if (token && to.path === '/login') {
+    return '/dashboard'
+  }
+  if (!token) return true
+
+  // 加载 profile（含权限）
+  const auth = useAuthStore()
+  if (!auth.profile) {
+    try {
+      await auth.fetchProfile()
+    } catch {
+      auth.logout()
+      return '/login'
+    }
+  }
+  const perms = permMap[to.name as string]
+  if (perms && !auth.hasPermission(...perms)) {
     return '/dashboard'
   }
   return true

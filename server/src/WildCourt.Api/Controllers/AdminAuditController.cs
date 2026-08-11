@@ -21,6 +21,7 @@ public class AdminAuditController : AdminControllerBase
     [HttpGet("audit-logs")]
     public async Task<ApiResponse<PagedResult<AdminOperationLogDto>>> Query([FromQuery] AuditLogQueryRequest query)
     {
+        RequirePermission(AdminPermissions.AuditView);
         return ApiResponse<PagedResult<AdminOperationLogDto>>.Ok(await _service.QueryAsync(query));
     }
 
@@ -28,6 +29,7 @@ public class AdminAuditController : AdminControllerBase
     [HttpGet("audit-actions")]
     public async Task<ApiResponse<List<string>>> Actions()
     {
+        RequirePermission(AdminPermissions.AuditView);
         return ApiResponse<List<string>>.Ok(await _service.GetActionsAsync());
     }
 }

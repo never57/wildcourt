@@ -3,7 +3,7 @@
     <template #header>
       <div class="card-header">
         <span>管理员账号</span>
-        <el-button type="primary" @click="dialogVisible = true">新建管理员</el-button>
+        <el-button v-if="authStore.hasPermission('admins:edit')" type="primary" @click="dialogVisible = true">新建管理员</el-button>
       </div>
     </template>
 
@@ -11,6 +11,11 @@
       <el-table-column prop="adminId" label="ID" width="80" />
       <el-table-column prop="username" label="账号" min-width="140" />
       <el-table-column prop="displayName" label="显示名" min-width="140" />
+      <el-table-column label="角色" width="120">
+        <template #default="{ row }">
+          <el-tag :type="roleTagType(row.role)" size="small">{{ row.roleName }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="row.isActive ? 'success' : 'info'" size="small">
@@ -24,36 +29,39 @@
       <el-table-column label="创建时间" width="170">
         <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column label="操作" width="300" fixed="right">
         <template #default="{ row }">
-          <el-button
-            v-if="row.isActive && row.adminId !== currentAdminId"
-            link
-            type="warning"
-            size="small"
-            @click="toggleActive(row, false)"
-          >
-            停用
-          </el-button>
-          <el-button
-            v-else-if="!row.isActive"
-            link
-            type="success"
-            size="small"
-            @click="toggleActive(row, true)"
-          >
-            启用
-          </el-button>
-          <el-button link type="primary" size="small" @click="openReset(row)">重置密码</el-button>
-          <el-button
-            v-if="row.adminId !== currentAdminId"
-            link
-            type="danger"
-            size="small"
-            @click="remove(row)"
-          >
-            删除
-          </el-button>
+          <template v-if="authStore.hasPermission('admins:edit')">
+            <el-button
+              v-if="row.isActive && row.adminId !== currentAdminId"
+              link
+              type="warning"
+              size="small"
+              @click="toggleActive(row, false)"
+            >
+              停用
+            </el-button>
+            <el-button
+              v-else-if="!row.isActive"
+              link
+              type="success"
+              size="small"
+              @click="toggleActive(row, true)"
+            >
+              启用
+            </el-button>
+            <el-button link type="primary" size="small" @click="openChangeRole(row)">改角色</el-button>
+            <el-button link type="primary" size="small" @click="openReset(row)">重置密码</el-button>
+            <el-button
+              v-if="row.adminId !== currentAdminId"
+              link
+              type="danger"
+              size="small"
+              @click="remove(row)"
+            >
+              删除
+            </el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -68,6 +76,16 @@
         </el-form-item>
         <el-form-item label="显示名" prop="displayName">
           <el-input v-model="form.displayName" placeholder="如：运营-张三" maxlength="32" />
+        </el-form-item>
+        <el-form-item label="角色" prop="role">
+          <el-select v-model="form.role" placeholder="选择角色" style="width: 100%">
+            <el-option
+              v-for="r in roles"
+              :key="r.role"
+              :label="`${r.name}（${r.role}）`"
+              :value="r.role"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -90,13 +108,38 @@
         <el-button type="primary" :loading="resetting" @click="submitReset">确认重置</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="roleVisible" title="调整角色" width="420px">
+      <el-form label-width="80px">
+        <el-form-item label="账号">
+          <span>{{ roleTarget?.username }}</span>
+        </el-form-item>
+        <el-form-item label="当前角色">
+          <el-tag size="small">{{ roleTarget?.roleName }}</el-tag>
+        </el-form-item>
+        <el-form-item label="新角色" prop="role">
+          <el-select v-model="roleForm.role" placeholder="选择新角色" style="width: 100%">
+            <el-option
+              v-for="r in roles"
+              :key="r.role"
+              :label="`${r.name}（${r.role}）`"
+              :value="r.role"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="roleVisible = false">取消</el-button>
+        <el-button type="primary" :loading="roleSaving" @click="submitRole">确认修改</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { authApi, type AdminItem } from '@/api'
+import { authApi, type AdminItem, type AdminRoleInfo } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { sha256Hex } from '@/utils/sha256'
 
@@ -104,6 +147,7 @@ const authStore = useAuthStore()
 const currentAdminId = computed(() => authStore.profile?.adminId ?? 0)
 
 const items = ref<AdminItem[]>([])
+const roles = ref<AdminRoleInfo[]>([])
 const loading = ref(false)
 const dialogVisible = ref(false)
 const saving = ref(false)
@@ -121,13 +165,31 @@ const resetRules: FormRules = {
   ],
 }
 
-const form = reactive({ username: '', password: '', displayName: '' })
+const roleVisible = ref(false)
+const roleSaving = ref(false)
+const roleTarget = ref<AdminItem | null>(null)
+const roleForm = reactive({ role: '' })
+
+const form = reactive({ username: '', password: '', displayName: '', role: 'operator' })
 const rules: FormRules = {
   username: [{ required: true, message: '请输入账号', trigger: 'blur' }],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码至少 6 位', trigger: 'blur' },
   ],
+}
+
+function roleTagType(role: string) {
+  switch (role) {
+    case 'superadmin':
+      return 'danger'
+    case 'operator':
+      return 'warning'
+    case 'support':
+      return 'success'
+    default:
+      return 'info'
+  }
 }
 
 async function fetchList() {
@@ -141,6 +203,14 @@ async function fetchList() {
   }
 }
 
+async function fetchRoles() {
+  try {
+    roles.value = await authApi.listRoles()
+  } catch {
+    // 拦截器提示
+  }
+}
+
 async function submit() {
   if (!formRef.value) return
   const valid = await formRef.value.validate().catch(() => false)
@@ -151,17 +221,48 @@ async function submit() {
       username: form.username.trim(),
       password: await sha256Hex(form.password),
       displayName: form.displayName.trim(),
+      role: form.role,
     })
     ElMessage.success('创建成功')
     dialogVisible.value = false
     form.username = ''
     form.password = ''
     form.displayName = ''
+    form.role = 'operator'
     fetchList()
   } catch {
     // 拦截器提示
   } finally {
     saving.value = false
+  }
+}
+
+function openChangeRole(row: AdminItem) {
+  roleTarget.value = row
+  roleForm.role = row.role
+  roleVisible.value = true
+}
+
+async function submitRole() {
+  if (!roleTarget.value) return
+  if (!roleForm.role) {
+    ElMessage.warning('请选择新角色')
+    return
+  }
+  roleSaving.value = true
+  try {
+    await authApi.updateRole(roleTarget.value.adminId, roleForm.role)
+    ElMessage.success('角色已更新')
+    roleVisible.value = false
+    // 修改了当前账号角色时刷新本地权限
+    if (roleTarget.value.adminId === currentAdminId.value) {
+      await authStore.fetchProfile()
+    }
+    fetchList()
+  } catch {
+    // 拦截器提示
+  } finally {
+    roleSaving.value = false
   }
 }
 
@@ -231,7 +332,12 @@ function formatDate(value: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-onMounted(fetchList)
+onMounted(() => {
+  fetchList()
+  if (authStore.hasPermission('admins:edit')) {
+    fetchRoles()
+  }
+})
 </script>
 
 <style scoped>

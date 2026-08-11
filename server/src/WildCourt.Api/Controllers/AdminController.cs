@@ -21,6 +21,7 @@ public class AdminController : AdminControllerBase
     [HttpPost("letter/review")]
     public async Task<ApiResponse<object>> ReviewLetter([FromBody] ReviewLetterRequest request)
     {
+        RequirePermission(AdminPermissions.ReviewsEdit);
         await _adminService.ReviewLetterAsync(request.LetterId, request.Approve);
         return ApiResponse<object>.Ok(new object());
     }
@@ -29,6 +30,7 @@ public class AdminController : AdminControllerBase
     [HttpGet("audit-queue")]
     public async Task<ApiResponse<List<ReviewQueueItemDto>>> GetAuditQueue()
     {
+        RequirePermission(AdminPermissions.ReviewsView);
         return ApiResponse<List<ReviewQueueItemDto>>.Ok(await _adminService.GetAuditQueueAsync());
     }
 
@@ -36,6 +38,7 @@ public class AdminController : AdminControllerBase
     [HttpPost("ban/{userId}")]
     public async Task<ApiResponse<object>> BanUser(long userId)
     {
+        RequirePermission(AdminPermissions.PlayersBan);
         var changed = await _adminService.BanAsync(userId);
         return ApiResponse<object>.Ok(new { Changed = changed });
     }

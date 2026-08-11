@@ -19,13 +19,16 @@ public class AdminTokenService
         _ttl = ttl;
     }
 
-    public string Issue(long adminId)
+    public string Issue(long adminId) => Issue(adminId, _ttl);
+
+    /// <summary>签发指定有效期的令牌（双因素临时票据用短 TTL）。</summary>
+    public string Issue(long adminId, TimeSpan ttl)
     {
         var payload = new Dictionary<string, object>
         {
             ["sub"] = adminId,
             ["iat"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-            ["exp"] = DateTimeOffset.UtcNow.Add(_ttl).ToUnixTimeSeconds(),
+            ["exp"] = DateTimeOffset.UtcNow.Add(ttl).ToUnixTimeSeconds(),
         };
         var body = Base64Url(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
         var sig = Sign(body);

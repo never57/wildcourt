@@ -18,6 +18,7 @@ public class AdminDeployController : AdminControllerBase
     [HttpGet("deploy/status")]
     public ApiResponse<DeployStatusResponse> Status()
     {
+        RequirePermission(AdminPermissions.DeployView);
         return ApiResponse<DeployStatusResponse>.Ok(_deploy.GetStatus());
     }
 
@@ -25,6 +26,7 @@ public class AdminDeployController : AdminControllerBase
     [HttpGet("deploy/logs")]
     public ApiResponse<List<string>> Logs([FromQuery] int count = 200)
     {
+        RequirePermission(AdminPermissions.DeployView);
         return ApiResponse<List<string>>.Ok(_deploy.GetRecentLog(Math.Clamp(count, 10, 1000)));
     }
 
@@ -33,6 +35,7 @@ public class AdminDeployController : AdminControllerBase
     [RequestSizeLimit(200 * 1024 * 1024)]
     public async Task<ApiResponse<object>> Upload(IFormFile file)
     {
+        RequirePermission(AdminPermissions.DeployEdit);
         var count = await _deploy.UploadPackageAsync(file);
         return ApiResponse<object>.Ok(new { Files = count, Message = $"已解压 {count} 个文件，可以执行构建部署" });
     }
@@ -41,6 +44,7 @@ public class AdminDeployController : AdminControllerBase
     [HttpGet("deploy/files")]
     public ApiResponse<List<FileEntryDto>> ListFiles([FromQuery] string? path)
     {
+        RequirePermission(AdminPermissions.DeployView);
         return ApiResponse<List<FileEntryDto>>.Ok(_deploy.ListFiles(path ?? string.Empty));
     }
 
@@ -49,6 +53,7 @@ public class AdminDeployController : AdminControllerBase
     [RequestSizeLimit(100 * 1024 * 1024)]
     public ApiResponse<object> UploadFile(IFormFile file, [FromForm] string? path)
     {
+        RequirePermission(AdminPermissions.DeployEdit);
         var entry = _deploy.UploadFile(path ?? string.Empty, file);
         return ApiResponse<object>.Ok(new { entry.Path, entry.Size, Message = $"已上传 {entry.Name}" });
     }
@@ -57,6 +62,7 @@ public class AdminDeployController : AdminControllerBase
     [HttpDelete("deploy/file")]
     public ApiResponse<object> DeleteFile([FromQuery] string path)
     {
+        RequirePermission(AdminPermissions.DeployEdit);
         _deploy.DeleteFile(path);
         return ApiResponse<object>.Ok(new { Message = "已删除" });
     }
@@ -65,6 +71,7 @@ public class AdminDeployController : AdminControllerBase
     [HttpPost("deploy/mkdir")]
     public ApiResponse<object> CreateDirectory([FromBody] CreateDirectoryRequest request)
     {
+        RequirePermission(AdminPermissions.DeployEdit);
         _deploy.CreateDirectory(request.Path);
         return ApiResponse<object>.Ok(new { Message = "目录已创建" });
     }
@@ -73,6 +80,7 @@ public class AdminDeployController : AdminControllerBase
     [HttpGet("deploy/file/content")]
     public ApiResponse<FileContentDto> GetFileContent([FromQuery] string path)
     {
+        RequirePermission(AdminPermissions.DeployView);
         return ApiResponse<FileContentDto>.Ok(_deploy.GetFileContent(path));
     }
 
@@ -81,6 +89,7 @@ public class AdminDeployController : AdminControllerBase
     [RequestSizeLimit(5 * 1024 * 1024)]
     public ApiResponse<object> SaveFileContent([FromBody] SaveFileRequest request)
     {
+        RequirePermission(AdminPermissions.DeployEdit);
         var dto = _deploy.SaveFileContent(request.Path, request.Content, request.Encoding);
         return ApiResponse<object>.Ok(new { dto.Path, dto.Size, Message = "已保存，执行构建部署后生效" });
     }
@@ -89,6 +98,7 @@ public class AdminDeployController : AdminControllerBase
     [HttpPost("deploy/build")]
     public async Task<ApiResponse<object>> Build([FromBody] DeployBuildRequest request)
     {
+        RequirePermission(AdminPermissions.DeployEdit);
         await Task.Yield();
         var started = _deploy.BuildAndDeployAsync(request.NoCache, request.Service);
         if (!started)

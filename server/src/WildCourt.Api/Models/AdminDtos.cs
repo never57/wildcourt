@@ -1,3 +1,5 @@
+using WildCourt.Data.Entities;
+
 namespace WildCourt.Api.Models;
 
 // ============ 认证 ============
@@ -8,6 +10,18 @@ public class AdminLoginRequest
 
     /// <summary>客户端 SHA256 hex（与玩家登录约定一致）。</summary>
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>验证码 ID（先调 /auth/captcha 获取）。</summary>
+    public string? CaptchaId { get; set; }
+
+    /// <summary>验证码内容。</summary>
+    public string? CaptchaCode { get; set; }
+
+    /// <summary>双因素验证（第二步时传）。</summary>
+    public string? TotpCode { get; set; }
+
+    /// <summary>双因素登录的临时票据（第二步时传）。</summary>
+    public string? TotpTicket { get; set; }
 }
 
 public class AdminLoginResponse
@@ -18,7 +32,15 @@ public class AdminLoginResponse
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public string Role { get; set; } = string.Empty;
+
     public DateTime ExpireAt { get; set; }
+
+    /// <summary>是否需要双因素第二步验证。</summary>
+    public bool NeedTotp { get; set; }
+
+    /// <summary>双因素临时票据（NeedTotp=true 时返回，5 分钟有效）。</summary>
+    public string? TotpTicket { get; set; }
 }
 
 public class AdminProfileResponse
@@ -28,6 +50,14 @@ public class AdminProfileResponse
     public string Username { get; set; } = string.Empty;
 
     public string DisplayName { get; set; } = string.Empty;
+
+    public string Role { get; set; } = string.Empty;
+
+    public string RoleName { get; set; } = string.Empty;
+
+    public List<string> Permissions { get; set; } = new();
+
+    public bool TwoFactorEnabled { get; set; }
 
     public DateTime? LastLoginAt { get; set; }
 }
@@ -44,6 +74,54 @@ public class ResetAdminPasswordRequest
 {
     /// <summary>新密码（客户端 SHA256 hex）。</summary>
     public string NewPassword { get; set; } = string.Empty;
+}
+
+// ============ 验证码 ============
+
+public class CaptchaResponse
+{
+    /// <summary>验证码 ID（登录时回传）。</summary>
+    public string CaptchaId { get; set; } = string.Empty;
+
+    /// <summary>SVG 图片（data:image/svg+xml;base64,...）。</summary>
+    public string Image { get; set; } = string.Empty;
+}
+
+// ============ 双因素（TOTP） ============
+
+public class TwoFactorSetupResponse
+{
+    public string Secret { get; set; } = string.Empty;
+
+    public string OtpUri { get; set; } = string.Empty;
+}
+
+public class EnableTwoFactorRequest
+{
+    public string Secret { get; set; } = string.Empty;
+
+    public string Code { get; set; } = string.Empty;
+}
+
+public class DisableTwoFactorRequest
+{
+    public string Code { get; set; } = string.Empty;
+}
+
+// ============ 角色 ============
+
+public class AdminRoleInfoDto
+{
+    public string Role { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public List<string> Permissions { get; set; } = new();
+}
+
+public class UpdateAdminRoleRequest
+{
+    public string Role { get; set; } = string.Empty;
 }
 
 // ============ 仪表盘 ============
@@ -523,6 +601,10 @@ public class AdminItemDto
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public string Role { get; set; } = string.Empty;
+
+    public string RoleName { get; set; } = string.Empty;
+
     public bool IsActive { get; set; }
 
     public DateTime CreatedAt { get; set; }
@@ -537,6 +619,9 @@ public class CreateAdminRequest
     public string Password { get; set; } = string.Empty;
 
     public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>角色：superadmin / operator / support / readonly，默认 operator。</summary>
+    public string Role { get; set; } = AdminRoleDefaults.DefaultRole;
 }
 
 // ============ 操作审计日志 ============

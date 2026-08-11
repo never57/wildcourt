@@ -32,7 +32,7 @@
       <el-table-column label="时间" width="160">
         <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column v-if="canEdit" label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button link type="success" size="small" @click="review(row, true)">通过</el-button>
           <el-button link type="danger" size="small" @click="review(row, false)">拒绝</el-button>
@@ -49,19 +49,26 @@
         <el-descriptions-item label="发送时间">{{ current ? formatDate(current.createdAt) : '' }}</el-descriptions-item>
       </el-descriptions>
       <div class="letter-content">{{ current?.content }}</div>
-      <template #footer>
+      <template v-if="canEdit" #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
         <el-button type="success" @click="review(current!, true)">通过</el-button>
         <el-button type="danger" @click="review(current!, false)">拒绝</el-button>
+      </template>
+      <template v-else #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { reviewApi, type ReviewQueueItem } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canEdit = computed(() => authStore.hasPermission('reviews:edit'))
 
 const items = ref<ReviewQueueItem[]>([])
 const loading = ref(false)

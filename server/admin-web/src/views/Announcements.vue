@@ -3,7 +3,7 @@
     <template #header>
       <div class="card-header">
         <span>公告管理</span>
-        <el-button type="primary" @click="openCreate">新建公告</el-button>
+        <el-button v-if="canEdit" type="primary" @click="openCreate">新建公告</el-button>
       </div>
     </template>
 
@@ -20,7 +20,7 @@
       <el-table-column label="创建时间" width="160">
         <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column v-if="canEdit" label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status !== 'published'" link type="success" size="small" @click="publish(row)">发布</el-button>
           <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
@@ -53,9 +53,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { announcementApi, type Announcement } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canEdit = computed(() => authStore.hasPermission('announcements:edit'))
 
 const items = ref<Announcement[]>([])
 const loading = ref(false)

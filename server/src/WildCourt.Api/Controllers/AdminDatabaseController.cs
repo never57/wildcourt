@@ -23,6 +23,7 @@ public class AdminDatabaseController : AdminControllerBase
     [HttpPost("database/execute-sql")]
     public async Task<ApiResponse<ExecuteSqlResultDto>> ExecuteSql([FromBody] ExecuteSqlRequest request)
     {
+        RequirePermission(AdminPermissions.DatabaseExecute);
         var sql = request.SqlFile ?? request.Sql;
         return ApiResponse<ExecuteSqlResultDto>.Ok(await _database.ExecuteAsync(sql ?? string.Empty));
     }
@@ -32,6 +33,7 @@ public class AdminDatabaseController : AdminControllerBase
     [RequestSizeLimit(5 * 1024 * 1024)]
     public async Task<ApiResponse<ExecuteSqlResultDto>> UploadSql(IFormFile file)
     {
+        RequirePermission(AdminPermissions.DatabaseExecute);
         if (file.Length == 0)
         {
             throw new BusinessException(ApiCodes.BadRequest, "上传文件为空");
@@ -47,6 +49,7 @@ public class AdminDatabaseController : AdminControllerBase
     [HttpGet("database/databases")]
     public async Task<ApiResponse<List<DatabaseInfoDto>>> ListDatabases()
     {
+        RequirePermission(AdminPermissions.DatabaseView);
         return ApiResponse<List<DatabaseInfoDto>>.Ok(await _database.ListDatabasesAsync());
     }
 
@@ -54,6 +57,7 @@ public class AdminDatabaseController : AdminControllerBase
     [HttpGet("database/tables")]
     public async Task<ApiResponse<List<TableInfoDto>>> ListTables([FromQuery] string database)
     {
+        RequirePermission(AdminPermissions.DatabaseView);
         return ApiResponse<List<TableInfoDto>>.Ok(await _database.ListTablesAsync(database));
     }
 
@@ -72,6 +76,7 @@ public class AdminDatabaseController : AdminControllerBase
         [FromQuery] string? orderBy = null,
         [FromQuery] bool orderDesc = false)
     {
+        RequirePermission(AdminPermissions.DatabaseView);
         List<RowFilterDto>? filters = null;
         if (!string.IsNullOrWhiteSpace(filter))
         {
@@ -93,6 +98,7 @@ public class AdminDatabaseController : AdminControllerBase
         [FromQuery] string database,
         [FromQuery] string table)
     {
+        RequirePermission(AdminPermissions.DatabaseView);
         return ApiResponse<TableSchemaResultDto>.Ok(await _database.GetTableSchemaAsync(database, table));
     }
 
@@ -100,6 +106,7 @@ public class AdminDatabaseController : AdminControllerBase
     [HttpPost("database/query")]
     public async Task<ApiResponse<QueryResultDto>> Query([FromBody] QueryRequest request)
     {
+        RequirePermission(AdminPermissions.DatabaseView);
         return ApiResponse<QueryResultDto>.Ok(await _database.QueryAsync(request.Sql));
     }
 
@@ -110,6 +117,7 @@ public class AdminDatabaseController : AdminControllerBase
         [FromQuery] string table,
         [FromQuery] string format = "csv")
     {
+        RequirePermission(AdminPermissions.DatabaseView);
         var (fileName, content, contentType) = await _database.ExportAsync(database, table, format);
         return File(Encoding.UTF8.GetBytes(content), contentType, fileName);
     }
@@ -118,6 +126,7 @@ public class AdminDatabaseController : AdminControllerBase
     [HttpPut("database/row")]
     public async Task<ApiResponse<int>> UpdateRow([FromBody] RowChangeRequest request)
     {
+        RequirePermission(AdminPermissions.DatabaseExecute);
         return ApiResponse<int>.Ok(await _database.UpdateRowAsync(request));
     }
 
@@ -125,6 +134,7 @@ public class AdminDatabaseController : AdminControllerBase
     [HttpPost("database/row")]
     public async Task<ApiResponse<int>> InsertRow([FromBody] RowChangeRequest request)
     {
+        RequirePermission(AdminPermissions.DatabaseExecute);
         return ApiResponse<int>.Ok(await _database.InsertRowAsync(request));
     }
 
@@ -132,6 +142,7 @@ public class AdminDatabaseController : AdminControllerBase
     [HttpDelete("database/row")]
     public async Task<ApiResponse<int>> DeleteRow([FromBody] RowChangeRequest request)
     {
+        RequirePermission(AdminPermissions.DatabaseExecute);
         return ApiResponse<int>.Ok(await _database.DeleteRowAsync(request));
     }
 }

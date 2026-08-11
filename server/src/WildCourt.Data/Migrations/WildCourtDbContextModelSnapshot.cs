@@ -55,6 +55,23 @@ namespace WildCourt.Data.Migrations
                         .HasColumnType("varchar(128)")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)")
+                        .HasDefaultValue("operator")
+                        .HasColumnName("role");
+
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("two_factor_enabled");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("two_factor_secret");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(32)

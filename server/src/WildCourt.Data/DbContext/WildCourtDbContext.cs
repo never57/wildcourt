@@ -95,9 +95,12 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.HasIndex(x => x.Username).HasDatabaseName("uk_admin_username").IsUnique();
             e.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(128).IsRequired();
             e.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(32).IsRequired();
+            e.Property(x => x.Role).HasColumnName("role").HasMaxLength(16).HasDefaultValue("operator").IsRequired();
             e.Property(x => x.IsActive).HasColumnName("is_active").IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
             e.Property(x => x.LastLoginAt).HasColumnName("last_login_at");
+            e.Property(x => x.TwoFactorEnabled).HasColumnName("two_factor_enabled").IsRequired();
+            e.Property(x => x.TwoFactorSecret).HasColumnName("two_factor_secret").HasMaxLength(64);
         });
     }
 

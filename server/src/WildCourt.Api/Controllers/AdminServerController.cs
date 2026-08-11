@@ -18,6 +18,7 @@ public class AdminServerController : AdminControllerBase
     [HttpGet("server/overview")]
     public async Task<ApiResponse<ServerOverviewResponse>> Overview()
     {
+        RequirePermission(AdminPermissions.ServerView);
         return ApiResponse<ServerOverviewResponse>.Ok(await _docker.GetHostOverviewAsync());
     }
 
@@ -25,6 +26,7 @@ public class AdminServerController : AdminControllerBase
     [HttpGet("server/containers")]
     public async Task<ApiResponse<List<ContainerInfoDto>>> Containers()
     {
+        RequirePermission(AdminPermissions.ServerView);
         return ApiResponse<List<ContainerInfoDto>>.Ok(await _docker.ListContainersAsync());
     }
 
@@ -32,6 +34,7 @@ public class AdminServerController : AdminControllerBase
     [HttpGet("server/containers/{nameOrId}/logs")]
     public async Task<ApiResponse<ContainerLogsResponse>> Logs(string nameOrId, [FromQuery] int tail = 300)
     {
+        RequirePermission(AdminPermissions.ServerView);
         return ApiResponse<ContainerLogsResponse>.Ok(await _docker.GetLogsAsync(nameOrId, Math.Clamp(tail, 10, 2000)));
     }
 
@@ -39,6 +42,7 @@ public class AdminServerController : AdminControllerBase
     [HttpPost("server/containers/{nameOrId}/restart")]
     public async Task<ApiResponse<object>> Restart(string nameOrId)
     {
+        RequirePermission(AdminPermissions.ServerRestart);
         await _docker.RestartContainerAsync(nameOrId);
         return ApiResponse<object>.Ok(new object());
     }

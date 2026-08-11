@@ -6,7 +6,7 @@ namespace WildCourt.Api.Controllers;
 
 /// <summary>
 /// 运营后台认证与管理员账号管理。
-/// 登录放行（AdminAuthMiddleware 白名单），其余需 Bearer 运营令牌。
+/// 登录/验证码放行（AdminAuthMiddleware 白名单），其余需 Bearer 运营令牌。
 /// </summary>
 public class AdminAuthController : AdminControllerBase
 {
@@ -17,15 +17,28 @@ public class AdminAuthController : AdminControllerBase
         _adminService = adminService;
     }
 
-    /// <summary>管理员登录（密码为客户端 SHA256 hex）。</summary>
+    /// <summary>图形验证码（登录前获取）。</summary>
+    [HttpGet("auth/captcha")]
+    public async Task<ApiResponse<CaptchaResponse>> Captcha()
+    {
+        return ApiResponse<CaptchaResponse>.Ok(await _adminService.GetCaptchaAsync());
+    }
+
+    /// <summary>管理员登录（密码为客户端 SHA256 hex，带验证码；启用双因素需两步）。</summary>
     [HttpPost("auth/login")]
     public async Task<ApiResponse<AdminLoginResponse>> Login([FromBody] AdminLoginRequest request)
     {
-        var result = await _adminService.LoginAsync(request.Username, request.Password);
+        var result = await _adminService.LoginAsync(
+            request.Username,
+            request.Password,
+            request.CaptchaId,
+            request.CaptchaCode,
+            request.TotpCode,
+            request.TotpTicket);
         return ApiResponse<AdminLoginResponse>.Ok(result);
     }
 
-    /// <summary>当前管理员信息。</summary>
+    /// <summary>当前管理员信息（含角色与权限集合）。</summary>
     [HttpGet("auth/profile")]
     public async Task<ApiResponse<AdminProfileResponse>> Profile()
     {
@@ -40,10 +53,48 @@ public class AdminAuthController : AdminControllerBase
         return ApiResponse<object>.Ok(new object());
     }
 
+    // ============ 双因素（TOTP） ============
+
+    /// <summary>生成双因素绑定密钥（未启用时调用）。</summary>
+    [HttpPost("auth/2fa/setup")]
+    public async Task<ApiResponse<TwoFactorSetupResponse>> SetupTwoFactor()
+    {
+        return ApiResponse<TwoFactorSetupResponse>.Ok(await _adminService.SetupTwoFactorAsync(GetAdminId()));
+    }
+
+    /// <summary>确认并启用双因素。</summary>
+    [HttpPost("auth/2fa/enable")]
+    public async Task<ApiResponse<object>> EnableTwoFactor([FromBody] EnableTwoFactorRequest request)
+    {
+        await _adminService.EnableTwoFactorAsync(GetAdminId(), request.Secret, request.Code);
+        return ApiResponse<object>.Ok(new object());
+    }
+
+    /// <summary>关闭双因素（需校验当前动态码）。</summary>
+    [HttpPost("auth/2fa/disable")]
+    public async Task<ApiResponse<object>> DisableTwoFactor([FromBody] DisableTwoFactorRequest request)
+    {
+        await _adminService.DisableTwoFactorAsync(GetAdminId(), request.Code);
+        return ApiResponse<object>.Ok(new object());
+    }
+
+    // ============ 角色 ============
+
+    /// <summary>角色定义列表（含权限集合）。</summary>
+    [HttpGet("roles")]
+    public ApiResponse<List<AdminRoleInfoDto>> Roles()
+    {
+        RequirePermission(AdminPermissions.AdminsView);
+        return ApiResponse<List<AdminRoleInfoDto>>.Ok(_adminService.ListRoles());
+    }
+
+    // ============ 管理员管理 ============
+
     /// <summary>管理员列表。</summary>
     [HttpGet("admins")]
     public async Task<ApiResponse<List<AdminItemDto>>> ListAdmins()
     {
+        RequirePermission(AdminPermissions.AdminsView);
         return ApiResponse<List<AdminItemDto>>.Ok(await _adminService.ListAdminsAsync());
     }
 
@@ -51,7 +102,8 @@ public class AdminAuthController : AdminControllerBase
     [HttpPost("admins")]
     public async Task<ApiResponse<object>> CreateAdmin([FromBody] CreateAdminRequest request)
     {
-        await _adminService.CreateAdminAsync(request.Username, request.Password, request.DisplayName);
+        RequirePermission(AdminPermissions.AdminsEdit);
+        await _adminService.CreateAdminAsync(request.Username, request.Password, request.DisplayName, request.Role);
         return ApiResponse<object>.Ok(new object());
     }
 
@@ -59,7 +111,17 @@ public class AdminAuthController : AdminControllerBase
     [HttpPost("admins/{adminId}/active/{active}")]
     public async Task<ApiResponse<object>> SetActive(long adminId, bool active)
     {
+        RequirePermission(AdminPermissions.AdminsEdit);
         await _adminService.SetAdminActiveAsync(adminId, active);
+        return ApiResponse<object>.Ok(new object());
+    }
+
+    /// <summary>修改管理员角色。</summary>
+    [HttpPut("admins/{adminId}/role")]
+    public async Task<ApiResponse<object>> UpdateRole(long adminId, [FromBody] UpdateAdminRoleRequest request)
+    {
+        RequirePermission(AdminPermissions.AdminsEdit);
+        await _adminService.UpdateAdminRoleAsync(adminId, request.Role, GetAdminId());
         return ApiResponse<object>.Ok(new object());
     }
 
@@ -67,6 +129,7 @@ public class AdminAuthController : AdminControllerBase
     [HttpPost("admins/{adminId}/reset-password")]
     public async Task<ApiResponse<object>> ResetPassword(long adminId, [FromBody] ResetAdminPasswordRequest request)
     {
+        RequirePermission(AdminPermissions.AdminsEdit);
         await _adminService.ResetAdminPasswordAsync(adminId, request.NewPassword);
         return ApiResponse<object>.Ok(new object());
     }
@@ -75,6 +138,7 @@ public class AdminAuthController : AdminControllerBase
     [HttpDelete("admins/{adminId}")]
     public async Task<ApiResponse<object>> DeleteAdmin(long adminId)
     {
+        RequirePermission(AdminPermissions.AdminsEdit);
         await _adminService.DeleteAdminAsync(adminId, GetAdminId());
         return ApiResponse<object>.Ok(new object());
     }

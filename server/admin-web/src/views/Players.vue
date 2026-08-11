@@ -39,9 +39,11 @@
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
-          <el-button link type="warning" size="small" @click="openEdit(row)">改数据</el-button>
-          <el-button v-if="!row.isBanned" link type="danger" size="small" @click="ban(row)">封禁</el-button>
-          <el-button v-else link type="success" size="small" @click="unban(row)">解封</el-button>
+          <el-button v-if="authStore.hasPermission('players:edit')" link type="warning" size="small" @click="openEdit(row)">改数据</el-button>
+          <template v-if="authStore.hasPermission('players:ban')">
+            <el-button v-if="!row.isBanned" link type="danger" size="small" @click="ban(row)">封禁</el-button>
+            <el-button v-else link type="success" size="small" @click="unban(row)">解封</el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -137,6 +139,9 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { playerApi, type PlayerDetail, type PlayerItem } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 const keyword = ref('')
 const players = ref<PlayerItem[]>([])

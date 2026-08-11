@@ -15,22 +15,89 @@ public class AdminService
     private readonly WildCourtDbContext _db;
     private readonly RedisUtil _redis;
     private readonly AdminTokenService _tokens;
+    private readonly CaptchaService _captcha;
+    private readonly TotpService _totp;
 
-    public AdminService(WildCourtDbContext db, RedisUtil redis, AdminTokenService tokens)
+    // 登录失败锁定配置：5 次失败锁定 15 分钟
+    private const int MaxLoginFails = 5;
+    private static readonly TimeSpan LoginLockDuration = TimeSpan.FromMinutes(15);
+    private const string LoginFailKeyPrefix = "admin_login_fail:";
+    private const string LoginLockKeyPrefix = "admin_login_lock:";
+    private const string CaptchaKeyPrefix = "admin_captcha:";
+
+    public AdminService(WildCourtDbContext db, RedisUtil redis, AdminTokenService tokens,
+        CaptchaService captcha, TotpService totp)
     {
         _db = db;
         _redis = redis;
         _tokens = tokens;
+        _captcha = captcha;
+        _totp = totp;
+    }
+
+    // ============ 验证码 ============
+
+    /// <summary>生成图形验证码：Redis 存 code（5 分钟），返回 id + SVG base64。</summary>
+    public async Task<CaptchaResponse> GetCaptchaAsync()
+    {
+        var (code, image) = _captcha.Generate();
+        var captchaId = Guid.NewGuid().ToString("N");
+        await _redis.SetStringAsync(CaptchaKeyPrefix + captchaId, code, TimeSpan.FromMinutes(5));
+        return new CaptchaResponse { CaptchaId = captchaId, Image = image };
+    }
+
+    private async Task<bool> ValidateCaptchaAsync(string? captchaId, string? captchaCode)
+    {
+        if (string.IsNullOrWhiteSpace(captchaId) || string.IsNullOrWhiteSpace(captchaCode))
+        {
+            return false;
+        }
+        var key = CaptchaKeyPrefix + captchaId;
+        var stored = await _redis.GetStringAsync(key);
+        if (stored is null) return false;
+        // 一次性使用，无论对错都删除
+        await _redis.DeleteAsync(key);
+        return string.Equals(stored, captchaCode.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     // ============ 认证 ============
 
-    /// <summary>管理员登录：校验密码 → 签发运营令牌 → 记录登录时间。</summary>
-    public async Task<AdminLoginResponse> LoginAsync(string username, string passwordSha256)
+    /// <summary>
+    /// 管理员登录：
+    /// 1. 校验验证码
+    /// 2. 失败锁定检查（5 次失败锁 15 分钟）
+    /// 3. 校验密码 → 未启用 2FA 直接签发令牌；已启用返回 NeedTotp + 临时票据
+    /// </summary>
+    public async Task<AdminLoginResponse> LoginAsync(string username, string passwordSha256,
+        string? captchaId, string? captchaCode, string? totpCode, string? totpTicket)
     {
-        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.Username == username.Trim());
+        username = username.Trim();
+
+        // ---- 双因素第二步：直接用票据 + TOTP 完成登录 ----
+        if (!string.IsNullOrEmpty(totpTicket))
+        {
+            return await CompleteTotpLoginAsync(username, totpTicket, totpCode);
+        }
+
+        // ---- 验证码校验 ----
+        if (!await ValidateCaptchaAsync(captchaId, captchaCode))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "验证码错误或已过期");
+        }
+
+        // ---- 失败锁定检查 ----
+        var lockKey = LoginLockKeyPrefix + username;
+        var lockUntil = await _redis.GetStringAsync(lockKey);
+        if (lockUntil is not null && DateTime.TryParse(lockUntil, out var until) && until > DateTime.UtcNow)
+        {
+            var remain = (int)(until - DateTime.UtcNow).TotalMinutes + 1;
+            throw new BusinessException(ApiCodes.Forbidden, $"登录失败次数过多，请 {remain} 分钟后再试");
+        }
+
+        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.Username == username);
         if (admin == null || !BCrypt.Net.BCrypt.Verify(passwordSha256, admin.PasswordHash))
         {
+            await RecordLoginFailAsync(username);
             throw new BusinessException(ApiCodes.Unauthorized, "账号或密码错误");
         }
         if (!admin.IsActive)
@@ -38,6 +105,29 @@ public class AdminService
             throw new BusinessException(ApiCodes.Forbidden, "账号已被停用");
         }
 
+        // 登录成功，清除失败计数
+        await _redis.DeleteAsync(LoginFailKeyPrefix + username);
+        await _redis.DeleteAsync(lockKey);
+
+        // 已启用双因素：签发 5 分钟临时票据，进入第二步
+        if (admin.TwoFactorEnabled)
+        {
+            return new AdminLoginResponse
+            {
+                Username = admin.Username,
+                DisplayName = admin.DisplayName,
+                Role = admin.Role,
+                NeedTotp = true,
+                TotpTicket = _tokens.Issue(admin.AdminId, TimeSpan.FromMinutes(5)),
+                ExpireAt = DateTime.UtcNow.AddMinutes(5),
+            };
+        }
+
+        return await IssueLoginAsync(admin);
+    }
+
+    private async Task<AdminLoginResponse> IssueLoginAsync(AdminEntity admin)
+    {
         admin.LastLoginAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
@@ -46,8 +136,52 @@ public class AdminService
             Token = _tokens.Issue(admin.AdminId),
             Username = admin.Username,
             DisplayName = admin.DisplayName,
+            Role = admin.Role,
             ExpireAt = DateTime.UtcNow.AddDays(1),
         };
+    }
+
+    /// <summary>双因素第二步：校验 TOTP 后签发正式令牌。</summary>
+    private async Task<AdminLoginResponse> CompleteTotpLoginAsync(string username, string totpTicket, string? totpCode)
+    {
+        var adminId = _tokens.TryValidate(totpTicket);
+        if (adminId is null)
+        {
+            throw new BusinessException(ApiCodes.Unauthorized, "双因素会话已过期，请重新登录");
+        }
+        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.AdminId == adminId.Value)
+            ?? throw new BusinessException(ApiCodes.Unauthorized, "账号不存在");
+        if (!admin.IsActive)
+        {
+            throw new BusinessException(ApiCodes.Forbidden, "账号已被停用");
+        }
+        if (!admin.TwoFactorEnabled || string.IsNullOrEmpty(admin.TwoFactorSecret))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "该账号未启用双因素认证");
+        }
+        if (!_totp.Validate(admin.TwoFactorSecret, totpCode))
+        {
+            throw new BusinessException(ApiCodes.Unauthorized, "动态验证码错误");
+        }
+        return await IssueLoginAsync(admin);
+    }
+
+    private async Task RecordLoginFailAsync(string username)
+    {
+        var failKey = LoginFailKeyPrefix + username;
+        var countStr = await _redis.GetStringAsync(failKey);
+        var count = int.TryParse(countStr, out var c) ? c + 1 : 1;
+        if (count >= MaxLoginFails)
+        {
+            // 达到阈值：锁定并清除计数
+            await _redis.SetStringAsync(LoginLockKeyPrefix + username,
+                DateTime.UtcNow.Add(LoginLockDuration).ToString("O"), LoginLockDuration);
+            await _redis.DeleteAsync(failKey);
+        }
+        else
+        {
+            await _redis.SetStringAsync(failKey, count.ToString(), LoginLockDuration);
+        }
     }
 
     public async Task<AdminProfileResponse> GetProfileAsync(long adminId)
@@ -59,8 +193,60 @@ public class AdminService
             AdminId = admin.AdminId,
             Username = admin.Username,
             DisplayName = admin.DisplayName,
+            Role = admin.Role,
+            RoleName = AdminPermissions.GetRoleName(admin.Role),
+            Permissions = AdminPermissions.GetPermissions(admin.Role).OrderBy(p => p).ToList(),
+            TwoFactorEnabled = admin.TwoFactorEnabled,
             LastLoginAt = admin.LastLoginAt,
         };
+    }
+
+    // ============ 双因素（TOTP） ============
+
+    /// <summary>生成双因素绑定密钥（未启用时才允许；已启用则报错）。</summary>
+    public async Task<TwoFactorSetupResponse> SetupTwoFactorAsync(long adminId)
+    {
+        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.AdminId == adminId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "管理员不存在");
+        if (admin.TwoFactorEnabled)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "双因素认证已启用，请先关闭再重新绑定");
+        }
+        var secret = _totp.GenerateSecret();
+        var uri = _totp.BuildOtpUri(secret, admin.Username);
+        return new TwoFactorSetupResponse { Secret = secret, OtpUri = uri };
+    }
+
+    /// <summary>确认并启用双因素：校验一次性码后保存密钥。</summary>
+    public async Task EnableTwoFactorAsync(long adminId, string secret, string code)
+    {
+        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.AdminId == adminId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "管理员不存在");
+        if (!_totp.Validate(secret, code))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "动态验证码错误");
+        }
+        admin.TwoFactorSecret = secret;
+        admin.TwoFactorEnabled = true;
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>关闭双因素：校验当前动态码（或回退口令不存在）。</summary>
+    public async Task DisableTwoFactorAsync(long adminId, string code)
+    {
+        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.AdminId == adminId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "管理员不存在");
+        if (!admin.TwoFactorEnabled || string.IsNullOrEmpty(admin.TwoFactorSecret))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "双因素认证未启用");
+        }
+        if (!_totp.Validate(admin.TwoFactorSecret, code))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "动态验证码错误");
+        }
+        admin.TwoFactorEnabled = false;
+        admin.TwoFactorSecret = null;
+        await _db.SaveChangesAsync();
     }
 
     /// <summary>修改密码：需验证旧密码（均为客户端 SHA256 hex）。</summary>
@@ -89,20 +275,31 @@ public class AdminService
                 AdminId = a.AdminId,
                 Username = a.Username,
                 DisplayName = a.DisplayName,
+                Role = a.Role,
+                RoleName = a.Role,
                 IsActive = a.IsActive,
                 CreatedAt = a.CreatedAt,
                 LastLoginAt = a.LastLoginAt,
             })
-            .ToListAsync();
+            .ToListAsync()
+            .ContinueWith(t =>
+            {
+                foreach (var item in t.Result)
+                {
+                    item.RoleName = AdminPermissions.GetRoleName(item.Role);
+                }
+                return t.Result;
+            });
     }
 
-    public async Task<long> CreateAdminAsync(string username, string passwordSha256, string displayName)
+    public async Task<long> CreateAdminAsync(string username, string passwordSha256, string displayName, string? role = null)
     {
         username = username.Trim();
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(passwordSha256))
         {
             throw new BusinessException(ApiCodes.BadRequest, "账号与密码不能为空");
         }
+        AdminPermissions.EnsureValidRole(role);
         if (await _db.Admins.AnyAsync(a => a.Username == username))
         {
             throw new BusinessException(ApiCodes.Conflict, "管理员账号已存在");
@@ -112,12 +309,47 @@ public class AdminService
             Username = username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(passwordSha256),
             DisplayName = string.IsNullOrWhiteSpace(displayName) ? username : displayName,
+            Role = string.IsNullOrWhiteSpace(role) ? AdminRoleDefaults.DefaultRole : role,
             CreatedAt = DateTime.UtcNow,
         };
         _db.Admins.Add(admin);
         await _db.SaveChangesAsync();
         return admin.AdminId;
     }
+
+    /// <summary>修改管理员角色。不能修改自己的角色（防止降权锁死），且超管数量不能降为零。</summary>
+    public async Task UpdateAdminRoleAsync(long adminId, string newRole, long operatorAdminId)
+    {
+        AdminPermissions.EnsureValidRole(newRole);
+        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.AdminId == adminId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "管理员不存在");
+        if (adminId == operatorAdminId && admin.Role != newRole)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "不能修改自己的角色，请联系其他超管操作");
+        }
+        // 若把某超管降级，需保证仍至少有一个超管
+        if (admin.Role == AdminPermissions.RoleSuperAdmin && newRole != AdminPermissions.RoleSuperAdmin)
+        {
+            var superCount = await _db.Admins.CountAsync(a => a.Role == AdminPermissions.RoleSuperAdmin && a.IsActive);
+            if (superCount <= 1)
+            {
+                throw new BusinessException(ApiCodes.BadRequest, "系统至少保留一个超管账号");
+            }
+        }
+        admin.Role = newRole;
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>角色定义列表（前端角色管理用）。</summary>
+    public List<AdminRoleInfoDto> ListRoles() =>
+        AdminPermissions.AllRoles
+            .Select(r => new AdminRoleInfoDto
+            {
+                Role = r,
+                Name = AdminPermissions.GetRoleName(r),
+                Permissions = AdminPermissions.GetPermissions(r).OrderBy(p => p).ToList(),
+            })
+            .ToList();
 
     public async Task SetAdminActiveAsync(long adminId, bool isActive)
     {

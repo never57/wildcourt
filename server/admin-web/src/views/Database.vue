@@ -62,7 +62,7 @@
                         </el-dropdown-menu>
                       </template>
                     </el-dropdown>
-                    <el-button :disabled="!primaryKey" @click="openInsert">新增行</el-button>
+                    <el-button v-if="canExecute" :disabled="!primaryKey" @click="openInsert">新增行</el-button>
                     <el-button type="primary" :loading="loading" @click="loadData">刷新</el-button>
                   </div>
                 </div>
@@ -101,7 +101,7 @@
                       </span>
                     </template>
                   </el-table-column>
-                  <el-table-column label="操作" width="130" fixed="right">
+                  <el-table-column v-if="canExecute" label="操作" width="130" fixed="right">
                     <template #default="{ row }">
                       <el-button link type="primary" :disabled="!primaryKey" @click="openEdit(row)">编辑</el-button>
                       <el-button link type="danger" :disabled="!primaryKey" @click="removeRow(row)">删除</el-button>
@@ -135,10 +135,11 @@
               <div class="sql-actions">
                 <el-radio-group v-model="sqlMode" size="small">
                   <el-radio-button value="read">只读查询</el-radio-button>
-                  <el-radio-button value="write">执行语句</el-radio-button>
+                  <el-radio-button v-if="canExecute" value="write">执行语句</el-radio-button>
                 </el-radio-group>
                 <el-tag v-if="sqlMode === 'read'" type="info" effect="plain" size="small">仅允许 SELECT，敏感列自动脱敏</el-tag>
                 <el-upload
+                  v-if="canExecute"
                   :show-file-list="false"
                   accept=".sql"
                   :before-upload="handleFileSelect"
@@ -326,6 +327,10 @@ import {
   type TableInfo,
   type TableSchemaResult,
 } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canExecute = computed(() => authStore.hasPermission('database:execute'))
 
 const activeTab = ref('visual')
 
@@ -353,6 +358,11 @@ function handleFileSelect(file: File): boolean {
 
 async function confirmExecute() {
   if (!sql.value.trim()) return
+
+  if (sqlMode.value === 'write' && !canExecute.value) {
+    ElMessage.error('当前账号无执行 SQL 权限')
+    return
+  }
 
   // 只读查询模式：走专用查询接口，无需高危确认
   if (sqlMode.value === 'read') {

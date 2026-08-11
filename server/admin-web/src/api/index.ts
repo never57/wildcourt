@@ -6,6 +6,10 @@ export interface AdminProfile {
   adminId: number
   username: string
   displayName: string
+  role: string
+  roleName: string
+  permissions: string[]
+  twoFactorEnabled: boolean
   lastLoginAt?: string
 }
 
@@ -13,9 +17,37 @@ export interface AdminItem {
   adminId: number
   username: string
   displayName: string
+  role: string
+  roleName: string
   isActive: boolean
   createdAt: string
   lastLoginAt?: string
+}
+
+export interface AdminRoleInfo {
+  role: string
+  name: string
+  permissions: string[]
+}
+
+export interface CaptchaInfo {
+  captchaId: string
+  image: string
+}
+
+export interface TwoFactorSetup {
+  secret: string
+  otpUri: string
+}
+
+export interface LoginResult {
+  token: string
+  username: string
+  displayName: string
+  role: string
+  expireAt: string
+  needTotp?: boolean
+  totpTicket?: string
 }
 
 export interface DashboardSummary {
@@ -206,24 +238,30 @@ export interface QueryResult {
 // ================= 认证 =================
 
 export const authApi = {
-  login: (username: string, password: string) =>
-    request<{ token: string; username: string; displayName: string; expireAt: string }>({
-      url: '/auth/login',
-      method: 'post',
-      data: { username, password },
-    }),
+  captcha: () => request<CaptchaInfo>({ url: '/auth/captcha' }),
+  login: (data: { username: string; password: string; captchaId?: string; captchaCode?: string; totpCode?: string; totpTicket?: string }) =>
+    request<LoginResult>({ url: '/auth/login', method: 'post', data }),
   profile: () => request<AdminProfile>({ url: '/auth/profile' }),
   changePassword: (oldPassword: string, newPassword: string) =>
     request<void>({ url: '/auth/change-password', method: 'post', data: { oldPassword, newPassword } }),
   listAdmins: () => request<AdminItem[]>({ url: '/admins' }),
-  createAdmin: (data: { username: string; password: string; displayName: string }) =>
+  createAdmin: (data: { username: string; password: string; displayName: string; role?: string }) =>
     request<void>({ url: '/admins', method: 'post', data }),
   setActive: (adminId: number, active: boolean) =>
     request<void>({ url: `/admins/${adminId}/active/${active}`, method: 'post' }),
+  updateRole: (adminId: number, role: string) =>
+    request<void>({ url: `/admins/${adminId}/role`, method: 'put', data: { role } }),
   resetPassword: (adminId: number, newPassword: string) =>
     request<void>({ url: `/admins/${adminId}/reset-password`, method: 'post', data: { newPassword } }),
   removeAdmin: (adminId: number) =>
     request<void>({ url: `/admins/${adminId}`, method: 'delete' }),
+  listRoles: () => request<AdminRoleInfo[]>({ url: '/roles' }),
+  // 双因素
+  setup2fa: () => request<TwoFactorSetup>({ url: '/auth/2fa/setup', method: 'post' }),
+  enable2fa: (secret: string, code: string) =>
+    request<void>({ url: '/auth/2fa/enable', method: 'post', data: { secret, code } }),
+  disable2fa: (code: string) =>
+    request<void>({ url: '/auth/2fa/disable', method: 'post', data: { code } }),
 }
 
 // ================= 仪表盘 =================

@@ -28,7 +28,7 @@
 
           <el-divider />
 
-          <div class="upload-area">
+          <div v-if="canEdit" class="upload-area">
             <div class="upload-title">1. 上传服务端代码包（zip）</div>
             <el-upload
               drag
@@ -52,7 +52,7 @@
 
           <el-divider />
 
-          <div class="build-area">
+          <div v-if="canEdit" class="build-area">
             <div class="upload-title">2. 构建并部署（docker compose up -d --build）</div>
             <el-checkbox v-model="noCache">强制无缓存重建（--no-cache）</el-checkbox>
             <div style="margin-top: 12px; display: flex; gap: 12px">
@@ -81,11 +81,13 @@
               <span>文件管理</span>
               <div class="header-actions">
                 <el-button size="small" @click="loadFiles">刷新</el-button>
-                <el-button size="small" @click="handleMkdir">新建目录</el-button>
-                <el-button size="small" type="primary" @click="openUpload">
-                  上传文件
-                  <input ref="fileInputRef" type="file" class="hidden-input" @change="onFileSelected" />
-                </el-button>
+                <template v-if="canEdit">
+                  <el-button size="small" @click="handleMkdir">新建目录</el-button>
+                  <el-button size="small" type="primary" @click="openUpload">
+                    上传文件
+                    <input ref="fileInputRef" type="file" class="hidden-input" @change="onFileSelected" />
+                  </el-button>
+                </template>
               </div>
             </div>
           </template>
@@ -122,7 +124,7 @@
               <template #default="{ row }">{{ row.type === 'dir' ? '-' : formatSize(row.size) }}</template>
             </el-table-column>
             <el-table-column label="修改时间" width="130" prop="modifiedAt" />
-            <el-table-column label="操作" width="80" align="center">
+            <el-table-column v-if="canEdit" label="操作" width="80" align="center">
               <template #default="{ row }">
                 <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
               </template>
@@ -181,7 +183,7 @@
       </div>
       <template #footer>
         <el-button @click="editorVisible = false">取消</el-button>
-        <el-button type="primary" :loading="editorSaving" :disabled="!editorDirty" @click="saveEditor">
+        <el-button v-if="canEdit" type="primary" :loading="editorSaving" :disabled="!editorDirty" @click="saveEditor">
           保存
         </el-button>
       </template>
@@ -194,6 +196,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled, Folder, Document } from '@element-plus/icons-vue'
 import { deployApi, type DeployStatus, type FileEntry } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canEdit = computed(() => authStore.hasPermission('deploy:edit'))
 
 const status = ref<DeployStatus | null>(null)
 const logs = ref<string[]>([])
