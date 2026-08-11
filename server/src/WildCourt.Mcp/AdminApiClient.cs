@@ -111,6 +111,35 @@ public class AdminApiClient
         return await ReadDataJsonAsync(response);
     }
 
+    /// <summary>GET 请求，返回原始响应文本（用于文件类接口，不走信封解析）。失败时尝试解析信封报错。</summary>
+    public async Task<string> GetRawAsync(string path, Dictionary<string, string?>? query = null)
+    {
+        var url = BuildUrl(path, query);
+        var response = await SendWithAuthAsync(HttpMethod.Get, url, null);
+        var raw = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+        {
+            try
+            {
+                var envelope = JsonSerializer.Deserialize<ApiEnvelope>(raw, JsonOpts.Default);
+                if (envelope is not null)
+                {
+                    throw new McpApiException($"API 错误[{envelope.Code}]: {envelope.Message}");
+                }
+            }
+            catch (McpApiException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // 非信封响应，走通用错误
+            }
+            throw new McpApiException($"请求失败 (HTTP {(int)response.StatusCode}): {Truncate(raw)}");
+        }
+        return raw;
+    }
+
     private async Task<HttpResponseMessage> SendWithAuthAsync(HttpMethod method, string url, object? body)
     {
         var token = await GetTokenAsync();

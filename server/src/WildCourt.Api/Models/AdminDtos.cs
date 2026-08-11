@@ -372,11 +372,65 @@ public class RowChangeRequest
     /// <summary>变更的列值；值为 null 表示 SQL NULL。</summary>
     public Dictionary<string, object?> Values { get; set; } = new();
 
-    /// <summary>主键列名（更新/删除时定位行）。</summary>
+    /// <summary>主键列名（更新/删除时定位行）；为空时服务端自动识别表主键。</summary>
     public string? PrimaryKey { get; set; }
 
     /// <summary>主键值。</summary>
     public object? PrimaryKeyValue { get; set; }
+}
+
+/// <summary>结构化行过滤条件（参数化绑定，防 SQL 注入）。</summary>
+public class RowFilterDto
+{
+    /// <summary>列名（必须为表中真实列）。</summary>
+    public string Column { get; set; } = string.Empty;
+
+    /// <summary>运算符：= != &gt; &gt;= &lt; &lt;= like in。</summary>
+    public string Op { get; set; } = "=";
+
+    /// <summary>比较值；in 运算符时为数组。</summary>
+    public object? Value { get; set; }
+}
+
+public class TableSchemaResultDto
+{
+    public string Database { get; set; } = string.Empty;
+
+    public string Table { get; set; } = string.Empty;
+
+    public List<ColumnInfoDto> Columns { get; set; } = new();
+
+    public List<IndexInfoDto> Indexes { get; set; } = new();
+}
+
+public class IndexInfoDto
+{
+    public string Name { get; set; } = string.Empty;
+
+    public bool Unique { get; set; }
+
+    public bool IsPrimary { get; set; }
+
+    public string Columns { get; set; } = string.Empty;
+}
+
+public class QueryRequest
+{
+    public string Sql { get; set; } = string.Empty;
+}
+
+public class QueryResultDto
+{
+    /// <summary>是否查询语句（SELECT）。</summary>
+    public bool IsQuery { get; set; }
+
+    public List<string> Columns { get; set; } = new();
+
+    public List<Dictionary<string, object?>> Rows { get; set; } = new();
+
+    public long Total { get; set; }
+
+    public string Message { get; set; } = string.Empty;
 }
 
 // ============ 部署 ============

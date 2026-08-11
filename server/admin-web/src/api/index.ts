@@ -1,4 +1,4 @@
-import { request } from './http'
+import { request, download } from './http'
 
 // ================= 类型定义 =================
 
@@ -171,6 +171,38 @@ export interface RowChangeRequest {
   primaryKeyValue?: unknown
 }
 
+/** 表格过滤条件 */
+export interface RowFilter {
+  column: string
+  op: '=' | '!=' | '>' | '>=' | '<' | '<=' | 'like' | 'in'
+  value?: unknown
+}
+
+/** 索引信息 */
+export interface IndexInfo {
+  name: string
+  unique: boolean
+  isPrimary: boolean
+  columns: string
+}
+
+/** 表结构 */
+export interface TableSchemaResult {
+  database: string
+  table: string
+  columns: ColumnInfo[]
+  indexes: IndexInfo[]
+}
+
+/** 只读查询结果 */
+export interface QueryResult {
+  isQuery: boolean
+  columns: string[]
+  rows: Record<string, unknown>[]
+  total: number
+  message: string
+}
+
 // ================= 认证 =================
 
 export const authApi = {
@@ -258,14 +290,31 @@ export const databaseApi = {
   listDatabases: () => request<DatabaseInfo[]>({ url: '/database/databases' }),
   listTables: (database: string) =>
     request<TableInfo[]>({ url: '/database/tables', params: { database } }),
-  getTableData: (database: string, table: string, page = 1, pageSize = 50) =>
-    request<TableDataResult>({ url: '/database/table-data', params: { database, table, page, pageSize } }),
+  getTableData: (
+    database: string,
+    table: string,
+    page = 1,
+    pageSize = 50,
+    filters?: RowFilter[],
+    orderBy?: string,
+    orderDesc = false,
+  ) =>
+    request<TableDataResult>({
+      url: '/database/table-data',
+      params: { database, table, page, pageSize, filter: filters?.length ? JSON.stringify(filters) : undefined, orderBy, orderDesc },
+    }),
   updateRow: (data: RowChangeRequest) =>
     request<number>({ url: '/database/row', method: 'put', data }),
   insertRow: (data: RowChangeRequest) =>
     request<number>({ url: '/database/row', method: 'post', data }),
   deleteRow: (data: RowChangeRequest) =>
     request<number>({ url: '/database/row', method: 'delete', data }),
+  getTableSchema: (database: string, table: string) =>
+    request<TableSchemaResult>({ url: '/database/schema', params: { database, table } }),
+  querySql: (sql: string) =>
+    request<QueryResult>({ url: '/database/query', method: 'post', data: { sql } }),
+  exportTable: (database: string, table: string, format: 'csv' | 'json') =>
+    download({ url: '/database/export', params: { database, table, format } }),
 }
 
 // ================= 服务端部署 =================

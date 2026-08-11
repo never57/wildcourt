@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using WildCourt.Api.Models;
 using WildCourt.Api.Services;
@@ -55,18 +57,64 @@ public class AdminDatabaseController : AdminControllerBase
         return ApiResponse<List<TableInfoDto>>.Ok(await _database.ListTablesAsync(database));
     }
 
-    /// <summary>分页读取表数据（含列结构）。</summary>
+    /// <summary>
+    /// 分页读取表数据（含列结构）。
+    /// filter：可选，JSON 数组，如 [{"column":"user_id","op":"=","value":1},{"column":"nickname","op":"like","value":"%x%"}]
+    /// orderBy：可选，单列名；orderDesc：是否倒序。
+    /// </summary>
     [HttpGet("database/table-data")]
     public async Task<ApiResponse<TableDataResultDto>> GetTableData(
         [FromQuery] string database,
         [FromQuery] string table,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50)
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? filter = null,
+        [FromQuery] string? orderBy = null,
+        [FromQuery] bool orderDesc = false)
     {
-        return ApiResponse<TableDataResultDto>.Ok(await _database.GetTableDataAsync(database, table, page, pageSize));
+        List<RowFilterDto>? filters = null;
+        if (!string.IsNullOrWhiteSpace(filter))
+        {
+            try
+            {
+                filters = JsonSerializer.Deserialize<List<RowFilterDto>>(filter);
+            }
+            catch (Exception)
+            {
+                throw new BusinessException(ApiCodes.BadRequest, "filter 不是合法的 JSON 数组");
+            }
+        }
+        return ApiResponse<TableDataResultDto>.Ok(await _database.GetTableDataAsync(database, table, page, pageSize, filters, orderBy, orderDesc));
     }
 
-    /// <summary>更新一行（按主键定位）。</summary>
+    /// <summary>获取表结构：列定义 + 索引 + 主键。</summary>
+    [HttpGet("database/schema")]
+    public async Task<ApiResponse<TableSchemaResultDto>> GetTableSchema(
+        [FromQuery] string database,
+        [FromQuery] string table)
+    {
+        return ApiResponse<TableSchemaResultDto>.Ok(await _database.GetTableSchemaAsync(database, table));
+    }
+
+    /// <summary>只读查询：仅放行单条 SELECT 语句。</summary>
+    [HttpPost("database/query")]
+    public async Task<ApiResponse<QueryResultDto>> Query([FromBody] QueryRequest request)
+    {
+        return ApiResponse<QueryResultDto>.Ok(await _database.QueryAsync(request.Sql));
+    }
+
+    /// <summary>导出表数据：format=csv 或 json，直接返回文件。</summary>
+    [HttpGet("database/export")]
+    public async Task<IActionResult> Export(
+        [FromQuery] string database,
+        [FromQuery] string table,
+        [FromQuery] string format = "csv")
+    {
+        var (fileName, content, contentType) = await _database.ExportAsync(database, table, format);
+        return File(Encoding.UTF8.GetBytes(content), contentType, fileName);
+    }
+
+    /// <summary>更新一行（按主键定位；主键可省略，服务端自动识别）。</summary>
     [HttpPut("database/row")]
     public async Task<ApiResponse<int>> UpdateRow([FromBody] RowChangeRequest request)
     {

@@ -46,10 +46,32 @@
                     <el-tag v-if="tableComment" size="small" type="info" effect="plain">{{ tableComment }}</el-tag>
                     <span class="table-total">共 {{ total }} 行</span>
                   </div>
-                  <div>
+                  <div class="toolbar-actions">
+                    <el-button :disabled="!currentTable" :type="filterRows.length ? 'primary' : 'default'" @click="openFilter">
+                      筛选<template v-if="filterRows.length">（{{ filterRows.length }}）</template>
+                    </el-button>
+                    <el-button :disabled="!currentTable" @click="openSchema">表结构</el-button>
+                    <el-dropdown :disabled="!currentTable" @command="exportData">
+                      <el-button :loading="exporting">
+                        导出<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                      </el-button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="csv">导出 CSV</el-dropdown-item>
+                          <el-dropdown-item command="json">导出 JSON</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
                     <el-button :disabled="!primaryKey" @click="openInsert">新增行</el-button>
                     <el-button type="primary" :loading="loading" @click="loadData">刷新</el-button>
                   </div>
+                </div>
+
+                <div v-if="filterRows.length" class="active-filters">
+                  <el-tag v-for="(f, i) in filterRows" :key="i" closable type="info" effect="plain" @close="removeFilterAt(i)">
+                    {{ f.column }} {{ f.op }} {{ f.op === 'in' ? String(f.value).split(',').join(', ') : f.value }}
+                  </el-tag>
+                  <el-button link type="primary" size="small" @click="clearFilters">清空筛选</el-button>
                 </div>
 
                 <el-table
@@ -59,8 +81,9 @@
                   size="small"
                   v-loading="loading"
                   height="calc(100vh - 380px)"
+                  @sort-change="onSortChange"
                 >
-                  <el-table-column v-for="col in columns" :key="col.name" :prop="col.name" min-width="150" show-overflow-tooltip>
+                  <el-table-column v-for="col in columns" :key="col.name" :prop="col.name" min-width="150" show-overflow-tooltip sortable="custom">
                     <template #header>
                       <el-tooltip
                         :content="`${col.columnType}${col.nullable ? ' · 可空' : ''}${col.comment ? ' · ' + col.comment : ''}`"
@@ -109,7 +132,12 @@
           <div>
             <div class="card-header">
               <span>SQL 编辑器</span>
-              <div>
+              <div class="sql-actions">
+                <el-radio-group v-model="sqlMode" size="small">
+                  <el-radio-button value="read">只读查询</el-radio-button>
+                  <el-radio-button value="write">执行语句</el-radio-button>
+                </el-radio-group>
+                <el-tag v-if="sqlMode === 'read'" type="info" effect="plain" size="small">仅允许 SELECT，敏感列自动脱敏</el-tag>
                 <el-upload
                   :show-file-list="false"
                   accept=".sql"
@@ -118,7 +146,9 @@
                 >
                   <el-button>上传 .sql 文件</el-button>
                 </el-upload>
-                <el-button type="primary" :disabled="!sql" @click="confirmExecute">执行 SQL</el-button>
+                <el-button type="primary" :disabled="!sql" @click="confirmExecute">
+                  {{ sqlMode === 'read' ? '查询' : '执行 SQL' }}
+                </el-button>
               </div>
             </div>
 
@@ -147,6 +177,31 @@ CREATE TABLE IF NOT EXISTS `gift_codes` (
                 <el-descriptions-item label="影响行数">{{ result.affectedRows }}</el-descriptions-item>
                 <el-descriptions-item label="耗时">{{ result.durationMs }} ms</el-descriptions-item>
               </el-descriptions>
+            </div>
+
+            <div v-if="queryResult" class="result-box">
+              <el-alert type="success" :closable="false" show-icon>
+                <template #title>
+                  {{ queryResult.isQuery ? `查询成功，共 ${queryResult.total} 行` : queryResult.message }}
+                </template>
+              </el-alert>
+              <template v-if="queryResult.isQuery">
+                <el-table :data="queryResult.rows" border stripe size="small" max-height="460" v-loading="queryLoading" class="mt12">
+                  <el-table-column
+                    v-for="col in queryResult.columns"
+                    :key="col"
+                    :prop="col"
+                    min-width="140"
+                    show-overflow-tooltip
+                  >
+                    <template #default="{ row }">
+                      <span :class="{ 'cell-null': row[col] == null }">{{ formatCell(row[col]) }}</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div v-if="!queryResult.rows.length" class="query-empty">（无数据）</div>
+              </template>
+              <el-alert v-else type="warning" :closable="false" show-icon class="mt12" title="只读查询仅支持 SELECT 语句" />
             </div>
           </div>
         </el-tab-pane>
@@ -191,19 +246,95 @@ CREATE TABLE IF NOT EXISTS `gift_codes` (
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 筛选条件弹窗 -->
+    <el-dialog v-model="filterDialog" title="筛选条件" width="760px">
+      <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+        <template #title>条件之间为 AND 关系。表头点击可直接排序；in 的多个值用英文逗号分隔。</template>
+      </el-alert>
+      <div v-for="(f, i) in filterRows" :key="i" class="filter-row">
+        <el-select v-model="f.column" placeholder="列" filterable style="width: 170px" @change="onFilterColumnChange(f)">
+          <el-option v-for="c in columns" :key="c.name" :label="c.name" :value="c.name" />
+        </el-select>
+        <el-select v-model="f.op" style="width: 130px">
+          <el-option v-for="op in filterOps" :key="op.value" :label="op.label" :value="op.value" />
+        </el-select>
+        <el-input v-if="f.op !== 'in'" v-model="f.value" placeholder="值" clearable style="flex: 1" />
+        <el-input v-else v-model="f.value" placeholder="多个值用英文逗号分隔，如 a,b,c" clearable style="flex: 1" />
+        <el-button type="danger" link @click="filterRows.splice(i, 1)">删除</el-button>
+      </div>
+      <el-empty v-if="!filterRows.length" description="暂无筛选条件" :image-size="60" />
+      <template #footer>
+        <el-button @click="filterDialog = false">取消</el-button>
+        <el-button @click="addFilter">添加条件</el-button>
+        <el-button type="primary" @click="applyFilters">应用筛选</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 表结构弹窗 -->
+    <el-dialog v-model="schemaDialog" title="表结构" width="840px">
+      <template v-if="schemaData">
+        <div class="schema-title">{{ schemaData.database }}.<b>{{ schemaData.table }}</b></div>
+        <h4 class="schema-sub">列定义（{{ schemaData.columns.length }}）</h4>
+        <el-table :data="schemaData.columns" border stripe size="small" max-height="320">
+          <el-table-column prop="name" label="列名" width="160" />
+          <el-table-column prop="columnType" label="类型" width="150" />
+          <el-table-column label="可空" width="70" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.nullable" type="info" size="small">YES</el-tag>
+              <el-tag v-else type="danger" size="small">NO</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="主键" width="70" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.isPrimaryKey" type="warning" size="small">PK</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="defaultValue" label="默认值" width="130" show-overflow-tooltip />
+          <el-table-column prop="comment" label="备注" min-width="160" show-overflow-tooltip />
+        </el-table>
+        <h4 class="schema-sub">索引（{{ schemaData.indexes.length }}）</h4>
+        <el-table :data="schemaData.indexes" border stripe size="small" max-height="240">
+          <el-table-column prop="name" label="索引名" min-width="150" />
+          <el-table-column label="类型" width="130" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.isPrimary" type="warning" size="small">PRIMARY</el-tag>
+              <el-tag v-else-if="row.unique" type="success" size="small">UNIQUE</el-tag>
+              <el-tag v-else type="info" size="small">NORMAL</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="columns" label="包含列" min-width="200" show-overflow-tooltip />
+        </el-table>
+      </template>
+      <el-empty v-else description="加载中..." />
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { databaseApi, type ColumnInfo, type DatabaseInfo, type ExecuteSqlResult, type TableInfo } from '@/api'
+import { ArrowDown } from '@element-plus/icons-vue'
+import {
+  databaseApi,
+  type ColumnInfo,
+  type DatabaseInfo,
+  type ExecuteSqlResult,
+  type IndexInfo,
+  type QueryResult,
+  type RowFilter,
+  type TableInfo,
+  type TableSchemaResult,
+} from '@/api'
 
 const activeTab = ref('visual')
 
 // ==================== SQL 编辑器 ====================
 const sql = ref('')
 const result = ref<ExecuteSqlResult | null>(null)
+const sqlMode = ref<'read' | 'write'>('read')
+const queryResult = ref<QueryResult | null>(null)
+const queryLoading = ref(false)
 
 function handleFileSelect(file: File): boolean {
   if (!file.name.toLowerCase().endsWith('.sql')) {
@@ -222,6 +353,22 @@ function handleFileSelect(file: File): boolean {
 
 async function confirmExecute() {
   if (!sql.value.trim()) return
+
+  // 只读查询模式：走专用查询接口，无需高危确认
+  if (sqlMode.value === 'read') {
+    result.value = null
+    queryLoading.value = true
+    try {
+      queryResult.value = await databaseApi.querySql(sql.value)
+      ElMessage.success(queryResult.value.isQuery ? '查询完成' : '仅支持 SELECT 语句')
+    } catch {
+      // 拦截器提示
+    } finally {
+      queryLoading.value = false
+    }
+    return
+  }
+
   const statementCount = sql.value.split(';').filter((s) => s.trim()).length
   try {
     await ElMessageBox.confirm(
@@ -233,6 +380,7 @@ async function confirmExecute() {
     return
   }
   try {
+    queryResult.value = null
     result.value = await databaseApi.executeSql(sql.value)
     ElMessage.success('执行完成')
   } catch {
@@ -317,6 +465,9 @@ function onNodeClick(data: TreeNode) {
   currentTable.value = data.tableName
   tableComment.value = data.comment || ''
   page.value = 1
+  orderBy.value = ''
+  orderDesc.value = false
+  filterRows.value = []
   loadData()
 }
 
@@ -324,7 +475,15 @@ async function loadData() {
   if (!currentDb.value || !currentTable.value) return
   loading.value = true
   try {
-    const data = await databaseApi.getTableData(currentDb.value, currentTable.value, page.value, pageSize.value)
+    const data = await databaseApi.getTableData(
+      currentDb.value,
+      currentTable.value,
+      page.value,
+      pageSize.value,
+      buildFilters(),
+      orderBy.value || undefined,
+      orderDesc.value,
+    )
     columns.value = data.columns
     rows.value = data.rows
     total.value = data.total
@@ -332,6 +491,119 @@ async function loadData() {
     // 拦截器提示
   } finally {
     loading.value = false
+  }
+}
+
+// ==================== 筛选 / 排序 / 表结构 / 导出 ====================
+
+const filterOps = [
+  { label: '等于 =', value: '=' },
+  { label: '不等于 !=', value: '!=' },
+  { label: '大于 >', value: '>' },
+  { label: '大于等于 >=', value: '>=' },
+  { label: '小于 <', value: '<' },
+  { label: '小于等于 <=', value: '<=' },
+  { label: '包含 like', value: 'like' },
+  { label: '在列表中 in', value: 'in' },
+] as const
+
+interface FilterRow {
+  column: string
+  op: (typeof filterOps)[number]['value']
+  value: string
+}
+
+const filterDialog = ref(false)
+const filterRows = ref<FilterRow[]>([])
+const orderBy = ref('')
+const orderDesc = ref(false)
+
+const schemaDialog = ref(false)
+const schemaData = ref<TableSchemaResult | null>(null)
+const exporting = ref(false)
+
+function openFilter() {
+  if (!filterRows.value.length) addFilter()
+  filterDialog.value = true
+}
+
+function addFilter() {
+  filterRows.value.push({ column: columns.value[0]?.name || '', op: '=', value: '' })
+}
+
+function onFilterColumnChange(f: FilterRow) {
+  f.op = '='
+  f.value = ''
+}
+
+function removeFilterAt(i: number) {
+  filterRows.value.splice(i, 1)
+  loadData()
+}
+
+function clearFilters() {
+  filterRows.value = []
+  loadData()
+}
+
+function applyFilters() {
+  filterDialog.value = false
+  loadData()
+}
+
+function buildFilters(): RowFilter[] {
+  return filterRows.value
+    .filter((f) => f.column && String(f.value).trim() !== '')
+    .map((f) => {
+      if (f.op === 'in') {
+        return {
+          column: f.column,
+          op: 'in',
+          value: String(f.value)
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        }
+      }
+      return { column: f.column, op: f.op, value: String(f.value).trim() }
+    })
+}
+
+function onSortChange({ prop, order }: { prop: string; order: 'ascending' | 'descending' | null }) {
+  orderBy.value = order ? prop : ''
+  orderDesc.value = order === 'descending'
+  loadData()
+}
+
+async function openSchema() {
+  if (!currentDb.value || !currentTable.value) return
+  schemaDialog.value = true
+  schemaData.value = null
+  try {
+    schemaData.value = await databaseApi.getTableSchema(currentDb.value, currentTable.value)
+  } catch {
+    // 拦截器提示
+  }
+}
+
+async function exportData(format: 'csv' | 'json') {
+  if (!currentDb.value || !currentTable.value) return
+  exporting.value = true
+  try {
+    const blob = await databaseApi.exportTable(currentDb.value, currentTable.value, format)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${currentDb.value}.${currentTable.value}.${format}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch {
+    // 拦截器提示
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -618,5 +890,56 @@ async function removeRow(row: Record<string, unknown>) {
   color: var(--el-text-color-secondary);
   margin-top: 2px;
   word-break: break-all;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.active-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.schema-title {
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.schema-sub {
+  margin: 14px 0 8px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+
+.mt12 {
+  margin-top: 12px;
+}
+
+.sql-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.query-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--el-text-color-placeholder);
+  font-size: 13px;
 }
 </style>

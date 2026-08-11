@@ -55,4 +55,33 @@ export function request<T>(config: AxiosRequestConfig): Promise<T> {
   return http.request(config) as Promise<T>
 }
 
+// ================= 文件下载（不套信封，返回 Blob） =================
+
+const httpDownload = axios.create({
+  baseURL: '/api/v1/admin',
+  timeout: 60000,
+  responseType: 'blob',
+})
+
+httpDownload.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+httpDownload.interceptors.response.use(
+  (response) => response.data as never,
+  (error) => {
+    ElMessage.error(error?.message || '网络错误，请检查服务是否可用')
+    return Promise.reject(error)
+  },
+)
+
+/** 下载接口：返回 Blob（用于导出等直接返回文件的接口）。 */
+export function download<T = Blob>(config: AxiosRequestConfig): Promise<T> {
+  return httpDownload.request(config) as Promise<T>
+}
+
 export default http
