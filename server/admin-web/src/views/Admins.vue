@@ -3,7 +3,10 @@
     <template #header>
       <div class="card-header">
         <span>管理员账号</span>
-        <el-button v-if="authStore.hasPermission('admins:edit')" type="primary" @click="dialogVisible = true">新建管理员</el-button>
+        <div class="header-actions">
+          <el-button @click="openPermDialog">角色权限说明</el-button>
+          <el-button v-if="authStore.hasPermission('admins:edit')" type="primary" @click="dialogVisible = true">新建管理员</el-button>
+        </div>
       </div>
     </template>
 
@@ -133,6 +136,28 @@
         <el-button type="primary" :loading="roleSaving" @click="submitRole">确认修改</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="permVisible" title="角色权限说明" width="780px">
+      <el-alert type="info" :closable="false" show-icon class="perm-tip">
+        权限点格式为「模块:操作」。表格按后端角色定义实时渲染，标记「✓」表示该角色拥有此权限。
+      </el-alert>
+      <el-table :data="permRows" v-loading="permLoading" border size="small" max-height="480">
+        <el-table-column prop="desc" label="权限" min-width="220" />
+        <el-table-column
+          v-for="r in roles"
+          :key="r.role"
+          :label="r.name"
+          align="center"
+          width="120"
+        >
+          <template #default="{ row }">
+            <span :class="row.perms.has(r.role) ? 'perm-yes' : 'perm-no'">
+              {{ row.perms.has(r.role) ? '✓' : '—' }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </el-card>
 </template>
 
@@ -169,6 +194,68 @@ const roleVisible = ref(false)
 const roleSaving = ref(false)
 const roleTarget = ref<AdminItem | null>(null)
 const roleForm = reactive({ role: '' })
+
+// ============ 角色权限说明 ============
+const permVisible = ref(false)
+const permLoading = ref(false)
+const permRows = ref<{ perm: string; desc: string; perms: Set<string> }[]>([])
+
+/** 权限点 → 中文说明（用于权限矩阵）。未列出的权限点将原样显示。 */
+const permDescMap: Record<string, string> = {
+  'dashboard:view': '查看仪表盘',
+  'server:view': '查看服务器监控',
+  'server:restart': '重启容器',
+  'players:view': '查看玩家',
+  'players:edit': '修改玩家资料与货币',
+  'players:ban': '封禁 / 解封玩家',
+  'reviews:view': '查看审核队列',
+  'reviews:edit': '审核玩家信件',
+  'announcements:view': '查看公告',
+  'announcements:edit': '发布 / 编辑公告',
+  'database:view': '查看表结构与数据',
+  'database:execute': '执行 SQL（含写操作）',
+  'deploy:view': '查看部署状态',
+  'deploy:edit': '部署 / 文件 / 命令操作',
+  'audit:view': '查看操作审计',
+  'admins:view': '查看管理员',
+  'admins:edit': '管理管理员账号',
+}
+
+async function openPermDialog() {
+  permVisible.value = true
+  // 已有角色数据则直接渲染；否则懒加载（该接口只需 admins:view）
+  if (roles.value.length) {
+    buildPermRows()
+    return
+  }
+  permLoading.value = true
+  try {
+    roles.value = await authApi.listRoles()
+    buildPermRows()
+  } catch {
+    // 拦截器提示
+  } finally {
+    permLoading.value = false
+  }
+}
+
+function buildPermRows() {
+  // 取所有角色的权限点并集，按描述映射表的顺序排序
+  const all = new Set<string>()
+  roles.value.forEach((r) => r.permissions.forEach((p) => all.add(p)))
+  const ordered = [...all].sort((a, b) => {
+    const ia = Object.keys(permDescMap).indexOf(a)
+    const ib = Object.keys(permDescMap).indexOf(b)
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+  })
+  permRows.value = ordered.map((perm) => ({
+    perm,
+    desc: permDescMap[perm] ?? perm,
+    perms: new Set(
+      roles.value.filter((r) => r.permissions.includes(perm)).map((r) => r.role),
+    ),
+  }))
+}
 
 const form = reactive({ username: '', password: '', displayName: '', role: 'operator' })
 const rules: FormRules = {
@@ -349,5 +436,23 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.perm-tip {
+  margin-bottom: 12px;
+}
+
+.perm-yes {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+.perm-no {
+  color: #c0c4cc;
 }
 </style>

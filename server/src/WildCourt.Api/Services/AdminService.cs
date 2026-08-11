@@ -394,24 +394,24 @@ public class AdminService
 
     public async Task<DashboardSummaryResponse> GetDashboardSummaryAsync()
     {
-        var now = DateTime.UtcNow;
-        var todayStart = now.Date;
-        var weekStart = todayStart.AddDays(-6);
+        // 数据库时间均为 UTC 字面值；业务"今日/近 7 日"按北京时间（UTC+8）自然日计算
+        var cnTodayStartUtc = DateTime.UtcNow.AddHours(8).Date.AddHours(-8); // 北京今日 00:00 → UTC 字面值
+        var weekStart = cnTodayStartUtc.AddDays(-6);
 
         var totalPlayers = await _db.Users.LongCountAsync();
-        var todayNew = await _db.Users.LongCountAsync(u => u.CreatedAt >= todayStart);
-        var todayActive = await _db.Users.LongCountAsync(u => u.LastLogin != null && u.LastLogin >= todayStart);
+        var todayNew = await _db.Users.LongCountAsync(u => u.CreatedAt >= cnTodayStartUtc);
+        var todayActive = await _db.Users.LongCountAsync(u => u.LastLogin != null && u.LastLogin >= cnTodayStartUtc);
         var online = await _redis.CountKeysAsync(RedisUtil.OnlineKeyPrefix + "*");
         var totalShell = await _db.Users.SumAsync(u => (long)u.Shell);
         var totalCoupon = await _db.Users.SumAsync(u => (long)u.Coupon);
 
         var raw = await _db.Users
             .Where(u => u.CreatedAt >= weekStart)
-            .GroupBy(u => u.CreatedAt.Date)
+            .GroupBy(u => u.CreatedAt.AddHours(8).Date) // 转为北京日期再按天分组
             .Select(g => new DailyCountDto { Date = g.Key.ToString("yyyy-MM-dd"), Count = g.LongCount() })
             .ToListAsync();
         var trend = Enumerable.Range(0, 7)
-            .Select(i => weekStart.AddDays(i).ToString("yyyy-MM-dd"))
+            .Select(i => weekStart.AddHours(8).AddDays(i).ToString("yyyy-MM-dd"))
             .Select(d => new DailyCountDto { Date = d, Count = raw.FirstOrDefault(r => r.Date == d)?.Count ?? 0 })
             .ToList();
 
