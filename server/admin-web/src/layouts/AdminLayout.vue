@@ -42,6 +42,10 @@
           <el-icon><Promotion /></el-icon>
           <template #title>服务端部署</template>
         </el-menu-item>
+        <el-menu-item index="/audit-logs">
+          <el-icon><Document /></el-icon>
+          <template #title>操作审计</template>
+        </el-menu-item>
         <el-menu-item index="/admins">
           <el-icon><Setting /></el-icon>
           <template #title>管理员账号</template>

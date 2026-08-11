@@ -20,6 +20,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'announcements', name: 'announcements', component: () => import('@/views/Announcements.vue'), meta: { title: '公告管理' } },
       { path: 'database', name: 'database', component: () => import('@/views/Database.vue'), meta: { title: '数据库管理' } },
       { path: 'deploy', name: 'deploy', component: () => import('@/views/Deploy.vue'), meta: { title: '服务端部署' } },
+      { path: 'audit-logs', name: 'audit-logs', component: () => import('@/views/AuditLogs.vue'), meta: { title: '操作审计' } },
       { path: 'admins', name: 'admins', component: () => import('@/views/Admins.vue'), meta: { title: '管理员账号' } },
     ],
   },

@@ -45,6 +45,7 @@ var adminSecret = builder.Configuration["Admin:JwtSecret"] ?? "wildcourt-admin-s
 var adminTtlHours = double.TryParse(builder.Configuration["Admin:JwtExpireHours"], out var h) ? h : 24;
 builder.Services.AddSingleton(new AdminTokenService(adminSecret, TimeSpan.FromHours(adminTtlHours)));
 builder.Services.AddScoped<AdminService>();
+builder.Services.AddScoped<AdminAuditService>();
 builder.Services.AddSingleton<DockerService>();
 builder.Services.AddSingleton<DeployService>();
 builder.Services.AddScoped<DatabaseAdminService>();
@@ -95,6 +96,7 @@ using (var scope = app.Services.CreateScope())
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<AdminAuthMiddleware>();
+app.UseMiddleware<AdminAuditMiddleware>();
 app.UseMiddleware<AuthMiddleware>();
 app.UseMiddleware<LogMiddleware>();
 

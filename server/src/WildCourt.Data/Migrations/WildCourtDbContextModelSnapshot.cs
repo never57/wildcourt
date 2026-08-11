@@ -70,6 +70,78 @@ namespace WildCourt.Data.Migrations
                     b.ToTable("admins", (string)null);
                 });
 
+            modelBuilder.Entity("WildCourt.Data.Entities.AdminOperationLogEntity", b =>
+                {
+                    b.Property<long>("LogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("log_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("LogId"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("action");
+
+                    b.Property<long?>("AdminId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("admin_id");
+
+                    b.Property<string>("AdminName")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasColumnName("admin_name");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("longtext")
+                        .HasColumnName("details");
+
+                    b.Property<long>("DurationMs")
+                        .HasColumnType("bigint")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("varchar(45)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("varchar(8)")
+                        .HasColumnName("method");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("path");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("int")
+                        .HasColumnName("status_code");
+
+                    b.HasKey("LogId");
+
+                    b.HasIndex("Action")
+                        .HasDatabaseName("idx_operation_logs_action");
+
+                    b.HasIndex("AdminId")
+                        .HasDatabaseName("idx_operation_logs_admin_id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("idx_operation_logs_created_at");
+
+                    b.ToTable("operation_logs", (string)null);
+                });
+
             modelBuilder.Entity("WildCourt.Data.Entities.AnnouncementEntity", b =>
                 {
                     b.Property<long>("AnnouncementId")

@@ -538,3 +538,52 @@ public class CreateAdminRequest
 
     public string DisplayName { get; set; } = string.Empty;
 }
+
+// ============ 操作审计日志 ============
+
+public class AdminOperationLogDto
+{
+    public long LogId { get; set; }
+
+    public long? AdminId { get; set; }
+
+    public string AdminName { get; set; } = string.Empty;
+
+    public string Action { get; set; } = string.Empty;
+
+    public string Method { get; set; } = string.Empty;
+
+    public string Path { get; set; } = string.Empty;
+
+    public string? Details { get; set; }
+
+    public string? IpAddress { get; set; }
+
+    public int StatusCode { get; set; }
+
+    public long DurationMs { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+}
+
+public class AuditLogQueryRequest
+{
+    public int Page { get; set; } = 1;
+
+    public int PageSize { get; set; } = 20;
+
+    /// <summary>按管理员 ID 筛选。</summary>
+    public long? AdminId { get; set; }
+
+    /// <summary>按操作名精确匹配，如 player.update-currency。</summary>
+    public string? Action { get; set; }
+
+    /// <summary>关键词：匹配操作名 / 路径 / 管理员名。</summary>
+    public string? Keyword { get; set; }
+
+    public DateTime? StartTime { get; set; }
+
+    public DateTime? EndTime { get; set; }
+
+    public int? StatusCode { get; set; }
+}

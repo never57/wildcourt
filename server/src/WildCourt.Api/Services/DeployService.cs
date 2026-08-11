@@ -15,6 +15,24 @@ public class DeployService
 {
     private const int MaxLogLines = 500;
 
+    private static readonly TimeZoneInfo _cnTz = GetChinaTimeZone();
+
+    private static TimeZoneInfo GetChinaTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Shanghai");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+        }
+    }
+
+    /// <summary>把 UTC 时间转成中国时区（Asia/Shanghai）的格式化字符串。</summary>
+    private static string ToCnTime(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), _cnTz).ToString("yyyy-MM-dd HH:mm");
+
     private readonly string _hostCodeRoot;
     private readonly string _composeFile;
     private readonly string _dockerHost;
@@ -152,7 +170,7 @@ public class DeployService
                 Name = info.Name,
                 Path = Path.GetRelativePath(_hostCodeRoot, info.FullName).Replace('\\', '/'),
                 Type = "dir",
-                ModifiedAt = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm"),
+                ModifiedAt = ToCnTime(info.LastWriteTimeUtc),
             });
         }
         foreach (var file in Directory.GetFiles(dir))
@@ -164,7 +182,7 @@ public class DeployService
                 Path = Path.GetRelativePath(_hostCodeRoot, info.FullName).Replace('\\', '/'),
                 Type = "file",
                 Size = info.Length,
-                ModifiedAt = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm"),
+                ModifiedAt = ToCnTime(info.LastWriteTimeUtc),
             });
         }
         return entries
@@ -206,7 +224,7 @@ public class DeployService
             Path = Path.GetRelativePath(_hostCodeRoot, full).Replace('\\', '/'),
             Type = "file",
             Size = file.Length,
-            ModifiedAt = File.GetLastWriteTimeUtc(full).ToString("yyyy-MM-dd HH:mm"),
+            ModifiedAt = ToCnTime(File.GetLastWriteTimeUtc(full)),
         };
     }
 
@@ -291,7 +309,7 @@ public class DeployService
             Content = content,
             Size = info.Length,
             Encoding = encoding,
-            ModifiedAt = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm"),
+            ModifiedAt = ToCnTime(info.LastWriteTimeUtc),
         };
     }
 
@@ -319,7 +337,7 @@ public class DeployService
             Content = content,
             Size = info.Length,
             Encoding = encoding,
-            ModifiedAt = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm"),
+            ModifiedAt = ToCnTime(info.LastWriteTimeUtc),
         };
     }
 

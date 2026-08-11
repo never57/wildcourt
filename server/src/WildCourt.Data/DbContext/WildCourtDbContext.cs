@@ -41,6 +41,8 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public DbSet<AnnouncementEntity> Announcements => Set<AnnouncementEntity>();
 
+    public DbSet<AdminOperationLogEntity> AdminOperationLogs => Set<AdminOperationLogEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureUser(modelBuilder);
@@ -54,6 +56,7 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
         ConfigureStealRecord(modelBuilder);
         ConfigureAdmin(modelBuilder);
         ConfigureAnnouncement(modelBuilder);
+        ConfigureAdminOperationLog(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -227,6 +230,29 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.CellId).HasColumnName("cell_id").IsRequired();
             e.Property(x => x.Count).HasColumnName("count").IsRequired();
             e.Property(x => x.StolenAt).HasColumnName("stolen_at").IsRequired();
+        });
+    }
+
+    private static void ConfigureAdminOperationLog(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AdminOperationLogEntity>(e =>
+        {
+            e.ToTable("operation_logs");
+            e.HasKey(x => x.LogId);
+            e.Property(x => x.LogId).HasColumnName("log_id").ValueGeneratedOnAdd();
+            e.Property(x => x.AdminId).HasColumnName("admin_id");
+            e.Property(x => x.AdminName).HasColumnName("admin_name").HasMaxLength(32).IsRequired();
+            e.Property(x => x.Action).HasColumnName("action").HasMaxLength(64).IsRequired();
+            e.Property(x => x.Method).HasColumnName("method").HasMaxLength(8).IsRequired();
+            e.Property(x => x.Path).HasColumnName("path").HasMaxLength(255).IsRequired();
+            e.Property(x => x.Details).HasColumnName("details").HasColumnType("longtext");
+            e.Property(x => x.IpAddress).HasColumnName("ip_address").HasMaxLength(45);
+            e.Property(x => x.StatusCode).HasColumnName("status_code").IsRequired();
+            e.Property(x => x.DurationMs).HasColumnName("duration_ms").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.HasIndex(x => x.AdminId).HasDatabaseName("idx_operation_logs_admin_id");
+            e.HasIndex(x => x.Action).HasDatabaseName("idx_operation_logs_action");
+            e.HasIndex(x => x.CreatedAt).HasDatabaseName("idx_operation_logs_created_at");
         });
     }
 }

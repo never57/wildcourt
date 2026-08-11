@@ -335,6 +335,39 @@ export interface FileContent {
   modifiedAt: string
 }
 
+// ================= 操作审计日志 =================
+
+export interface AdminOperationLog {
+  logId: number
+  adminId?: number | null
+  adminName: string
+  action: string
+  method: string
+  path: string
+  details?: string | null
+  ipAddress?: string | null
+  statusCode: number
+  durationMs: number
+  createdAt: string
+}
+
+export interface AuditLogQuery {
+  page?: number
+  pageSize?: number
+  adminId?: number
+  action?: string
+  keyword?: string
+  startTime?: string
+  endTime?: string
+  statusCode?: number
+}
+
+export const auditApi = {
+  list: (params: AuditLogQuery) =>
+    request<PagedResult<AdminOperationLog>>({ url: '/audit-logs', params }),
+  actions: () => request<string[]>({ url: '/audit-actions' }),
+}
+
 export const deployApi = {
   status: () => request<DeployStatus>({ url: '/deploy/status' }),
   logs: (count = 200) => request<string[]>({ url: '/deploy/logs', params: { count } }),
