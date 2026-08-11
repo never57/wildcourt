@@ -6,8 +6,12 @@ obj/
 .vs/
 # 本地配置覆盖（含密钥）
 config/appsettings.*.local.json
+# MCP Server 本地配置（含管理员密码，不入库）
+src/WildCourt.Mcp/appsettings.local.json
 # Node / 前端构建产物
 node_modules/
 dist/
 # 打包产物
 *.zip
+# MCP Server 发布产物
+publish/
