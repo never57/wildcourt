@@ -7,20 +7,19 @@ using WildCourt.Net.Protocol;
 namespace WildCourt.Gameplay.Yard
 {
     /// <summary>
-    /// 庭院渲染（阶段 C，占位美术）：等轴测 45° 布局、按 (x+y) 遮挡排序、编辑幽灵预览、点选/长按移动。
-    /// 美术资源到位后仅需替换 Sprite 来源。
+    /// 庭院渲染：俯视方格布局。地面优先使用场景里提前摆好的瓦片地图（YardTilemap），
+    /// 检测不到时回退到代码动态生成占位地面/围墙；装饰物仍为运行时代码实例化。
     /// </summary>
     public class YardRenderer : MonoBehaviour
     {
         public static YardRenderer Instance { get; private set; }
 
-        /// <summary>等轴测单元格半宽/半高（world 单位）。</summary>
-        public const float IsoW = 1.0f;
-        public const float IsoH = 0.5f;
+        /// <summary>俯视方格单元格边长（world 单位，与场景 Grid.cellSize 保持一致）。</summary>
+        public const float CellSize = 1f;
 
         /// <summary>相机适配参数（20×20 庭院完整入画）。</summary>
-        public const float CameraSize = 13f;
-        public const float WorldCenterY = 4.75f;
+        public const float CameraSize = 11f;
+        public const float WorldCenterY = 10f;
 
         /// <summary>长按进入“移动/拖放”的阈值（秒）。</summary>
         public const float LongPressSeconds = 0.5f;
@@ -52,11 +51,13 @@ namespace WildCourt.Gameplay.Yard
         };
 
         private readonly List<GameObject> _placed = new();
+        private YardTilemap _yardTilemap;
+        private Grid _grid;
+        private Vector3Int _origin;
         private GameObject _ground;
         private GameObject _ghost;
         private SpriteRenderer _ghostRenderer;
         private Sprite _solidSprite;
-        private Sprite _diamondSprite;
         private int _selectedIndex = -1;
         private int _moveIndex = -1;
         private bool _clickPending;
@@ -83,8 +84,19 @@ namespace WildCourt.Gameplay.Yard
                 yard.LayoutChanged += OnLayoutChanged;
                 yard.Error += OnYardError;
             }
+            _yardTilemap = FindObjectOfType<YardTilemap>();
+            if (_yardTilemap != null)
+            {
+                _grid = _yardTilemap.grid;
+                _origin = _yardTilemap.origin;
+            }
+            else
+            {
+                _grid = FindObjectOfType<Grid>();
+                _origin = Vector3Int.zero;
+            }
             _solidSprite = CreateSolidSprite(Color.white, 4);
-            _diamondSprite = CreateDiamondSprite(Color.white, 16);
+            AlignCameraToGrid();
             BuildGround();
             Rebuild();
         }
@@ -278,15 +290,15 @@ namespace WildCourt.Gameplay.Yard
             var go = new GameObject("deco_" + d.id);
             go.transform.SetParent(transform, false);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = _diamondSprite;
+            sr.sprite = _solidSprite;
             sr.color = GetCategoryColor(d.category);
-            sr.sortingOrder = (x + y) * 10;
+            sr.sortingOrder = GetSortingOrder(x, y);
             var (w, h) = GetSize(d, rotation);
-            go.transform.localPosition = IsoToWorld(x, y);
+            go.transform.localPosition = CellToWorld(x, y);
 
-            // 网格单元规格 = 宽 1、高 0.5（2:1 菱形）：占位按 (w, h×0.5)；真实图等比适配进该矩形，不拉伸
-            float cellH = h * 0.5f;
-            float baseScaleX = w * (mirror ? -1f : 1f);
+            // 俯视方格：网格单元 = 1×1；占位按 (w, h) 满格；真实图等比适配进该矩形，不拉伸
+            float cellH = h * CellSize;
+            float baseScaleX = w * CellSize * (mirror ? -1f : 1f);
             go.transform.localScale = new Vector3(baseScaleX, cellH, 1f);
 
             // 商品图异步加载（StreamingAssets/ui/Decorations/{id}.png）：成功后换图并按原图比例适配
@@ -343,12 +355,13 @@ namespace WildCourt.Gameplay.Yard
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
             var mat = new Material(Shader.Find("Sprites/Default"));
             if (mat != null) renderer.material = mat;
-            renderer.sortingOrder = (x + y) * 10 + 1;
+            renderer.sortingOrder = GetSortingOrder(x, y) + 1;
         }
 
         private void BuildGround()
         {
-            // 场景预置地面（挂 YardGround 组件）时不再生成地面/围墙，尊重“提前摆放”
+            // 场景预置地面（Grid 瓦片地图 / YardGround 组件）时不再动态生成地面/围墙，尊重“提前摆放”
+            if (_grid != null) return;
             if (FindObjectOfType<YardGround>() != null) return;
 
             if (_ground != null) Destroy(_ground);
@@ -356,11 +369,12 @@ namespace WildCourt.Gameplay.Yard
             _ground = new GameObject("yard_ground");
             _ground.transform.SetParent(transform, false);
             var sr = _ground.AddComponent<SpriteRenderer>();
-            sr.sprite = _diamondSprite;
+            sr.sprite = _solidSprite;
             sr.color = GrassColor;
             sr.sortingOrder = -1000;
-            _ground.transform.localPosition = new Vector3(0f, WorldCenterY, 0f);
-            _ground.transform.localScale = new Vector3(21f, 10.5f, 1f);
+            var center = CellToWorld(YardManager.YardWidth * 0.5f, YardManager.YardHeight * 0.5f);
+            _ground.transform.localPosition = center;
+            _ground.transform.localScale = new Vector3(YardManager.YardWidth * CellSize, YardManager.YardHeight * CellSize, 1f);
 
             for (int x = 0; x < YardManager.YardWidth; x++)
             {
@@ -379,11 +393,11 @@ namespace WildCourt.Gameplay.Yard
             var go = new GameObject("wall");
             go.transform.SetParent(transform, false);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = _diamondSprite;
+            sr.sprite = _solidSprite;
             sr.color = WallColor;
-            sr.sortingOrder = (x + y) * 10 - 5;
-            go.transform.localPosition = IsoToWorld(x, y);
-            go.transform.localScale = new Vector3(1f, 0.5f, 1f);
+            sr.sortingOrder = GetSortingOrder(x, y) - 5;
+            go.transform.localPosition = CellToWorld(x, y);
+            go.transform.localScale = new Vector3(CellSize, CellSize, 1f);
         }
 
         // ---- 幽灵 ----
@@ -400,13 +414,13 @@ namespace WildCourt.Gameplay.Yard
                 _ghost = new GameObject("ghost");
                 _ghost.transform.SetParent(transform, false);
                 _ghostRenderer = _ghost.AddComponent<SpriteRenderer>();
-                _ghostRenderer.sprite = _diamondSprite;
+                _ghostRenderer.sprite = _solidSprite;
                 _ghostRenderer.sortingOrder = 9999;
             }
             var (w, h) = GetSize(d, rotation);
             _ghostRenderer.color = valid ? GhostValidColor : GhostInvalidColor;
-            _ghost.transform.localPosition = IsoToWorld(x, y);
-            _ghost.transform.localScale = new Vector3(w * (mirror ? -1f : 1f), h * 0.5f, 1f);
+            _ghost.transform.localPosition = CellToWorld(x, y);
+            _ghost.transform.localScale = new Vector3(w * CellSize * (mirror ? -1f : 1f), h * CellSize, 1f);
         }
 
         private void HideGhost()
@@ -435,16 +449,32 @@ namespace WildCourt.Gameplay.Yard
             cam.orthographicSize = Mathf.Clamp(cam.orthographicSize - delta, MinZoom, MaxZoom);
         }
 
+        /// <summary>
+        /// 场景摆好瓦片地图（Grid）后，把相机中心对准地面中心，Grid 摆哪都能居中：
+        /// 优先用已铺瓦片的实际范围中心（Tilemap.cellBounds），无 Tilemap 时回退到逻辑庭院中心。
+        /// </summary>
+        private void AlignCameraToGrid()
+        {
+            if (_grid == null) return;
+            var cam = Camera.main;
+            if (cam == null) return;
+            var center = _yardTilemap != null ? _yardTilemap.GetGroundCenterWorld() : CellToWorld(YardManager.YardWidth / 2f, YardManager.YardHeight / 2f);
+            var t = cam.transform;
+            t.position = new Vector3(center.x, center.y, t.position.z);
+            cam.orthographicSize = CameraSize;
+        }
+
         // ---- 工具 ----
 
         public (int X, int Y) ScreenToCell(Vector3 screen)
         {
             var wp = ScreenToWorld(screen);
-            float a = IsoW * 0.5f;
-            float b = IsoH * 0.5f;
-            float gx = (wp.x / a + wp.y / b) * 0.5f;
-            float gy = (wp.y / b - wp.x / a) * 0.5f;
-            return (Mathf.FloorToInt(gx), Mathf.FloorToInt(gy));
+            if (_grid != null)
+            {
+                var cell = _grid.WorldToCell(wp) - _origin;
+                return (cell.x, cell.y);
+            }
+            return (Mathf.FloorToInt(wp.x / CellSize), Mathf.FloorToInt(wp.y / CellSize));
         }
 
         public Vector3 ScreenToWorld(Vector3 screen)
@@ -454,14 +484,28 @@ namespace WildCourt.Gameplay.Yard
             return cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, 10f));
         }
 
-        public static Vector3 IsoToWorld(int x, int y)
+        public Vector3 CellToWorld(float x, float y)
         {
-            return new Vector3((x - y) * IsoW * 0.5f, (x + y) * IsoH * 0.5f, 0f);
+            if (_grid != null)
+            {
+                return _grid.GetCellCenterWorld(new Vector3Int((int)x, (int)y, 0) + _origin);
+            }
+            return new Vector3(x * CellSize, y * CellSize, 0f);
+        }
+
+        /// <summary>
+        /// 俯视方格遮挡排序：y 越大（越靠屏幕上方）越靠后渲染。
+        /// 基础偏移 1000 保证装饰物永远高于场景瓦片地图（TilemapRenderer 默认排序 0），
+        /// 避免树等物块被地面瓦片盖住。
+        /// </summary>
+        private static int GetSortingOrder(int x, int y)
+        {
+            return 1000 - y * 10;
         }
 
         /// <summary>
         /// 按“视觉块”命中：以锚点为中心的轴对齐矩形（半宽/半高按配置与旋转，镜像不改变矩形），
-        /// 点击物块任意位置都可命中；重叠时取 x+y 最大的（近下远上）。
+        /// 点击物块任意位置都可命中；重叠时取 y 最小的（屏幕下方、视觉靠前）。
         /// </summary>
         private int FindItemAtScreen(Vector3 screen)
         {
@@ -469,20 +513,20 @@ namespace WildCourt.Gameplay.Yard
             if (yard == null) return -1;
             var wp = ScreenToWorld(screen);
             int best = -1;
-            int bestSum = int.MinValue;
+            int bestY = int.MaxValue;
             for (int i = 0; i < yard.Items.Count; i++)
             {
                 var item = yard.Items[i];
                 var d = GetDecoration(item.id);
                 if (d == null) continue;
                 var (w, h) = GetSize(d, item.rotation);
-                var center = IsoToWorld(item.x, item.y);
+                var center = CellToWorld(item.x, item.y);
                 if (Mathf.Abs(wp.x - center.x) <= w * 0.5f &&
-                    Mathf.Abs(wp.y - center.y) <= h * 0.25f &&
-                    item.x + item.y > bestSum)
+                    Mathf.Abs(wp.y - center.y) <= h * 0.5f &&
+                    item.y < bestY)
                 {
                     best = i;
-                    bestSum = item.x + item.y;
+                    bestY = item.y;
                 }
             }
             return best;
@@ -514,25 +558,5 @@ namespace WildCourt.Gameplay.Yard
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
         }
 
-        /// <summary>生成菱形贴图（等轴测占位，|dx|+|dy| ≤ r 填充），scale 按 w×h 即得对角线 w×h 的菱形。</summary>
-        private static Sprite CreateDiamondSprite(Color color, int size)
-        {
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            float center = (size - 1) * 0.5f;
-            float radius = size * 0.5f;
-            var pixels = new Color[size * size];
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = Mathf.Abs(x - center);
-                    float dy = Mathf.Abs(y - center);
-                    pixels[y * size + x] = dx + dy <= radius ? color : Color.clear;
-                }
-            }
-            tex.SetPixels(pixels);
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
-        }
     }
 }
