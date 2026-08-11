@@ -409,6 +409,56 @@ public class DeployBuildRequest
     public bool NoCache { get; set; }
 }
 
+// ============ 部署：文件管理 ============
+
+public class FileEntryDto
+{
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>相对代码根目录的路径（目录/文件），目录统一不带结尾斜杠。</summary>
+    public string Path { get; set; } = string.Empty;
+
+    /// <summary>dir / file。</summary>
+    public string Type { get; set; } = string.Empty;
+
+    public long Size { get; set; }
+
+    public string ModifiedAt { get; set; } = string.Empty;
+}
+
+public class CreateDirectoryRequest
+{
+    /// <summary>相对代码根目录的新目录路径，如 src/WildCourt.Api/Services。</summary>
+    public string Path { get; set; } = string.Empty;
+}
+
+public class FileContentDto
+{
+    /// <summary>相对代码根目录的文件路径。</summary>
+    public string Path { get; set; } = string.Empty;
+
+    /// <summary>文件文本内容（BOM 已剥离）。</summary>
+    public string Content { get; set; } = string.Empty;
+
+    public long Size { get; set; }
+
+    /// <summary>utf-8 / utf-8-bom，保存时原样回传以保留原始编码。</summary>
+    public string Encoding { get; set; } = "utf-8";
+
+    public string ModifiedAt { get; set; } = string.Empty;
+}
+
+public class SaveFileRequest
+{
+    /// <summary>相对代码根目录的文件路径。</summary>
+    public string Path { get; set; } = string.Empty;
+
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>文件编码（utf-8 / utf-8-bom），由读取接口返回后原样回传。</summary>
+    public string Encoding { get; set; } = "utf-8";
+}
+
 // ============ 管理员账号 ============
 
 public class AdminItemDto

@@ -2,7 +2,7 @@
   <div class="page">
     <el-row :gutter="16">
       <!-- 左：部署配置与操作 -->
-      <el-col :xs="24" :md="10">
+      <el-col :xs="24" :md="6">
         <el-card shadow="never">
           <template #header>
             <div class="card-header">
@@ -73,8 +73,69 @@
         </el-card>
       </el-col>
 
+      <!-- 中：文件管理（浏览/上传/替换/删除，免打包） -->
+      <el-col :xs="24" :md="12">
+        <el-card shadow="never" class="file-card">
+          <template #header>
+            <div class="card-header">
+              <span>文件管理</span>
+              <div class="header-actions">
+                <el-button size="small" @click="loadFiles">刷新</el-button>
+                <el-button size="small" @click="handleMkdir">新建目录</el-button>
+                <el-button size="small" type="primary" @click="openUpload">
+                  上传文件
+                  <input ref="fileInputRef" type="file" class="hidden-input" @change="onFileSelected" />
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <div class="file-breadcrumb">
+            <el-breadcrumb separator="/">
+              <el-breadcrumb-item>
+                <a href="#" @click.prevent="goRoot">{{ rootName }}</a>
+              </el-breadcrumb-item>
+              <el-breadcrumb-item v-for="(seg, i) in breadcrumbs" :key="i">
+                <a href="#" @click.prevent="goBreadcrumb(i)">{{ seg }}</a>
+              </el-breadcrumb-item>
+            </el-breadcrumb>
+            <span class="file-hint">点击目录进入；点击文件在线预览/编辑；上传同名文件即覆盖（替换）</span>
+          </div>
+
+          <el-table
+            :data="entries"
+            size="small"
+            height="calc(100vh - 340px)"
+            :row-style="{ cursor: 'pointer' }"
+            @row-dblclick="onRowDblClick"
+          >
+            <el-table-column label="名称" min-width="240">
+              <template #default="{ row }">
+                <span class="file-name" @click="onNameClick(row)">
+                  <el-icon v-if="row.type === 'dir'" color="#e6a23c"><Folder /></el-icon>
+                  <el-icon v-else color="#909399"><Document /></el-icon>
+                  <span class="file-name-text">{{ row.name }}</span>
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="大小" width="90">
+              <template #default="{ row }">{{ row.type === 'dir' ? '-' : formatSize(row.size) }}</template>
+            </el-table-column>
+            <el-table-column label="修改时间" width="130" prop="modifiedAt" />
+            <el-table-column label="操作" width="80" align="center">
+              <template #default="{ row }">
+                <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+              </template>
+            </el-table-column>
+            <template #empty>
+              <el-empty description="空目录" :image-size="60" />
+            </template>
+          </el-table>
+        </el-card>
+      </el-col>
+
       <!-- 右：部署日志 -->
-      <el-col :xs="24" :md="14">
+      <el-col :xs="24" :md="6">
         <el-card shadow="never">
           <template #header>
             <div class="card-header">
@@ -91,14 +152,48 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 文件内容预览 / 在线编辑 -->
+    <el-dialog
+      v-model="editorVisible"
+      :title="editorTitle"
+      width="76%"
+      top="4vh"
+      destroy-on-close
+      :before-close="onEditorBeforeClose"
+    >
+      <div v-loading="editorLoading" class="editor-body">
+        <template v-if="editorPath">
+          <div class="editor-meta">
+            <el-tag size="small" type="info">{{ formatSize(editorSize) }}</el-tag>
+            <el-tag size="small">{{ editorEncoding }}</el-tag>
+            <span class="file-hint">Ctrl+S 保存 · Tab 缩进 · 保存后需重新构建部署生效</span>
+          </div>
+          <textarea
+            v-model="editorContent"
+            class="code-editor"
+            spellcheck="false"
+            @keydown.tab.prevent="insertTab"
+            @keydown.ctrl.s.prevent="saveEditor"
+            @keydown.meta.s.prevent="saveEditor"
+          ></textarea>
+        </template>
+      </div>
+      <template #footer>
+        <el-button @click="editorVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editorSaving" :disabled="!editorDirty" @click="saveEditor">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { UploadFilled } from '@element-plus/icons-vue'
-import { deployApi, type DeployStatus } from '@/api'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { UploadFilled, Folder, Document } from '@element-plus/icons-vue'
+import { deployApi, type DeployStatus, type FileEntry } from '@/api'
 
 const status = ref<DeployStatus | null>(null)
 const logs = ref<string[]>([])
@@ -106,6 +201,16 @@ const noCache = ref(false)
 const uploadResult = ref('')
 const autoScroll = ref(true)
 const logRef = ref<HTMLDivElement>()
+
+const entries = ref<FileEntry[]>([])
+const currentPath = ref('')
+const fileInputRef = ref<HTMLInputElement>()
+
+const rootName = computed(() => {
+  const root = status.value?.hostCodeRoot || 'server'
+  return root.split(/[\\/]/).filter(Boolean).pop() || 'server'
+})
+const breadcrumbs = computed(() => (currentPath.value ? currentPath.value.split('/') : []))
 
 let timer: number | undefined
 
@@ -164,6 +269,184 @@ async function startBuild() {
   }
 }
 
+// ==================== 文件管理 ====================
+
+async function loadFiles() {
+  try {
+    entries.value = await deployApi.listFiles(currentPath.value)
+  } catch {
+    // 拦截器提示
+  }
+}
+
+function goRoot() {
+  currentPath.value = ''
+  loadFiles()
+}
+
+function goDir(entry: FileEntry) {
+  if (entry.type !== 'dir') return
+  currentPath.value = entry.path
+  loadFiles()
+}
+
+function goBreadcrumb(index: number) {
+  currentPath.value = currentPath.value.split('/').slice(0, index + 1).join('/')
+  loadFiles()
+}
+
+function onNameClick(row: FileEntry) {
+  if (row.type === 'dir') goDir(row)
+  else openEditor(row)
+}
+
+function onRowDblClick(row: FileEntry) {
+  if (row.type === 'dir') goDir(row)
+  else openEditor(row)
+}
+
+// ==================== 文件内容预览 / 在线编辑 ====================
+
+const editorVisible = ref(false)
+const editorLoading = ref(false)
+const editorSaving = ref(false)
+const editorPath = ref('')
+const editorContent = ref('')
+const editorOriginal = ref('')
+const editorEncoding = ref('utf-8')
+const editorSize = ref(0)
+
+const editorDirty = computed(() => editorContent.value !== editorOriginal.value)
+const editorTitle = computed(() => (editorPath.value ? `编辑 ${editorPath.value}` : '文件编辑'))
+
+async function openEditor(row: FileEntry) {
+  if (row.type !== 'file') return
+  editorPath.value = row.path
+  editorContent.value = ''
+  editorOriginal.value = ''
+  editorVisible.value = true
+  editorLoading.value = true
+  try {
+    const res = await deployApi.getFileContent(row.path)
+    editorContent.value = res.content
+    editorOriginal.value = res.content
+    editorEncoding.value = res.encoding
+    editorSize.value = res.size
+  } catch {
+    editorVisible.value = false
+  } finally {
+    editorLoading.value = false
+  }
+}
+
+function onEditorBeforeClose(done: () => void) {
+  if (editorDirty.value) {
+    ElMessageBox.confirm('有未保存的修改，确定关闭？', '提示', { type: 'warning' })
+      .then(() => done())
+      .catch(() => {})
+  } else {
+    done()
+  }
+}
+
+function insertTab(e: KeyboardEvent) {
+  const el = e.target as HTMLTextAreaElement
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  editorContent.value = editorContent.value.slice(0, start) + '    ' + editorContent.value.slice(end)
+  nextTick(() => {
+    el.selectionStart = el.selectionEnd = start + 4
+  })
+}
+
+async function saveEditor() {
+  if (!editorPath.value || editorSaving.value) return
+  editorSaving.value = true
+  try {
+    const res = await deployApi.saveFileContent(editorPath.value, editorContent.value, editorEncoding.value)
+    ElMessage.success(res.message)
+    editorOriginal.value = editorContent.value
+    editorSize.value = res.size
+    await loadFiles()
+  } catch {
+    // 拦截器提示
+  } finally {
+    editorSaving.value = false
+  }
+}
+
+function openUpload() {
+  fileInputRef.value?.click()
+}
+
+async function onFileSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  try {
+    const res = await deployApi.uploadFile(currentPath.value, file)
+    ElMessage.success(res.message)
+    await loadFiles()
+  } catch {
+    // 拦截器提示
+  } finally {
+    input.value = ''
+  }
+}
+
+async function handleMkdir() {
+  let name = ''
+  try {
+    const { value } = await ElMessageBox.prompt('输入新目录名称', '新建目录', {
+      confirmButtonText: '创建',
+      cancelButtonText: '取消',
+      inputPattern: /^[\w.\- ]+$/,
+      inputErrorMessage: '目录名仅支持字母/数字/下划线/点/横线/空格',
+    })
+    name = value.trim()
+  } catch {
+    return
+  }
+  if (!name) return
+  try {
+    const path = currentPath.value ? `${currentPath.value}/${name}` : name
+    const res = await deployApi.mkdir(path)
+    ElMessage.success(res.message)
+    await loadFiles()
+  } catch {
+    // 拦截器提示
+  }
+}
+
+async function handleDelete(row: FileEntry) {
+  const isDir = row.type === 'dir'
+  try {
+    await ElMessageBox.confirm(
+      `确定删除${isDir ? '目录' : '文件'}「${row.name}」？${isDir ? '目录将递归删除，不可恢复！' : ''}`,
+      '删除确认',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  try {
+    const res = await deployApi.deleteFile(row.path)
+    ElMessage.success(res.message)
+    await loadFiles()
+  } catch {
+    // 拦截器提示
+  }
+}
+
+function formatSize(size: number): string {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+// ==================== 通用 ====================
+
 function isResultError(s?: string): boolean {
   return !!s && s.includes('失败')
 }
@@ -178,6 +461,7 @@ function formatDate(value: string): string {
 onMounted(async () => {
   await refreshStatus()
   await fetchLogs()
+  await loadFiles()
   timer = window.setInterval(async () => {
     await refreshStatus()
     if (status.value?.building) await fetchLogs()
@@ -198,6 +482,13 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .upload-title {
@@ -217,6 +508,36 @@ onBeforeUnmount(() => {
 
 .result-error {
   color: #f56c6c;
+}
+
+.file-breadcrumb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.file-hint {
+  font-size: 12px;
+  color: #909399;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.file-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .log-box {
@@ -240,5 +561,37 @@ onBeforeUnmount(() => {
   color: #808080;
   text-align: center;
   padding-top: 40px;
+}
+
+.editor-body {
+  min-height: 55vh;
+}
+
+.editor-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.code-editor {
+  width: 100%;
+  height: 55vh;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 6px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.code-editor:focus {
+  border-color: var(--el-color-primary);
 }
 </style>

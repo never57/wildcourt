@@ -37,6 +37,54 @@ public class AdminDeployController : AdminControllerBase
         return ApiResponse<object>.Ok(new { Files = count, Message = $"已解压 {count} 个文件，可以执行构建部署" });
     }
 
+    /// <summary>文件管理：列出目录内容（path 为空 = 代码根目录）。</summary>
+    [HttpGet("deploy/files")]
+    public ApiResponse<List<FileEntryDto>> ListFiles([FromQuery] string? path)
+    {
+        return ApiResponse<List<FileEntryDto>>.Ok(_deploy.ListFiles(path ?? string.Empty));
+    }
+
+    /// <summary>文件管理：上传/覆盖单个文件到指定目录（multipart：file + path）。</summary>
+    [HttpPost("deploy/file")]
+    [RequestSizeLimit(100 * 1024 * 1024)]
+    public ApiResponse<object> UploadFile(IFormFile file, [FromForm] string? path)
+    {
+        var entry = _deploy.UploadFile(path ?? string.Empty, file);
+        return ApiResponse<object>.Ok(new { entry.Path, entry.Size, Message = $"已上传 {entry.Name}" });
+    }
+
+    /// <summary>文件管理：删除文件或目录（path 相对代码根目录）。</summary>
+    [HttpDelete("deploy/file")]
+    public ApiResponse<object> DeleteFile([FromQuery] string path)
+    {
+        _deploy.DeleteFile(path);
+        return ApiResponse<object>.Ok(new { Message = "已删除" });
+    }
+
+    /// <summary>文件管理：新建目录。</summary>
+    [HttpPost("deploy/mkdir")]
+    public ApiResponse<object> CreateDirectory([FromBody] CreateDirectoryRequest request)
+    {
+        _deploy.CreateDirectory(request.Path);
+        return ApiResponse<object>.Ok(new { Message = "目录已创建" });
+    }
+
+    /// <summary>文件管理：读取文件内容（文本，2MB 以内，二进制文件拒绝）。</summary>
+    [HttpGet("deploy/file/content")]
+    public ApiResponse<FileContentDto> GetFileContent([FromQuery] string path)
+    {
+        return ApiResponse<FileContentDto>.Ok(_deploy.GetFileContent(path));
+    }
+
+    /// <summary>文件管理：保存文件内容（在线编辑）。</summary>
+    [HttpPut("deploy/file/content")]
+    [RequestSizeLimit(5 * 1024 * 1024)]
+    public ApiResponse<object> SaveFileContent([FromBody] SaveFileRequest request)
+    {
+        var dto = _deploy.SaveFileContent(request.Path, request.Content, request.Encoding);
+        return ApiResponse<object>.Ok(new { dto.Path, dto.Size, Message = "已保存，执行构建部署后生效" });
+    }
+
     /// <summary>触发构建部署（docker compose up -d --build）。构建中重复调用将被忽略。</summary>
     [HttpPost("deploy/build")]
     public async Task<ApiResponse<object>> Build([FromBody] DeployBuildRequest request)

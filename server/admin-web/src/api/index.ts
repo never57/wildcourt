@@ -270,6 +270,22 @@ export const databaseApi = {
 
 // ================= 服务端部署 =================
 
+export interface FileEntry {
+  name: string
+  path: string
+  type: 'dir' | 'file'
+  size: number
+  modifiedAt: string
+}
+
+export interface FileContent {
+  path: string
+  content: string
+  size: number
+  encoding: string
+  modifiedAt: string
+}
+
 export const deployApi = {
   status: () => request<DeployStatus>({ url: '/deploy/status' }),
   logs: (count = 200) => request<string[]>({ url: '/deploy/logs', params: { count } }),
@@ -280,4 +296,20 @@ export const deployApi = {
   },
   build: (noCache = false, service?: string) =>
     request<{ started: boolean; message: string }>({ url: '/deploy/build', method: 'post', data: { noCache, service } }),
+  listFiles: (path = '') => request<FileEntry[]>({ url: '/deploy/files', params: { path } }),
+  uploadFile: (dirPath: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('path', dirPath)
+    return request<{ path: string; size: number; message: string }>({ url: '/deploy/file', method: 'post', data: form })
+  },
+  deleteFile: (path: string) => request<{ message: string }>({ url: '/deploy/file', params: { path }, method: 'delete' }),
+  mkdir: (path: string) => request<{ message: string }>({ url: '/deploy/mkdir', method: 'post', data: { path } }),
+  getFileContent: (path: string) => request<FileContent>({ url: '/deploy/file/content', params: { path } }),
+  saveFileContent: (path: string, content: string, encoding = 'utf-8') =>
+    request<{ path: string; size: number; message: string }>({
+      url: '/deploy/file/content',
+      method: 'put',
+      data: { path, content, encoding },
+    }),
 }
