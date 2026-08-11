@@ -50,6 +50,24 @@ namespace WildCourt.Gameplay.Yard
             return CellToWorld(YardManager.YardWidth / 2, YardManager.YardHeight / 2);
         }
 
+        /// <summary>
+        /// 已铺瓦片在逻辑坐标下的矩形范围 (xMin, yMin, width, height)。
+        /// 用于把装饰物放置边界限定在瓦片地图区域内；
+        /// 无有效 Tilemap（仅普通 Grid）时回退到 20×20 全庭院。
+        /// </summary>
+        public (int xMin, int yMin, int width, int height) GetGroundBoundsLogic()
+        {
+            if (grid != null && tilemap != null)
+            {
+                var bounds = tilemap.cellBounds;
+                if (bounds.size.x > 0 && bounds.size.y > 0)
+                {
+                    return (bounds.xMin - origin.x, bounds.yMin - origin.y, bounds.size.x, bounds.size.y);
+                }
+            }
+            return (0, 0, YardManager.YardWidth, YardManager.YardHeight);
+        }
+
         /// <summary>逻辑坐标 (x,y) → 世界坐标（格子中心）。无 Grid 时按左下角 (0,0)、边长 1 的方格回退。</summary>
         public Vector3 CellToWorld(int x, int y)
         {

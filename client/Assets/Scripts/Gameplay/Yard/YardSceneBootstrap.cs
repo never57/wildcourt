@@ -101,8 +101,7 @@ namespace WildCourt.Gameplay.Yard
             if (cam == null) return;
             cam.orthographic = true;
             cam.orthographicSize = YardRenderer.CameraSize;
-            var t = cam.transform;
-            t.position = new Vector3(0f, YardRenderer.WorldCenterY, t.position.z);
+            // 相机位置尊重场景里设置的初始位置（MainScene 主相机），不再强制覆盖。
         }
     }
 }

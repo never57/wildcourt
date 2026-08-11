@@ -24,6 +24,15 @@ namespace WildCourt.Gameplay.Yard
         public const int YardWidth = 20;
         public const int YardHeight = 20;
 
+        /// <summary>
+        /// 可放置边界（逻辑坐标，含边界）。默认 20×20 全庭院；
+        /// 渲染层初始化后可按瓦片地图实际范围收紧（瓦片没铺满时，防止装饰悬空在无地面区域）。
+        /// </summary>
+        public int PlaceXMin = 0;
+        public int PlaceYMin = 0;
+        public int PlaceXMax = YardWidth - 1;
+        public int PlaceYMax = YardHeight - 1;
+
         /// <summary>编辑模式状态（文档 03 §3.9：放置/移动/旋转/删除）。</summary>
         public enum EditState
         {
@@ -160,7 +169,7 @@ namespace WildCourt.Gameplay.Yard
             var d = GetDecoration(item.id);
             if (d == null) return false;
             var (w, h) = GetSize(d, item.rotation);
-            if (x < 0 || y < 0 || x + w > YardWidth || y + h > YardHeight) return false;
+            if (!IsInPlaceBounds(x, y, w, h)) return false;
 
             for (int i = 0; i < Items.Count; i++)
             {
@@ -261,6 +270,13 @@ namespace WildCourt.Gameplay.Yard
             LayoutChanged?.Invoke();
         }
 
+        /// <summary>矩形 (x,y)-(x+w-1, y+h-1) 是否完整落在可放置边界内。</summary>
+        private bool IsInPlaceBounds(int x, int y, int w, int h)
+        {
+            return x >= PlaceXMin && y >= PlaceYMin &&
+                   x + w - 1 <= PlaceXMax && y + h - 1 <= PlaceYMax;
+        }
+
         private bool CanPlaceAt(YardItemDto item)
         {
             if (Items.Count >= Cap.decorationLimit) return false;
@@ -270,7 +286,7 @@ namespace WildCourt.Gameplay.Yard
             int limit = Math.Min(owned, d.maxCount);
             if (PlacedCount(item.id) >= limit) return false;
             var (w, h) = GetSize(d, item.rotation);
-            if (item.x < 0 || item.y < 0 || item.x + w > YardWidth || item.y + h > YardHeight) return false;
+            if (!IsInPlaceBounds(item.x, item.y, w, h)) return false;
             for (int i = 0; i < Items.Count; i++)
             {
                 var other = Items[i];

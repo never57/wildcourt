@@ -18,4 +18,5 @@ public class DecorationConfig
     public string description;   // 描述
     public int maxCount = 2;     // 可拥有/可摆放数量上限（当前统一 2）
     public string effect = "";   // 粒子效果类型（空=无，如 leaves）
+    public float displayScale = 1f; // 仅显示缩放，不影响占格/碰撞；<1 显示更小，>1 更大
 }

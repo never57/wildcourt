@@ -17,17 +17,17 @@ namespace WildCourt.Gameplay.Yard
         /// <summary>俯视方格单元格边长（world 单位，与场景 Grid.cellSize 保持一致）。</summary>
         public const float CellSize = 1f;
 
-        /// <summary>相机适配参数（20×20 庭院完整入画）。</summary>
-        public const float CameraSize = 11f;
-        public const float WorldCenterY = 10f;
+        /// <summary>相机初始缩放（最远视角；配合 MaxZoom 使用，初始即上限，只允许往里缩）。</summary>
+        public const float CameraSize = 5f;
 
         /// <summary>长按进入“移动/拖放”的阈值（秒）。</summary>
-        public const float LongPressSeconds = 0.5f;
+        public const float LongPressSeconds = 0.2f;
 
-        /// <summary>缩放范围与步长（滚轮与面板 +/- 按钮共用）。</summary>
-        public const float MinZoom = 5f;
-        public const float MaxZoom = 20f;
-        public const float ZoomStep = 1.5f;
+        /// <summary>缩放范围与步长（滚轮与面板 +/- 按钮共用）。
+        /// MaxZoom 与 CameraSize 保持一致：初始即最远视角，只允许往内缩进，不允许再往外退。</summary>
+        public const float MinZoom = 1f;
+        public const float MaxZoom = 5f;
+        public const float ZoomStep = 0.5f;
 
         /// <summary>选中/取消选中事件（YardPanel 订阅显示操作按钮）。</summary>
         public event Action<int> ItemSelected;
@@ -57,6 +57,11 @@ namespace WildCourt.Gameplay.Yard
         private GameObject _ground;
         private GameObject _ghost;
         private SpriteRenderer _ghostRenderer;
+        private string _ghostId;
+        private Sprite _ghostSprite;
+        private int _ghostW, _ghostH;
+        private bool _ghostMirror;
+        private float _ghostScale = 1f;
         private Sprite _solidSprite;
         private int _selectedIndex = -1;
         private int _moveIndex = -1;
@@ -94,6 +99,15 @@ namespace WildCourt.Gameplay.Yard
             {
                 _grid = FindObjectOfType<Grid>();
                 _origin = Vector3Int.zero;
+            }
+            // 放置边界跟随瓦片地图实际范围：瓦片没铺满 20×20 时，禁止把装饰放到没有地面的区域。
+            if (yard != null && _yardTilemap != null)
+            {
+                var (xMin, yMin, w, h) = _yardTilemap.GetGroundBoundsLogic();
+                yard.PlaceXMin = xMin;
+                yard.PlaceYMin = yMin;
+                yard.PlaceXMax = xMin + w - 1;
+                yard.PlaceYMax = yMin + h - 1;
             }
             _solidSprite = CreateSolidSprite(Color.white, 4);
             AlignCameraToGrid();
@@ -296,9 +310,11 @@ namespace WildCourt.Gameplay.Yard
             var (w, h) = GetSize(d, rotation);
             go.transform.localPosition = CellToWorld(x, y);
 
-            // 俯视方格：网格单元 = 1×1；占位按 (w, h) 满格；真实图等比适配进该矩形，不拉伸
-            float cellH = h * CellSize;
-            float baseScaleX = w * CellSize * (mirror ? -1f : 1f);
+            // 俯视方格：网格单元 = 1×1；占位按 (w, h) 满格；真实图等比适配进该矩形，不拉伸。
+            // displayScale 仅缩放显示，占格与碰撞仍按 (w, h) 计算。
+            float s = d.displayScale;
+            float cellH = h * CellSize * s;
+            float baseScaleX = w * CellSize * s * (mirror ? -1f : 1f);
             go.transform.localScale = new Vector3(baseScaleX, cellH, 1f);
 
             // 商品图异步加载（StreamingAssets/ui/Decorations/{id}.png）：成功后换图并按原图比例适配
@@ -402,6 +418,11 @@ namespace WildCourt.Gameplay.Yard
 
         // ---- 幽灵 ----
 
+        /// <summary>
+        /// 移动/放置预览（幽灵）：
+        /// 显示装饰物真实图片形状（异步加载，无图回退矩形占位）；
+        /// 合法性仍由调用方按占格矩形判断，这里只把 valid 反映到颜色上。
+        /// </summary>
         private void ShowGhost(DecorationConfig d, int x, int y, int rotation, bool mirror, bool valid)
         {
             if (d == null)
@@ -417,10 +438,54 @@ namespace WildCourt.Gameplay.Yard
                 _ghostRenderer.sprite = _solidSprite;
                 _ghostRenderer.sortingOrder = 9999;
             }
+            // 重置为矩形占位，等待真实图回调（避免切换物品时残留上一物品的图）
+            _ghostSprite = null;
+            _ghostRenderer.sprite = _solidSprite;
+            _ghostId = d.id;
             var (w, h) = GetSize(d, rotation);
+            _ghostW = w;
+            _ghostH = h;
+            _ghostMirror = mirror;
+            _ghostScale = d.displayScale;
             _ghostRenderer.color = valid ? GhostValidColor : GhostInvalidColor;
             _ghost.transform.localPosition = CellToWorld(x, y);
-            _ghost.transform.localScale = new Vector3(w * CellSize * (mirror ? -1f : 1f), h * CellSize, 1f);
+            ApplyGhostScale();
+
+            GoodsSprites.Request(d.id, (loadedId, sprite) =>
+            {
+                if (sprite == null || _ghostRenderer == null || loadedId != _ghostId) return;
+                _ghostSprite = sprite;
+                _ghostRenderer.sprite = sprite;
+                ApplyGhostScale();
+            });
+        }
+
+        /// <summary>幽灵缩放：有真实图按原图比例适配进占格矩形；无图用矩形占位。displayScale 只影响显示。</summary>
+        private void ApplyGhostScale()
+        {
+            if (_ghostRenderer == null) return;
+            float cellH = _ghostH * CellSize * _ghostScale;
+            float baseScaleX = _ghostW * CellSize * _ghostScale * (_ghostMirror ? -1f : 1f);
+            if (_ghostSprite != null)
+            {
+                var bounds = _ghostSprite.bounds.size;
+                float aspect = bounds.x / Mathf.Max(bounds.y, 0.0001f);
+                float sx = baseScaleX;
+                float sy = cellH;
+                if (Mathf.Abs(baseScaleX) / cellH > aspect)
+                {
+                    sx = cellH * aspect * (_ghostMirror ? -1f : 1f);
+                }
+                else
+                {
+                    sy = Mathf.Abs(baseScaleX) / aspect;
+                }
+                _ghostRenderer.transform.localScale = new Vector3(sx, sy, 1f);
+            }
+            else
+            {
+                _ghostRenderer.transform.localScale = new Vector3(baseScaleX, cellH, 1f);
+            }
         }
 
         private void HideGhost()
@@ -428,6 +493,8 @@ namespace WildCourt.Gameplay.Yard
             if (_ghost != null) Destroy(_ghost);
             _ghost = null;
             _ghostRenderer = null;
+            _ghostSprite = null;
+            _ghostId = null;
         }
 
         // ---- 缩放 ----
@@ -450,17 +517,14 @@ namespace WildCourt.Gameplay.Yard
         }
 
         /// <summary>
-        /// 场景摆好瓦片地图（Grid）后，把相机中心对准地面中心，Grid 摆哪都能居中：
-        /// 优先用已铺瓦片的实际范围中心（Tilemap.cellBounds），无 Tilemap 时回退到逻辑庭院中心。
+        /// 初始化相机：正交视角 + 最远初始缩放（看全庭院）。
+        /// 相机位置尊重场景里设置的初始位置（MainScene 主相机），不再自动对准 Grid；
+        /// 之后可通过滚轮 / 面板按钮缩小 orthographicSize 往内缩进。
         /// </summary>
         private void AlignCameraToGrid()
         {
-            if (_grid == null) return;
             var cam = Camera.main;
             if (cam == null) return;
-            var center = _yardTilemap != null ? _yardTilemap.GetGroundCenterWorld() : CellToWorld(YardManager.YardWidth / 2f, YardManager.YardHeight / 2f);
-            var t = cam.transform;
-            t.position = new Vector3(center.x, center.y, t.position.z);
             cam.orthographicSize = CameraSize;
         }
 

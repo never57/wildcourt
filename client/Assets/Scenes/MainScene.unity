@@ -210,7 +210,7 @@ Transform:
   m_GameObject: {fileID: 1590240758}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 7.71567, y: -4.8500175, z: -16.91766}
+  m_LocalPosition: {x: 8.13, y: -4.93, z: -16.91766}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -368,9 +368,21 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 114522030223186843, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
+      propertyPath: tilemap
+      value: 
+      objectReference: {fileID: 4170073365473864149}
+    - target: {fileID: 1470342836515357933, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.13
+      objectReference: {fileID: 0}
+    - target: {fileID: 1470342836515357933, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.183
+      objectReference: {fileID: 0}
     - target: {fileID: 1470342836515357933, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 8.83
+      value: 8.9067
       objectReference: {fileID: 0}
     - target: {fileID: 1470342836515357933, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
       propertyPath: m_LocalPosition.y
@@ -412,6 +424,22 @@ PrefabInstance:
       propertyPath: m_Name
       value: Grid
       objectReference: {fileID: 0}
+    - target: {fileID: 4500086358077335224, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
+      propertyPath: m_CellLayout
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4500086358077335224, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
+      propertyPath: m_CellSize.x
+      value: 0.6
+      objectReference: {fileID: 0}
+    - target: {fileID: 4500086358077335224, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
+      propertyPath: m_CellSize.y
+      value: 0.6
+      objectReference: {fileID: 0}
+    - target: {fileID: 4500086358077335224, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
+      propertyPath: m_CellSwizzle
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7114176049887334717, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
       propertyPath: m_TileAnchor.x
       value: 0
@@ -425,6 +453,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
+--- !u!1839735485 &4170073365473864149 stripped
+Tilemap:
+  m_CorrespondingSourceObject: {fileID: 7114176049887334717, guid: e7f6b505465fb2940a89680038d7e879, type: 3}
+  m_PrefabInstance: {fileID: 4170073365473864148}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
