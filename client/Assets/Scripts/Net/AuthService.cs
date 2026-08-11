@@ -53,8 +53,9 @@ namespace WildCourt.UI
         /// <summary>
         /// 确保 NetManager 单例存在（start 场景当前未挂载 NetManager，此处自举；
         /// 若场景已配置则复用，DontDestroyOnLoad 保证跨场景存活）。
+        /// 登录前发起的公开请求（如公告弹窗）也复用此入口。
         /// </summary>
-        private static void EnsureNetManager()
+        public static void EnsureNetManager()
         {
             if (NetManager.Instance == null)
             {

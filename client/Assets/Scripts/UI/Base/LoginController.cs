@@ -62,6 +62,9 @@ namespace WildCourt.UI
             registerButton.onClick.AddListener(OnRegisterClick);
             gotoRegisterLink.onClick.AddListener(OnGotoRegister);
             gotoLoginLink.onClick.AddListener(OnGotoLogin);
+
+            // 进入登录界面即弹出公告（公开接口免登录；无已发布公告或失败时静默不弹）
+            AnnouncementPopup.Open(transform);
         }
 
         private void OnDestroy()

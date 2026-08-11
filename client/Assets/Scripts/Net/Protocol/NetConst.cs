@@ -49,6 +49,9 @@ namespace WildCourt.Net.Protocol
         public const string ActivityList = Base + "/activity/list";
         public static string ActivityClaim(string activityId) => Base + $"/activity/claim/{activityId}";
 
+        // AnnouncementController（公开接口，免登录）
+        public const string Announcements = Base + "/announcements";
+
         // DailySignInController
         public const string SignInToday = Base + "/signin/today";
         public const string SignInClaimWeek = Base + "/signin/claim-week";

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using MySqlConnector;
 using WildCourt.Api.Models;
 
@@ -185,11 +186,11 @@ public class DatabaseAdminService
         foreach (var kv in request.Values)
         {
             sets.Add($"{QuoteIdentifier(kv.Key)} = @v{index}");
-            parameters.Add(new MySqlParameter($"@v{index}", kv.Value ?? DBNull.Value));
+            parameters.Add(new MySqlParameter($"@v{index}", NormalizeValue(kv.Value) ?? DBNull.Value));
             index++;
         }
 
-        parameters.Add(new MySqlParameter("@pk", request.PrimaryKeyValue ?? DBNull.Value));
+        parameters.Add(new MySqlParameter("@pk", NormalizeValue(request.PrimaryKeyValue) ?? DBNull.Value));
         var sql = $"UPDATE {fullTable} SET {string.Join(", ", sets)} WHERE {QuoteIdentifier(request.PrimaryKey!)} = @pk";
         return await ExecuteNonQueryAsync(sql, parameters.ToArray());
     }
@@ -207,7 +208,7 @@ public class DatabaseAdminService
         {
             columns.Add(QuoteIdentifier(kv.Key));
             placeholders.Add($"@v{index}");
-            parameters.Add(new MySqlParameter($"@v{index}", kv.Value ?? DBNull.Value));
+            parameters.Add(new MySqlParameter($"@v{index}", NormalizeValue(kv.Value) ?? DBNull.Value));
             index++;
         }
         if (columns.Count == 0)
@@ -224,7 +225,7 @@ public class DatabaseAdminService
         ValidateChangeRequest(request, requirePrimaryKey: true);
         var fullTable = BuildFullTable(request.Database, request.Table);
         var sql = $"DELETE FROM {fullTable} WHERE {QuoteIdentifier(request.PrimaryKey!)} = @pk";
-        return await ExecuteNonQueryAsync(sql, new MySqlParameter("@pk", request.PrimaryKeyValue ?? DBNull.Value));
+        return await ExecuteNonQueryAsync(sql, new MySqlParameter("@pk", NormalizeValue(request.PrimaryKeyValue) ?? DBNull.Value));
     }
 
     private async Task<List<ColumnInfoDto>> GetColumnsAsync(string database, string table)
@@ -309,6 +310,44 @@ public class DatabaseAdminService
     private static string QuoteIdentifier(string identifier)
     {
         return "`" + identifier.Replace("`", "``") + "`";
+    }
+
+    /// <summary>
+    /// 将 JSON 反序列化得到的 JsonElement 规范化为 MySqlConnector 可识别的 CLR 类型。
+    /// Dictionary&lt;string, object?&gt; 反序列化时数字字段默认为 JsonElement，
+    /// 直接绑定 MySqlParameter 会因无法推断 DbType 抛异常（表现为"服务器内部错误"）。
+    /// </summary>
+    private static object? NormalizeValue(object? value)
+    {
+        if (value is not JsonElement je)
+        {
+            return value;
+        }
+        switch (je.ValueKind)
+        {
+            case JsonValueKind.Null:
+                return null;
+            case JsonValueKind.True:
+            case JsonValueKind.False:
+                return je.GetBoolean();
+            case JsonValueKind.String:
+                return je.GetString();
+            case JsonValueKind.Number:
+                // 整数优先 long，避免小数列被误转为整型丢失精度；
+                // 超出 long 或带小数时依次尝试 decimal/double。
+                if (je.TryGetInt64(out var longValue))
+                {
+                    return longValue;
+                }
+                if (je.TryGetDecimal(out var decimalValue))
+                {
+                    return decimalValue;
+                }
+                return je.GetDouble();
+            default:
+                // 数组/对象等复合值（如 JSON 列）按原始文本绑定
+                return je.GetRawText();
+        }
     }
 }
 
