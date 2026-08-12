@@ -27,6 +27,8 @@ namespace WildCourt.Lua
             "Logic.SignIn.Config_DailySignIn",
             "Logic.Activity.Activity_MidAutumn",
             "Logic.Farm.FarmManager",
+            "Logic.Yard.YardManager",
+            "Logic.Shop.ShopManager",
             "Localization.LetterTemplates",
         };
 
@@ -136,6 +138,15 @@ namespace WildCourt.Lua
         /// <summary>调用 Lua 模块函数（module 为表路径，如 "Logic.MatchMaker"）。</summary>
         public T CallFunc<T>(string module, string func, params object[] args)
         {
+            return CallFuncArray<T>(module, func, args);
+        }
+
+        /// <summary>
+        /// 调用 Lua 模块函数，参数以数组原样展开传入（用于需要动态拼参数列表 / 扁平数组透传的场景，
+        /// 避免 <c>params object[]</c> 把嵌套 <c>object[]</c> 当成单个参数）。
+        /// </summary>
+        public T CallFuncArray<T>(string module, string func, object[] args)
+        {
 #if USE_XLUA
             try
             {
@@ -154,7 +165,7 @@ namespace WildCourt.Lua
                     Debug.LogWarning($"[LuaManager] 函数不存在: {module}.{func}");
                     return default;
                 }
-                var ret = luaFunc.Call(args);
+                var ret = luaFunc.Call(args ?? Array.Empty<object>());
                 if (ret != null && ret.Length > 0 && ret[0] is T typed)
                 {
                     return typed;

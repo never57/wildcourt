@@ -1,6 +1,6 @@
-using System;
 using UnityEngine;
 using UnityEngine.UI;
+using WildCourt.Gameplay.Shop;
 using WildCourt.Gameplay.Yard;
 
 namespace WildCourt.UI.Yard
@@ -32,15 +32,16 @@ namespace WildCourt.UI.Yard
             if (nameText != null) nameText.text = d.name;
             if (countText != null) countText.text = $"已建造 {built}/{owned}";
 
-            bool canBuy = remain > 0;
+            bool canBuy = ShopManager.CanBuy(owned, _config.maxCount, built);
             if (remainText != null) remainText.text = canBuy ? $"商店剩余 {remain}" : "库存不足";
 
             if (buyButton != null)
             {
+                // 复用格子时先清空旧监听，避免上一次绑定的点击回调残留
+                buyButton.onClick.RemoveAllListeners();
                 buyButton.gameObject.SetActive(canBuy);
                 if (canBuy)
                 {
-                    buyButton.onClick.RemoveAllListeners();
                     buyButton.onClick.AddListener(OnBuyClicked);
                 }
             }

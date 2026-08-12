@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using WildCourt.Gameplay.Shop;
 using WildCourt.Gameplay.Yard;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
@@ -46,6 +47,9 @@ namespace WildCourt.UI.Yard
         private int _page;
         private string _category = "全部";
         private int _selectedIndex = -1;
+
+        /// <summary>格子对象池（复用 YardCell 实例，翻页/切分类时避免频繁 Instantiate/Destroy）。</summary>
+        private readonly List<GameObject> _cellPool = new(PageSize);
 
         [Header("预制体绑定（YardPanel.prefab 内字段）")]
         [SerializeField] private Text _shellText;
@@ -353,7 +357,7 @@ namespace WildCourt.UI.Yard
             for (int i = 0; i < all.Length; i++)
             {
                 var d = all[i];
-                if (_category == "全部" || d.category == _category) _visible.Add(d);
+                if (ShopManager.FilterByCategory(d.category, _category)) _visible.Add(d);
             }
 
             int pages = Mathf.Max(1, Mathf.CeilToInt(_visible.Count / (float)PageSize));
@@ -369,9 +373,21 @@ namespace WildCourt.UI.Yard
         private void BuildGrid()
         {
             if (_gridRoot == null) return;
+
+            // 回收当前显示中的格子：预制体格子（带 YardCell）入池复用；代码建格回退产物直接销毁。
             for (int i = _gridRoot.childCount - 1; i >= 0; i--)
             {
-                Destroy(_gridRoot.GetChild(i).gameObject);
+                var child = _gridRoot.GetChild(i).gameObject;
+                if (child.GetComponent<YardCell>() != null)
+                {
+                    child.SetActive(false);
+                    child.transform.SetParent(null, false); // 移出 gridRoot，保留在池中
+                    _cellPool.Add(child);
+                }
+                else
+                {
+                    Destroy(child); // 代码建格（动态子节点）无法复用，直接销毁
+                }
             }
 
             int start = _page * PageSize;
@@ -383,11 +399,40 @@ namespace WildCourt.UI.Yard
 
         private void CreateCell(DecorationConfig d)
         {
-            // 预制体路径：格子模板 Instantiate + YardCell 绑定
+            // 预制体路径：优先从对象池取格子复用，不足再 Instantiate；YardCell 绑定
             if (_cellPrefab != null && _gridRoot != null)
             {
-                var cellGo = Instantiate(_cellPrefab, _gridRoot);
-                var cellComp = cellGo.GetComponent<YardCell>();
+                YardCell cellComp = null;
+
+                // 从池尾取一个可用的预制体格子（类型需匹配 YardCell）
+                while (_cellPool.Count > 0 && cellComp == null)
+                {
+                    int last = _cellPool.Count - 1;
+                    var pooled = _cellPool[last];
+                    _cellPool.RemoveAt(last);
+                    cellComp = pooled != null ? pooled.GetComponent<YardCell>() : null;
+                    if (cellComp != null)
+                    {
+                        pooled.transform.SetParent(_gridRoot, false);
+                        pooled.SetActive(true);
+                    }
+                    else if (pooled != null)
+                    {
+                        // 池中混入非预制体格子（代码建格回退产物），直接销毁
+                        Destroy(pooled);
+                    }
+                }
+
+                if (cellComp == null)
+                {
+                    var fresh = Instantiate(_cellPrefab, _gridRoot);
+                    cellComp = fresh.GetComponent<YardCell>();
+                    if (cellComp == null)
+                    {
+                        Destroy(fresh);
+                    }
+                }
+
                 if (cellComp != null)
                 {
                     int prefOwned = _owned.TryGetValue(d.id, out var prefCnt) ? prefCnt : 0;
@@ -399,14 +444,13 @@ namespace WildCourt.UI.Yard
                         ownedFlag);
                     return;
                 }
-                Destroy(cellGo);
             }
 
             // —— 回退：代码建格 ——
             int owned = _owned.TryGetValue(d.id, out var cnt) ? cnt : 0;
             int built = CountBuilt(d.id);
             int remain = d.maxCount - owned;
-            bool canBuy = remain > 0;
+            bool canBuy = ShopManager.CanBuy(owned, d.maxCount, built);
 
             var cell = CreateUiObject("cell_" + d.id, _gridRoot);
             var img = AddImage(cell, owned > 0 ? YardRenderer.GetCategoryColor(d.category) : new Color(0.42f, 0.42f, 0.42f, 0.9f));
