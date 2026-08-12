@@ -186,6 +186,15 @@ namespace WildCourt.Gameplay.Yard
             return yard.TryPlace(x, y);
         }
 
+        /// <summary>退出建造模式：取消选中、清除放置/移动 ghost。</summary>
+        public void CancelSelection()
+        {
+            _moveIndex = -1;
+            _clickPending = false;
+            HideGhost();
+            DeselectItem();
+        }
+
         // ---- 点选 / 长按移动 ----
 
         private void UpdateSelectAndMove(YardManager yard)

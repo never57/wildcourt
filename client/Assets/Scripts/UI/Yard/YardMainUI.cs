@@ -78,12 +78,25 @@ namespace WildCourt.UI.Yard
                 _buildButton.onClick.RemoveAllListeners();
                 _buildButton.onClick.AddListener(OpenBuildPanel);
             }
+            YardPanel.BackPressed -= OnBuildPanelClosed;
+            YardPanel.BackPressed += OnBuildPanelClosed;
         }
 
         private void OnDestroy()
         {
             if (Instance == this) Instance = null;
             if (_buildButton != null) _buildButton.onClick.RemoveAllListeners();
+            YardPanel.BackPressed -= OnBuildPanelClosed;
+        }
+
+        /// <summary>建造面板返回：隐藏建造面板，恢复显示主 UI。</summary>
+        private void OnBuildPanelClosed()
+        {
+            if (_panel != null)
+            {
+                _panel.gameObject.SetActive(false);
+            }
+            gameObject.SetActive(true);
         }
 
         /// <summary>拉取玩家资料，缓存后供 YardPanel 打开时注入（余额显示）。</summary>
@@ -96,13 +109,14 @@ namespace WildCourt.UI.Yard
                 (code, msg) => Debug.LogWarning($"[YardMainUI] profile 加载失败: {msg}"));
         }
 
-        /// <summary>点击“建造”按钮：实例化打开庭院建造面板（YardPanel），并注入已缓存资料。</summary>
+        /// <summary>点击“建造”按钮：实例化打开庭院建造面板（YardPanel），注入已缓存资料，并隐藏主 UI。</summary>
         private void OpenBuildPanel()
         {
             if (_yard == null) return;
             if (_panel != null)
             {
                 _panel.gameObject.SetActive(true);
+                gameObject.SetActive(false);
                 return;
             }
             _panel = YardPanel.CreateOrInstantiate(_yard);
@@ -110,6 +124,7 @@ namespace WildCourt.UI.Yard
             {
                 _panel.OnProfileLoaded(_profile);
             }
+            gameObject.SetActive(false);
         }
     }
 }

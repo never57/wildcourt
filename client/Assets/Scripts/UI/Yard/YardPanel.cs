@@ -16,6 +16,9 @@ namespace WildCourt.UI.Yard
     {
         public static YardPanel Instance { get; private set; }
 
+        /// <summary>返回按钮点击（退出建造模式、隐藏/销毁面板）时触发，YardMainUI 订阅以恢复显示。</summary>
+        public static event System.Action BackPressed;
+
         /// <summary>
         /// 跨场景预加载的 YardPanel 预制体引用（对应 VideoSceneTransition.PreloadedLoginUI）。
         /// 登录成功、切 MainScene 前由 LoginController 注入；支持热更（热更包下载的 prefab 赋值即可）。
@@ -64,6 +67,7 @@ namespace WildCourt.UI.Yard
         [SerializeField] private Button _zoomOutButton;
         [SerializeField] private Button _zoomInButton;
         [SerializeField] private Button[] _tabButtonsArray;
+        [SerializeField] private Button _backButton;
         [SerializeField] private Image[] _tabImagesArray;
         private PlayerInfoEntry _infoEntry;
 
@@ -178,6 +182,7 @@ namespace WildCourt.UI.Yard
             }
             _zoomOutButton?.onClick.AddListener(() => Zoom(-1));
             _zoomInButton?.onClick.AddListener(() => Zoom(1));
+            _backButton?.onClick.AddListener(OnBackClicked);
 
             LoadInventory();
             RefreshList();
@@ -311,6 +316,13 @@ namespace WildCourt.UI.Yard
         {
             if (_panelRoot != null) _panelRoot.SetActive(show);
             if (_expandButton != null) _expandButton.SetActive(!show);
+        }
+
+        /// <summary>返回按钮：退出建造模式，取消选中/放置态，触发 BackPressed 通知主 UI 恢复。</summary>
+        private void OnBackClicked()
+        {
+            YardRenderer.Instance?.CancelSelection();
+            BackPressed?.Invoke();
         }
 
         private void Zoom(int dir)
