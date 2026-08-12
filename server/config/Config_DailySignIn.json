@@ -1,0 +1,13 @@
+{
+  "rows": [
+    { "kind": "week", "day": 1, "shell": 5 },
+    { "kind": "week", "day": 2, "shell": 8 },
+    { "kind": "week", "day": 3, "shell": 10, "item": "seed_wheat", "count": 1 },
+    { "kind": "week", "day": 4, "shell": 12 },
+    { "kind": "week", "day": 5, "shell": 15, "item": "coupon_speed", "count": 1 },
+    { "kind": "week", "day": 6, "shell": 20, "item": "pet_food", "count": 2 },
+    { "kind": "week", "day": 7, "shell": 30, "item": "deco_week", "count": 1 },
+    { "kind": "month", "total": 14, "shell": 100 },
+    { "kind": "month", "total": 30, "shell": 200, "item": "deco_month", "count": 1 }
+  ]
+}

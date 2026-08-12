@@ -5,9 +5,8 @@ namespace WildCourt.Data.DbContext;
 
 /// <summary>
 /// EF Core DbContext（MySQL，Pomelo 驱动）。
-/// 对应文档 02 §2.8：共 13 张表，当前已落实体 7 张；其余 6 张
-/// （nonfiction_collections / badges / match_pools / operation_logs /
-/// daily_settlements / sign_in_records）待实体补齐后加入。
+/// 对应文档 02 §2.8：共 13 张核心表 + 扩展表（admins/announcements/operation_logs）。
+/// 剩余待补核心表：nonfiction_collections / badges / match_pools / daily_settlements。
 /// 列名统一 snake_case（与文档 15.3 / init_db.sql 对齐）。
 /// 注：命名空间 WildCourt.Data.DbContext 与 EF Core 的 DbContext 类同名，
 /// 故基类使用全限定名 Microsoft.EntityFrameworkCore.DbContext。
@@ -37,6 +36,8 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public DbSet<StealRecordEntity> StealRecords => Set<StealRecordEntity>();
 
+    public DbSet<SignInRecordEntity> SignInRecords => Set<SignInRecordEntity>();
+
     public DbSet<AdminEntity> Admins => Set<AdminEntity>();
 
     public DbSet<AnnouncementEntity> Announcements => Set<AnnouncementEntity>();
@@ -54,6 +55,7 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
         ConfigureTransaction(modelBuilder);
         ConfigureFarmPlot(modelBuilder);
         ConfigureStealRecord(modelBuilder);
+        ConfigureSignInRecord(modelBuilder);
         ConfigureAdmin(modelBuilder);
         ConfigureAnnouncement(modelBuilder);
         ConfigureAdminOperationLog(modelBuilder);
@@ -233,6 +235,20 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.CellId).HasColumnName("cell_id").IsRequired();
             e.Property(x => x.Count).HasColumnName("count").IsRequired();
             e.Property(x => x.StolenAt).HasColumnName("stolen_at").IsRequired();
+        });
+    }
+
+    private static void ConfigureSignInRecord(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SignInRecordEntity>(e =>
+        {
+            e.ToTable("sign_in_records");
+            e.HasKey(x => x.RecordId);
+            e.Property(x => x.RecordId).HasColumnName("record_id").ValueGeneratedOnAdd();
+            e.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            e.Property(x => x.SignDate).HasColumnName("sign_date").HasColumnType("date").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.HasIndex(x => new { x.UserId, x.SignDate }).HasDatabaseName("uk_sign_in_user_date").IsUnique();
         });
     }
 

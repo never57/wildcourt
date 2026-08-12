@@ -40,6 +40,7 @@ builder.Services.AddScoped<PlayerService>();
 builder.Services.AddScoped<ShopService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<FriendService>();
+builder.Services.AddScoped<SignInService>();
 
 // 运营后台：令牌服务 + 业务服务 + 监控/部署
 var adminSecret = builder.Configuration["Admin:JwtSecret"] ?? "wildcourt-admin-secret-change-me";

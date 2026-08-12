@@ -365,6 +365,36 @@ namespace WildCourt.Data.Migrations
                     b.ToTable("pets", (string)null);
                 });
 
+            modelBuilder.Entity("WildCourt.Data.Entities.SignInRecordEntity", b =>
+                {
+                    b.Property<long>("RecordId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("record_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("RecordId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("SignDate")
+                        .HasColumnType("date")
+                        .HasColumnName("sign_date");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("RecordId");
+
+                    b.HasIndex("UserId", "SignDate")
+                        .IsUnique()
+                        .HasDatabaseName("uk_sign_in_user_date");
+
+                    b.ToTable("sign_in_records", (string)null);
+                });
+
             modelBuilder.Entity("WildCourt.Data.Entities.StealRecordEntity", b =>
                 {
                     b.Property<long>("RecordId")
