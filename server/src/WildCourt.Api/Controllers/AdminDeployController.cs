@@ -30,6 +30,22 @@ public class AdminDeployController : AdminControllerBase
         return ApiResponse<List<string>>.Ok(_deploy.GetRecentLog(Math.Clamp(count, 10, 1000)));
     }
 
+    /// <summary>git 状态（分支 / commit / 与远端差距 / 工作区干净度），供"拉取代码"前置判断。</summary>
+    [HttpGet("deploy/git/status")]
+    public async Task<ApiResponse<GitStatusResponse>> GitStatus()
+    {
+        RequirePermission(AdminPermissions.DeployView);
+        return ApiResponse<GitStatusResponse>.Ok(await _deploy.GetGitStatusAsync());
+    }
+
+    /// <summary>从远端拉取最新代码（--ff-only，SSH 免密）。工作区有未提交修改 / 领先远端时会拒绝。</summary>
+    [HttpPost("deploy/git/pull")]
+    public async Task<ApiResponse<GitPullResponse>> GitPull()
+    {
+        RequirePermission(AdminPermissions.DeployEdit);
+        return ApiResponse<GitPullResponse>.Ok(await _deploy.GitPullAsync());
+    }
+
     /// <summary>上传服务端源码 zip（multipart/form-data，字段名 file），解压覆盖宿主代码目录。</summary>
     [HttpPost("deploy/upload")]
     [RequestSizeLimit(200 * 1024 * 1024)]

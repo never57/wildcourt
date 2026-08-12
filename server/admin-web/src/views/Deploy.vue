@@ -28,26 +28,45 @@
 
           <el-divider />
 
-          <div v-if="canEdit" class="upload-area">
-            <div class="upload-title">1. 上传服务端代码包（zip）</div>
-            <el-upload
-              drag
-              :show-file-list="false"
-              accept=".zip,application/zip,application/x-zip-compressed"
-              :before-upload="handleUpload"
+          <div v-if="canEdit" class="build-area">
+            <div class="upload-title">1. 拉取代码（git，SSH 免密）</div>
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="分支">
+                <span style="margin-right: 6px">{{ gitStatus?.branch || '-' }}</span>
+                <el-tag v-if="gitStatus?.ahead" type="danger" size="small">领先 {{ gitStatus.ahead }}</el-tag>
+                <el-tag v-if="gitStatus?.behind" type="warning" size="small">落后 {{ gitStatus.behind }}</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="当前提交">{{ gitStatus?.commitShort || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="提交信息">{{ gitStatus?.commitMessage || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="工作区">
+                <el-tag v-if="gitStatus?.dirty" type="danger" size="small">
+                  有未提交修改（{{ gitStatus.dirtyFiles.length }} 个文件，将阻塞拉取）
+                </el-tag>
+                <el-tag v-else type="success" size="small">干净</el-tag>
+              </el-descriptions-item>
+            </el-descriptions>
+            <el-alert
+              v-if="gitStatus && !gitStatus.gitRepo"
+              class="mt12"
+              type="warning"
+              :closable="false"
+              show-icon
+              title="当前代码目录不是 git 仓库，无法拉取；请确认服务器 /opt/wildcourt 下存在 .git 且 API 容器已挂载"
+            />
+            <el-tooltip
+              :disabled="!gitStatus?.dirty"
+              content="工作区有未提交修改，拉取会被拒绝；请先通过文件管理回退或手动提交"
             >
-              <el-icon size="40" color="#909399"><UploadFilled /></el-icon>
-              <div class="el-upload__text">拖拽 zip 到这里，或 <em>点击选择</em></div>
-              <template #tip>
-                <div class="el-upload__tip">
-                  压缩包需为 server 目录结构（含 Dockerfile / docker-compose.yml），
-                  解压后覆盖宿主机 {{ status?.hostCodeRoot || '/opt/wildcourt/server' }}
-                </div>
-              </template>
-            </el-upload>
-            <div v-if="uploadResult" class="upload-result">
-              <el-tag type="success" size="small">{{ uploadResult }}</el-tag>
-            </div>
+              <el-button
+                type="primary"
+                style="margin-top: 12px"
+                :loading="gitPulling"
+                :disabled="status?.building || !gitStatus?.gitRepo || gitStatus?.dirty"
+                @click="pullCode"
+              >
+                拉取最新代码
+              </el-button>
+            </el-tooltip>
           </div>
 
           <el-divider />
@@ -59,7 +78,7 @@
               <el-button type="primary" :disabled="!status?.enabled || status?.building" @click="startBuild">
                 开始构建部署
               </el-button>
-              <el-button @click="refreshStatus">刷新状态</el-button>
+              <el-button @click="refreshAll">刷新状态</el-button>
             </div>
             <el-alert
               v-if="!status?.enabled"
@@ -70,6 +89,33 @@
               title="部署功能未启用：请确认后端已挂载 /opt/wildcourt/server 且配置 Admin:Deploy 节点"
             />
           </div>
+
+          <el-divider />
+
+          <el-collapse v-if="canEdit" class="zip-collapse">
+            <el-collapse-item title="备选：上传 zip 覆盖（与 git 路线互斥，上传后工作区变脏、无法 git pull）" name="zip">
+              <div class="upload-area">
+                <el-upload
+                  drag
+                  :show-file-list="false"
+                  accept=".zip,application/zip,application/x-zip-compressed"
+                  :before-upload="handleUpload"
+                >
+                  <el-icon size="40" color="#909399"><UploadFilled /></el-icon>
+                  <div class="el-upload__text">拖拽 zip 到这里，或 <em>点击选择</em></div>
+                  <template #tip>
+                    <div class="el-upload__tip">
+                      压缩包需为 server 目录结构（含 Dockerfile / docker-compose.yml），
+                      解压后覆盖宿主机 {{ status?.hostCodeRoot || '/opt/wildcourt/server' }}
+                    </div>
+                  </template>
+                </el-upload>
+                <div v-if="uploadResult" class="upload-result">
+                  <el-tag type="success" size="small">{{ uploadResult }}</el-tag>
+                </div>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
         </el-card>
       </el-col>
 
@@ -195,13 +241,15 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled, Folder, Document } from '@element-plus/icons-vue'
-import { deployApi, type DeployStatus, type FileEntry } from '@/api'
+import { deployApi, type DeployStatus, type FileEntry, type GitStatus } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
 const canEdit = computed(() => authStore.hasPermission('deploy:edit'))
 
 const status = ref<DeployStatus | null>(null)
+const gitStatus = ref<GitStatus | null>(null)
+const gitPulling = ref(false)
 const logs = ref<string[]>([])
 const noCache = ref(false)
 const uploadResult = ref('')
@@ -225,6 +273,33 @@ async function refreshStatus() {
     status.value = await deployApi.status()
   } catch {
     // 拦截器提示
+  }
+}
+
+async function refreshGitStatus() {
+  try {
+    gitStatus.value = await deployApi.gitStatus()
+  } catch {
+    // 拦截器提示
+  }
+}
+
+async function refreshAll() {
+  await Promise.all([refreshStatus(), refreshGitStatus()])
+}
+
+async function pullCode() {
+  if (gitPulling.value) return
+  gitPulling.value = true
+  try {
+    const res = await deployApi.gitPull()
+    ElMessage.success(res.message)
+  } catch {
+    // 拦截器提示
+  } finally {
+    gitPulling.value = false
+    await refreshGitStatus()
+    await fetchLogs()
   }
 }
 
@@ -465,11 +540,11 @@ function formatDate(value: string): string {
 }
 
 onMounted(async () => {
-  await refreshStatus()
+  await refreshAll()
   await fetchLogs()
   await loadFiles()
   timer = window.setInterval(async () => {
-    await refreshStatus()
+    await refreshAll()
     if (status.value?.building) await fetchLogs()
   }, 3000)
 })

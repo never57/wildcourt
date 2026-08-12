@@ -343,6 +343,198 @@ public class DeployService
         };
     }
 
+    /// <summary>读取 git 仓库状态（分支 / commit / 与远端差距 / 工作区是否干净）。</summary>
+    public async Task<GitStatusResponse> GetGitStatusAsync()
+    {
+        var resp = new GitStatusResponse();
+        try
+        {
+            var gitRoot = FindGitRoot();
+            if (gitRoot is null)
+            {
+                return resp; // GitRepo=false：当前代码目录不是 git 仓库
+            }
+            resp.GitRepo = true;
+
+            var (code, output) = await RunGitAsync("rev-parse --abbrev-ref HEAD");
+            resp.Branch = code == 0 ? output.Trim() : null;
+
+            (code, output) = await RunGitAsync("rev-parse HEAD");
+            resp.Commit = code == 0 ? output.Trim() : null;
+            if (resp.Commit is { Length: >= 8 })
+            {
+                resp.CommitShort = resp.Commit[..8];
+            }
+
+            (code, output) = await RunGitAsync("log -1 --format=%s");
+            resp.CommitMessage = code == 0 ? output.Trim() : null;
+
+            (code, output) = await RunGitAsync("status --porcelain");
+            if (code == 0)
+            {
+                resp.DirtyFiles = output
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(l => l.Trim())
+                    .ToList();
+                resp.Dirty = resp.DirtyFiles.Count > 0;
+            }
+
+            // ahead/behind（无 upstream 时命令失败，保持 0）
+            (code, output) = await RunGitAsync("rev-list --left-right --count HEAD...@{upstream}");
+            if (code == 0)
+            {
+                var parts = output.Trim().Split('\t');
+                if (parts.Length == 2
+                    && int.TryParse(parts[0], out var ahead)
+                    && int.TryParse(parts[1], out var behind))
+                {
+                    resp.Ahead = ahead;
+                    resp.Behind = behind;
+                }
+            }
+            return resp;
+        }
+        catch (Exception ex)
+        {
+            resp.Error = ex.Message;
+            return resp;
+        }
+    }
+
+    /// <summary>从宿主代码仓库执行 git pull（--ff-only，SSH 免密）。与构建互斥，防止拉取与部署并发改文件。</summary>
+    public async Task<GitPullResponse> GitPullAsync()
+    {
+        await _buildLock.WaitAsync();
+        try
+        {
+            var status = await GetGitStatusAsync();
+            if (!status.GitRepo)
+            {
+                throw new BusinessException(ApiCodes.ServerError, "当前代码目录不是 git 仓库（未找到 .git），无法拉取");
+            }
+            if (string.IsNullOrEmpty(status.Branch) || status.Branch == "HEAD")
+            {
+                throw new BusinessException(ApiCodes.BadRequest, "当前处于 detached HEAD 状态，无法拉取，请先切回分支");
+            }
+            if (status.Dirty)
+            {
+                var files = string.Join("、", status.DirtyFiles.Take(10));
+                if (status.DirtyFiles.Count > 10)
+                {
+                    files += $" 等 {status.DirtyFiles.Count} 个文件";
+                }
+                throw new BusinessException(ApiCodes.BadRequest,
+                    $"工作区有未提交修改，已中止拉取（避免冲突）：{files}");
+            }
+            if (status.Ahead > 0)
+            {
+                throw new BusinessException(ApiCodes.BadRequest,
+                    $"本地领先远端 {status.Ahead} 个提交且未推送，无法 fast-forward，请先在本地推送这些提交");
+            }
+
+            var gitRoot = FindGitRoot()!;
+            AppendLog($"===== git pull 开始（{DateTime.Now:HH:mm:ss}） =====");
+            using var process = StartGitProcess(gitRoot, "pull --ff-only");
+            process.OutputDataReceived += (_, e) => AppendLog(e.Data);
+            process.ErrorDataReceived += (_, e) => AppendLog(e.Data);
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            if (!await WaitForExitAsync(process, TimeSpan.FromMinutes(10)))
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // 尽力终止
+                }
+                AppendLog("!! git pull 超时（10 分钟），已终止");
+                throw new BusinessException(ApiCodes.ServerError, "git pull 超时（10 分钟），已终止");
+            }
+            AppendLog("===== git pull 结束 =====");
+
+            if (process.ExitCode != 0)
+            {
+                throw new BusinessException(ApiCodes.ServerError, $"git pull 失败（exit={process.ExitCode}），详见部署日志");
+            }
+
+            var after = await GetGitStatusAsync();
+            return new GitPullResponse
+            {
+                Success = true,
+                CommitShort = after.CommitShort,
+                Message = $"拉取成功：分支 {after.Branch}，当前提交 {after.CommitShort}（{after.CommitMessage}）"
+                          + (after.Behind > 0 ? $"，仍落后远端 {after.Behind} 个提交" : ""),
+            };
+        }
+        finally
+        {
+            _buildLock.Release();
+        }
+    }
+
+    /// <summary>从 _hostCodeRoot 向上查找 git 仓库根目录（含 .git）。</summary>
+    private string? FindGitRoot()
+    {
+        var dir = new DirectoryInfo(_hostCodeRoot);
+        while (dir is not null)
+        {
+            if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
+            {
+                return dir.FullName;
+            }
+            dir = dir.Parent;
+        }
+        return null;
+    }
+
+    /// <summary>启动 git 进程（容器内执行：挂载的 .git 属主可能不同，需 -c safe.directory；SSH 走宿主密钥免密）。</summary>
+    private Process StartGitProcess(string gitRoot, string args)
+    {
+        var psi = new ProcessStartInfo("git", $"-C \"{gitRoot}\" -c safe.directory=\"{gitRoot}\" {args}")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        psi.Environment["HOME"] = "/root";
+        // 容器内 /root/.ssh 为宿主 SSH 密钥只读挂载（compose 已配置），ssh-rsa 算法白名单在 config 中
+        psi.Environment["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=accept-new";
+        return Process.Start(psi)
+            ?? throw new BusinessException(ApiCodes.ServerError, "无法启动 git 进程（镜像未安装 git？）");
+    }
+
+    /// <summary>执行 git 命令并捕获输出（stderr 合并到输出末尾），超时抛业务异常。</summary>
+    private async Task<(int ExitCode, string Output)> RunGitAsync(string args, int timeoutSeconds = 30)
+    {
+        var gitRoot = FindGitRoot()
+            ?? throw new BusinessException(ApiCodes.ServerError, "未找到 git 仓库（_hostCodeRoot 向上未发现 .git 目录）");
+        using var process = StartGitProcess(gitRoot, args);
+
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        var exited = await WaitForExitAsync(process, TimeSpan.FromSeconds(timeoutSeconds));
+        var stdout = await stdoutTask;
+        var stderr = await stderrTask;
+
+        if (!exited)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // 尽力终止
+            }
+            throw new BusinessException(ApiCodes.ServerError, $"git 命令超时（{timeoutSeconds}s）：{args}");
+        }
+        return (process.ExitCode, stdout + stderr);
+    }
+
     /// <summary>触发后台构建部署（不阻塞请求）。单实例互斥，构建中重复触发会被忽略。</summary>
     public bool BuildAndDeployAsync(bool noCache, string? service)
     {

@@ -541,6 +541,49 @@ public class DeployBuildRequest
     public bool NoCache { get; set; }
 }
 
+public class GitStatusResponse
+{
+    /// <summary>是否为 git 仓库（向上找到 .git 目录）。</summary>
+    public bool GitRepo { get; set; }
+
+    /// <summary>当前分支。</summary>
+    public string? Branch { get; set; }
+
+    /// <summary>当前 commit 完整哈希。</summary>
+    public string? Commit { get; set; }
+
+    /// <summary>当前 commit 短哈希（8 位）。</summary>
+    public string? CommitShort { get; set; }
+
+    /// <summary>当前 commit 提交信息首行。</summary>
+    public string? CommitMessage { get; set; }
+
+    /// <summary>领先远端提交数（本地有而未推送）。</summary>
+    public int Ahead { get; set; }
+
+    /// <summary>落后远端提交数（远端有新而本地未拉取）。</summary>
+    public int Behind { get; set; }
+
+    /// <summary>工作区是否有未提交修改（在线编辑/上传覆盖会导致，会阻塞 git pull）。</summary>
+    public bool Dirty { get; set; }
+
+    /// <summary>未提交修改的文件列表（相对仓库根）。</summary>
+    public List<string> DirtyFiles { get; set; } = new();
+
+    /// <summary>获取 git 状态失败时的错误信息（非仓库/未装 git/权限等）。</summary>
+    public string? Error { get; set; }
+}
+
+public class GitPullResponse
+{
+    public bool Success { get; set; }
+
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>pull 后的最新 commit 短哈希。</summary>
+    public string? CommitShort { get; set; }
+}
+
 // ============ 部署：文件管理 ============
 
 public class FileEntryDto

@@ -20,6 +20,8 @@
 #       · /  → /host（只读）     → 宿主磁盘 df 统计
 #       · /proc → /host/proc     → 宿主内存/负载读取（必须覆盖在 /host 之上挂载）
 #       · /opt/wildcourt/server  → 宿主代码根目录同路径挂载（DeployService 在此执行 compose 部署）
+#       · /opt/wildcourt/.git    → git 仓库元数据（管理后台"拉取代码"执行 git pull 用，需可写）
+#       · ${SSH_DIR:-/home/ubuntu/.ssh} → /root/.ssh（只读）→ 宿主 SSH 密钥（git pull 免密）
 #     安全提醒：docker.sock 等于宿主 root 权限，管理后台务必绑定内网/Nginx+鉴权使用。
 
 # ---- API 蓝绿公共配置（api-blue / api-green 共用） ----
@@ -52,6 +54,8 @@ x-api-common: &api-common
     # ---- 管理后台依赖的挂载（见文件头说明，勿随意移除） ----
     - /var/run/docker.sock:/var/run/docker.sock   # docker CLI 与宿主 daemon 通信
     - /:/host:ro                                  # 宿主根目录（磁盘 df 统计）
+    - /opt/wildcourt/.git:/opt/wildcourt/.git     # git 仓库元数据（管理后台"拉取代码"执行 git pull 用）
+    - ${SSH_DIR:-/home/ubuntu/.ssh}:/root/.ssh:ro # 宿主 SSH 密钥（git pull 免密；SSH_DIR 环境变量可覆盖默认用户）
     - /proc:/host/proc:ro                         # 宿主 /proc（内存/负载），需覆盖在 /host 之上
     - /opt/wildcourt/server:/opt/wildcourt/server # 宿主代码根目录同路径挂载（部署服务用）
   # 收到停止信号后先处理完在途请求（ASP.NET Core 优雅停机）再退出

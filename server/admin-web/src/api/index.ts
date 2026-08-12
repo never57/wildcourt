@@ -161,6 +161,25 @@ export interface DeployStatus {
   lastDeployResult: string
 }
 
+export interface GitStatus {
+  gitRepo: boolean
+  branch?: string
+  commit?: string
+  commitShort?: string
+  commitMessage?: string
+  ahead: number
+  behind: number
+  dirty: boolean
+  dirtyFiles: string[]
+  error?: string
+}
+
+export interface GitPullResult {
+  success: boolean
+  message: string
+  commitShort?: string
+}
+
 export interface ExecuteSqlResult {
   statementCount: number
   affectedRows: number
@@ -414,6 +433,8 @@ export const deployApi = {
     form.append('file', file)
     return request<{ files: number; message: string }>({ url: '/deploy/upload', method: 'post', data: form })
   },
+  gitStatus: () => request<GitStatus>({ url: '/deploy/git/status' }),
+  gitPull: () => request<GitPullResult>({ url: '/deploy/git/pull', method: 'post' }),
   build: (noCache = false, service?: string) =>
     request<{ started: boolean; message: string }>({ url: '/deploy/build', method: 'post', data: { noCache, service } }),
   listFiles: (path = '') => request<FileEntry[]>({ url: '/deploy/files', params: { path } }),

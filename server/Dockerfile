@@ -34,11 +34,11 @@ COPY --from=build /app/publish .
 ARG APT_MIRROR=https://mirrors.aliyun.com
 ARG UBUNTU_CODENAME=noble
 
-# 安装 curl（apt 源切换为阿里云镜像加速）
+# 安装 curl + git（apt 源切换为阿里云镜像加速；git 供管理后台"拉取代码"执行 git pull 用）
 RUN sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}/ubuntu|g; s|http://security.ubuntu.com/ubuntu|${APT_MIRROR}/ubuntu|g" \
         /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null; \
     apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && apt-get install -y --no-install-recommends curl ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 
 # 通过阿里云 docker-ce 仓库安装 docker CLI + compose 插件（管理后台监控/部署使用，无需访问 GitHub）
