@@ -28,13 +28,14 @@ public class AuthMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         var path = context.Request.Path.Value ?? string.Empty;
-        // 放行：登录/注册、玩家端公告（登录前展示）、根路径、favicon、SignalR Hub（negotiate 握手 + WebSocket 升级）、
+        // 放行：登录/注册、玩家端公告（登录前展示）、根路径、favicon、健康检查、SignalR Hub（negotiate 握手 + WebSocket 升级）、
         // 运营后台（/api/v1/admin/*，由 AdminAuthMiddleware 独立鉴权，需注册在本中间件之前）
         if (path.EndsWith("/user/login", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith("/user/register", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith("/announcements", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/favicon.ico", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/hub/", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/v1/admin", StringComparison.OrdinalIgnoreCase))
         {
