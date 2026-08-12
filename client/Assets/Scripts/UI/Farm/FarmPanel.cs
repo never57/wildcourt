@@ -327,7 +327,12 @@ namespace WildCourt.UI.Farm
         {
             long m = sec / 60;
             long s = sec % 60;
-            return m + ":" + s.ToString("00");
+            var sb = new System.Text.StringBuilder(8);
+            sb.Append(m);
+            sb.Append(':');
+            if (s < 10) sb.Append('0');
+            sb.Append(s);
+            return sb.ToString();
         }
 
         // ---------- Lua 值转换 ----------

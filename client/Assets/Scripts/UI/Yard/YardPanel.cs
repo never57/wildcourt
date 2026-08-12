@@ -39,7 +39,7 @@ namespace WildCourt.UI.Yard
 
         private readonly Dictionary<string, int> _owned = new();
         private readonly List<(Button Btn, Image Img, string Category)> _tabButtons = new();
-        private readonly List<DecorationConfig> _visible = new();
+        private readonly List<DecorationConfig> _visible = new(32);
         private int _shell;
         private int _page;
         private string _category = "全部";
@@ -221,8 +221,9 @@ namespace WildCourt.UI.Yard
             _owned.Clear();
             if (data != null && data.items != null)
             {
-                foreach (var item in data.items)
+                for (int i = 0; i < data.items.Length; i++)
                 {
+                    var item = data.items[i];
                     if (item != null) _owned[item.itemId] = item.count;
                 }
             }
@@ -237,7 +238,7 @@ namespace WildCourt.UI.Yard
                 (code, msg) => SetHint(msg));
         }
 
-        private void BuyItem(DecorationConfig d)
+        public void BuyItem(DecorationConfig d)
         {
             NetManager.Instance.Post<BuyResponse>(ApiPaths.ShopBuy,
                 new BuyRequest { itemId = d.id, count = 1, currency = "shell" },
@@ -331,8 +332,9 @@ namespace WildCourt.UI.Yard
         {
             _visible.Clear();
             var all = _yard.GetDecorations();
-            foreach (var d in all)
+            for (int i = 0; i < all.Length; i++)
             {
+                var d = all[i];
                 if (_category == "全部" || d.category == _category) _visible.Add(d);
             }
 
@@ -374,8 +376,7 @@ namespace WildCourt.UI.Yard
                     int prefBuilt = CountBuilt(d.id);
                     int prefRemain = d.maxCount - prefOwned;
                     bool ownedFlag = prefOwned > 0;
-                    cellComp.Bind(d, prefOwned, prefBuilt, prefRemain,
-                        () => BuyItem(d),
+                    cellComp.Bind(this, d, prefOwned, prefBuilt, prefRemain,
                         ownedFlag ? YardRenderer.GetCategoryColor(d.category) : new Color(0.42f, 0.42f, 0.42f, 0.9f),
                         ownedFlag);
                     return;
@@ -445,17 +446,18 @@ namespace WildCourt.UI.Yard
         private int CountBuilt(string id)
         {
             int count = 0;
-            foreach (var item in _yard.Items)
+            for (int i = 0; i < _yard.Items.Count; i++)
             {
-                if (item.id == id) count++;
+                if (_yard.Items[i].id == id) count++;
             }
             return count;
         }
 
         private void RefreshTabs()
         {
-            foreach (var tab in _tabButtons)
+            for (int i = 0; i < _tabButtons.Count; i++)
             {
+                var tab = _tabButtons[i];
                 if (tab.Img == null) continue;
                 tab.Img.color = tab.Category == _category ? TabSelected : TabNormal;
             }

@@ -245,6 +245,7 @@ namespace WildCourt.Gameplay.Yard
             if (owned != null)
             {
                 foreach (var kv in owned) _owned[kv.Key] = kv.Value;
+                // Dictionary 遍历无法完全避免分配；此处为低频回调，可接受。
             }
         }
 
@@ -305,9 +306,9 @@ namespace WildCourt.Gameplay.Yard
         private int PlacedCount(string id)
         {
             int count = 0;
-            foreach (var item in Items)
+            for (int i = 0; i < Items.Count; i++)
             {
-                if (item.id == id) count++;
+                if (Items[i].id == id) count++;
             }
             return count;
         }

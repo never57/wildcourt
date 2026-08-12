@@ -280,8 +280,9 @@ namespace WildCourt.Gameplay.Yard
 
         private void Rebuild()
         {
-            foreach (var go in _placed)
+            for (int i = 0; i < _placed.Count; i++)
             {
+                var go = _placed[i];
                 if (go != null) Destroy(go);
             }
             _placed.Clear();

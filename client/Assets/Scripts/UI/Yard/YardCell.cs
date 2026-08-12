@@ -8,6 +8,7 @@ namespace WildCourt.UI.Yard
     /// <summary>
     /// 商品格子模板组件（YardPanel 预制体中的 cellPrefab，提前摆放）。
     /// Bind 负责填数据：名称 / 已建造-拥有 / 剩余-已满 / 购买按钮 / 商品图异步加载。
+    /// 购买回调通过持有 DecorationConfig + YardPanel 引用实现，避免每格 new Lambda。
     /// </summary>
     public class YardCell : MonoBehaviour
     {
@@ -19,8 +20,14 @@ namespace WildCourt.UI.Yard
         [SerializeField] private Button buyButton;
         [SerializeField] private YardItemCell dragCell; // 长按拖放（仅已拥有启用）
 
-        public void Bind(DecorationConfig d, int owned, int built, int remain, Action onBuy, Color bgColor, bool ownedFlag)
+        private YardPanel _panel;
+        private DecorationConfig _config;
+
+        public void Bind(YardPanel panel, DecorationConfig d, int owned, int built, int remain, Color bgColor, bool ownedFlag)
         {
+            _panel = panel;
+            _config = d;
+
             if (bgImage != null) bgImage.color = bgColor;
             if (nameText != null) nameText.text = d.name;
             if (countText != null) countText.text = $"已建造 {built}/{owned}";
@@ -34,7 +41,7 @@ namespace WildCourt.UI.Yard
                 if (canBuy)
                 {
                     buyButton.onClick.RemoveAllListeners();
-                    buyButton.onClick.AddListener(() => onBuy?.Invoke());
+                    buyButton.onClick.AddListener(OnBuyClicked);
                 }
             }
 
@@ -50,6 +57,14 @@ namespace WildCourt.UI.Yard
                     iconImage.sprite = sprite;
                     iconImage.color = ownedFlag ? Color.white : new Color(0.62f, 0.62f, 0.62f, 0.9f);
                 });
+            }
+        }
+
+        private void OnBuyClicked()
+        {
+            if (_panel != null && _config != null)
+            {
+                _panel.BuyItem(_config);
             }
         }
     }
