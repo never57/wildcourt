@@ -98,19 +98,35 @@ if ! docker exec "$NGINX_CONTAINER" cat /etc/nginx/conf.d/default.conf 2>/dev/nu
 fi
 
 # ---- 6. 切换 nginx 流量（改 bind mount 配置 → 校验 → reload） ----
+# 注意：不能用 sed -i（内部是 rename 替换 inode），否则 bind mount 的
+# nginx 容器会继续读到旧 inode 的配置（inode 陷阱），导致切换"看似成功实则失效"。
+# 用 sed | tee 原地写回，保持 inode，bind mount 立即对容器生效。
 echo "==> 切换 nginx 反代目标：api-${ACTIVE} → api-${STANDBY}"
-sed -i "s|http://api-${ACTIVE}:5000|http://api-${STANDBY}:5000|g" "$NGINX_CONF"
+sed "s|http://api-${ACTIVE}:5000|http://api-${STANDBY}:5000|g" "$NGINX_CONF" | tee "$NGINX_CONF" >/dev/null
 
 if ! docker exec "$NGINX_CONTAINER" nginx -t >/dev/null 2>&1; then
   echo "!! nginx 配置校验失败，回滚配置并停止新容器，保留 ${ACTIVE} 继续服务"
-  sed -i "s|http://api-${STANDBY}:5000|http://api-${ACTIVE}:5000|g" "$NGINX_CONF"
+  sed "s|http://api-${STANDBY}:5000|http://api-${ACTIVE}:5000|g" "$NGINX_CONF" | tee "$NGINX_CONF" >/dev/null
   docker compose -f "$COMPOSE_FILE" stop "api-${STANDBY}" || true
   exit 1
 fi
 docker exec "$NGINX_CONTAINER" nginx -s reload
 
-# ---- 6.5 切换后自检：从 nginx 容器内实测反代连通性 ----
-# 失败即中止（不进入停旧容器步骤），此时 standby 与 active 均在运行，便于手动排查。
+# ---- 6.5 切换后自检 ----
+# ① bind mount inode 兜底：确认容器内读到的配置确实指向 standby；
+#    若仍指向 active（inode 陷阱），自动重建 nginx 容器让挂载绑定新 inode。
+echo "==> 切换后自检：nginx 容器内配置已指向 api-${STANDBY}"
+if ! docker exec "$NGINX_CONTAINER" cat /etc/nginx/conf.d/default.conf 2>/dev/null | grep -q "http://api-${STANDBY}:5000"; then
+  echo "!! nginx 容器内仍是旧配置（bind mount inode 陷阱），自动重建 nginx 容器"
+  docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps nginx
+  sleep 1
+  if ! docker exec "$NGINX_CONTAINER" cat /etc/nginx/conf.d/default.conf 2>/dev/null | grep -q "http://api-${STANDBY}:5000"; then
+    echo "!! nginx 容器重建后仍未指向 api-${STANDBY}，中止部署；请检查 nginx 服务 volumes 配置"
+    exit 1
+  fi
+  echo "==> nginx 容器已重建，配置生效"
+fi
+# ② 实测反代连通性（此时 standby 与 active 均在运行）
 echo "==> 切换后自检：nginx 反代 api-${STANDBY} 连通性"
 sleep 1
 HTTP_CODE="$(docker exec "$NGINX_CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/api/v1/admin/auth/captcha 2>/dev/null || echo '000')"
