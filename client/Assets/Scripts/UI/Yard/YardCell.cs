@@ -45,7 +45,11 @@ namespace WildCourt.UI.Yard
                 }
             }
 
-            if (dragCell != null) dragCell.gameObject.SetActive(ownedFlag);
+            if (dragCell != null)
+            {
+                dragCell.Init(_panel, d);
+                dragCell.gameObject.SetActive(ownedFlag);
+            }
 
             if (iconImage != null)
             {
