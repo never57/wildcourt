@@ -501,8 +501,10 @@ public class DeployService
             CreateNoWindow = true,
         };
         psi.Environment["HOME"] = "/root";
-        // 容器内 /root/.ssh 为宿主 SSH 密钥只读挂载（compose 已配置），ssh-rsa 算法白名单在 config 中
-        psi.Environment["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=accept-new";
+        // 容器内 /root/.ssh 为宿主 SSH 密钥只读挂载（属主为宿主用户），OpenSSH 校验 config 属主不匹配会拒绝。
+        // entrypoint.sh 启动时已复制到 /root/.ssh-runtime 并修复属主/权限（含 ssh-rsa 算法白名单与 IdentityFile），
+        // 因此用 -F 显式指定修复后的 config。
+        psi.Environment["GIT_SSH_COMMAND"] = "ssh -F /root/.ssh-runtime/config -o StrictHostKeyChecking=accept-new";
         return Process.Start(psi)
             ?? throw new BusinessException(ApiCodes.ServerError, "无法启动 git 进程（镜像未安装 git？）");
     }

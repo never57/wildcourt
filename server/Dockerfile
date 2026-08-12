@@ -52,4 +52,8 @@ RUN install -m 0755 -d /etc/apt/keyrings \
     && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 5000
-ENTRYPOINT ["dotnet", "WildCourt.Api.dll"]
+# 入口脚本：启动时把只读挂载的 /root/.ssh 复制到 /root/.ssh-runtime 并修复属主/权限，
+# 解决 OpenSSH "Bad owner or permissions on /root/.ssh/config" 导致 git pull SSH 免密失败
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && sed -i 's/\r$//' /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
