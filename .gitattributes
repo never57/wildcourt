@@ -348,3 +348,6 @@
 # po
 
 # 无后缀文件，non-suffix files
+
+# 强制 shell 脚本使用 LF 行尾，避免 Windows CRLF 导致服务器 bash 执行失败
+server/deploy.sh text eol=lf
