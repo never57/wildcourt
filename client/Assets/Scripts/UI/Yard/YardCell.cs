@@ -33,7 +33,7 @@ namespace WildCourt.UI.Yard
             if (countText != null) countText.text = $"已建造 {built}/{owned}";
 
             bool canBuy = remain > 0;
-            if (remainText != null) remainText.text = canBuy ? $"剩余 {remain}" : "已满";
+            if (remainText != null) remainText.text = canBuy ? $"商店剩余 {remain}" : "库存不足";
 
             if (buyButton != null)
             {
