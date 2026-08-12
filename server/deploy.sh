@@ -21,9 +21,17 @@ set -euo pipefail
 
 HOST_CODE_ROOT="${HOST_CODE_ROOT:-/opt/wildcourt/server}"
 COMPOSE_FILE="${COMPOSE_FILE:-$HOST_CODE_ROOT/docker-compose.yml}"
+# nginx.conf 是运行时文件（被 .gitignore 忽略，不入库），由本脚本从模板生成
+NGINX_TEMPLATE="$HOST_CODE_ROOT/nginx/nginx.conf.template"
 NGINX_CONF="$HOST_CODE_ROOT/nginx/nginx.conf"
 ACTIVE_FILE="$HOST_CODE_ROOT/.deploy-active"
 NGINX_CONTAINER="${NGINX_CONTAINER:-wildcourt-nginx}"
+
+# 从模板生成 nginx.conf（用 sed | tee 原地写回，保持 inode，bind mount 立即对容器生效）
+gen_nginx_conf() {
+  local target="$1"   # 目标：api-blue / api-green
+  sed "s|http://api-blue:5000|http://${target}:5000|g" "$NGINX_TEMPLATE" | tee "$NGINX_CONF" >/dev/null
+}
 
 NO_CACHE=""
 if [ "${1:-}" = "--no-cache" ]; then
@@ -50,6 +58,12 @@ else
   STANDBY="blue"
 fi
 echo "==== 蓝绿部署开始：active=${ACTIVE}，standby=${STANDBY} ===="
+
+# 确保 nginx.conf 存在（bind mount 源文件，缺失会导致 docker 把挂载点建为目录使 nginx 启动失败）
+if [ ! -f "$NGINX_CONF" ]; then
+  echo "==> nginx.conf 不存在，从模板生成（指向 api-${ACTIVE}）"
+  gen_nginx_conf "api-${ACTIVE}"
+fi
 
 # ---- 3. 构建 standby 镜像（active 不受影响） ----
 echo "==> 构建 api-${STANDBY} 镜像"
@@ -97,16 +111,15 @@ if ! docker exec "$NGINX_CONTAINER" cat /etc/nginx/conf.d/default.conf 2>/dev/nu
   echo "==> nginx 容器已重建，bind mount 生效"
 fi
 
-# ---- 6. 切换 nginx 流量（改 bind mount 配置 → 校验 → reload） ----
-# 注意：不能用 sed -i（内部是 rename 替换 inode），否则 bind mount 的
-# nginx 容器会继续读到旧 inode 的配置（inode 陷阱），导致切换"看似成功实则失效"。
-# 用 sed | tee 原地写回，保持 inode，bind mount 立即对容器生效。
+# ---- 6. 切换 nginx 流量（从模板生成目标配置 → 校验 → reload） ----
+# 注意：生成时必须保持 inode（用 tee 原地写回），不能用 sed -i / 新建文件改名，
+# 否则 bind mount 的 nginx 容器会继续读到旧 inode 的配置（inode 陷阱），切换"看似成功实则失效"。
 echo "==> 切换 nginx 反代目标：api-${ACTIVE} → api-${STANDBY}"
-sed "s|http://api-${ACTIVE}:5000|http://api-${STANDBY}:5000|g" "$NGINX_CONF" | tee "$NGINX_CONF" >/dev/null
+gen_nginx_conf "api-${STANDBY}"
 
 if ! docker exec "$NGINX_CONTAINER" nginx -t >/dev/null 2>&1; then
   echo "!! nginx 配置校验失败，回滚配置并停止新容器，保留 ${ACTIVE} 继续服务"
-  sed "s|http://api-${STANDBY}:5000|http://api-${ACTIVE}:5000|g" "$NGINX_CONF" | tee "$NGINX_CONF" >/dev/null
+  gen_nginx_conf "api-${ACTIVE}"
   docker compose -f "$COMPOSE_FILE" stop "api-${STANDBY}" || true
   exit 1
 fi

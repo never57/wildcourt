@@ -1,8 +1,9 @@
-# WildCourt 管理后台 Nginx 配置（宿主 bind mount 版，蓝绿切换用）
-# 托管前端静态文件 + 反代 API 与 SignalR（WebSocket）。
-# 注意：本文件被 nginx 容器 bind mount（docker-compose.yml），
-# 蓝绿部署脚本 deploy.sh 会修改下方 proxy_pass 的目标（api-blue ↔ api-green），
-# 修改后执行 nginx -s reload 即生效（毫秒级），勿在此手写 api 服务名以外的目标。
+# WildCourt 管理后台 Nginx 配置模板（基线）
+# 注意：本文件是模板，不是 nginx 直接读取的配置。
+#   - nginx 容器 bind mount 的是运行时文件 nginx/nginx.conf（见 docker-compose.yml）
+#   - deploy.sh 从本模板生成 nginx.conf（把 proxy_pass 的 api-blue 替换为当前 active 目标）
+#   - nginx.conf 已被 .gitignore 忽略（运行时文件，不入库），本模板入库作为基线
+# 手写规则请改本模板；不要改 nginx.conf（会被 deploy.sh 覆盖）
 server {
     listen 80;
     server_name _;
