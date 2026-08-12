@@ -7,7 +7,9 @@ using WildCourt.Api.Models;
 namespace WildCourt.Api.Services;
 
 /// <summary>
-/// 服务端部署：上传源码 zip → 解压覆盖宿主代码目录 → docker compose up -d --build。
+/// 服务端部署：上传源码 zip → 解压覆盖宿主代码目录 → 按目标服务分流部署。
+/// api 系列（空 / api / api-blue / api-green）走 deploy.sh 蓝绿脚本（构建 standby → 健康检查 → nginx 切换，API 无中断、失败自动回滚）；
+/// 空 Service 蓝绿切换后另重建 nginx（托管前端）；其他服务走 docker compose up -d --build。
 /// 生产要求：API 容器挂载宿主代码目录（/opt/wildcourt/server）到相同路径 + docker.sock + 容器内 docker CLI/compose 插件。
 /// 构建在后台执行，日志保留最近 <see cref="MaxLogLines"/> 行供轮询。
 /// </summary>

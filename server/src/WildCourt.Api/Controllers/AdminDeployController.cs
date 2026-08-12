@@ -94,7 +94,7 @@ public class AdminDeployController : AdminControllerBase
         return ApiResponse<object>.Ok(new { dto.Path, dto.Size, Message = "已保存，执行构建部署后生效" });
     }
 
-    /// <summary>触发构建部署（docker compose up -d --build）。构建中重复调用将被忽略。</summary>
+    /// <summary>触发部署：api 系列走蓝绿脚本（无中断），其他服务走 docker compose up -d --build。构建中重复调用将被忽略。</summary>
     [HttpPost("deploy/build")]
     public async Task<ApiResponse<object>> Build([FromBody] DeployBuildRequest request)
     {

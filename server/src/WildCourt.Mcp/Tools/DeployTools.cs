@@ -42,11 +42,16 @@ public class DeployTools
         return Json(JsonDocument.Parse(raw).RootElement);
     }
 
-    /// <summary>触发构建部署（docker compose up -d --build，后台执行）。构建中重复调用会被忽略。</summary>
-    [McpServerTool(Name = "deploy_build"), Description("触发服务端构建部署（docker compose up -d --build，后台执行）。NoCache=true 强制无缓存重建；Service 可指定单个 compose 服务名。构建中重复调用会被忽略。")]
+    /// <summary>
+    /// 触发服务端部署（后台执行），构建中重复调用会被忽略。
+    /// Service 为空或 api / api-blue / api-green 时走蓝绿部署脚本（构建 standby → 健康检查 → nginx 切换，API 无中断、失败自动回滚）；
+    /// Service 为空时蓝绿切换完成后还会重建 nginx（托管前端，重建窗口约几秒）。
+    /// 其他服务（如 nginx / redis / mysql）走 docker compose up -d --build。
+    /// </summary>
+    [McpServerTool(Name = "deploy_build"), Description("触发服务端部署（后台执行）。Service 为空或 api/api-blue/api-green 时走蓝绿部署脚本（API 无中断、失败自动回滚）；Service 为空时蓝绿切换后还会重建 nginx（前端）；其他服务走 docker compose up -d --build。NoCache=true 强制无缓存重建；构建中重复调用会被忽略。")]
     public async Task<string> Build(
         [Description("是否无缓存重建镜像，默认 false")] bool? noCache = null,
-        [Description("可选：指定构建的 compose 服务名，默认空=全部")] string? service = null)
+        [Description("可选：compose 服务名。空=全部（API 蓝绿切换 + 重建 nginx）；api/api-blue/api-green=仅 API 蓝绿切换；nginx 等其他服务名=直接重建该服务")] string? service = null)
     {
         var body = new { NoCache = noCache ?? false, Service = service };
         var raw = await _api.PostAsync("deploy/build", body);

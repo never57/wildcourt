@@ -12,7 +12,7 @@
 | --- | --- |
 | `deploy_status` | 查询部署状态（是否在构建、上次结果、代码目录） |
 | `deploy_logs` | 查询最近部署日志（构建输出） |
-| `deploy_build` | 触发 `docker compose up -d --build`（可无缓存/指定服务） |
+| `deploy_build` | 触发部署：Service 为空或 `api` 系列走**蓝绿部署**（API 无中断、失败自动回滚，空 Service 还会重建 nginx 前端）；其他服务走 `docker compose up -d --build` |
 | `deploy_list_files` | 列出服务端源码目录 |
 | `deploy_read_file` | 读取服务端源码文件（2MB 内文本） |
 | `deploy_save_file` | 在线保存/覆盖源码文件（需重新构建生效） |

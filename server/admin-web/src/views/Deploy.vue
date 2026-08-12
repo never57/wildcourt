@@ -53,7 +53,7 @@
           <el-divider />
 
           <div v-if="canEdit" class="build-area">
-            <div class="upload-title">2. 构建并部署（docker compose up -d --build）</div>
+            <div class="upload-title">2. 构建并部署（api 走蓝绿切换，无中断）</div>
             <el-checkbox v-model="noCache">强制无缓存重建（--no-cache）</el-checkbox>
             <div style="margin-top: 12px; display: flex; gap: 12px">
               <el-button type="primary" :disabled="!status?.enabled || status?.building" @click="startBuild">

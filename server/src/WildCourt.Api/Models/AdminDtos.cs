@@ -534,7 +534,7 @@ public class DeployStatusResponse
 
 public class DeployBuildRequest
 {
-    /// <summary>可选：指定服务名（docker compose 的 service），默认空 = 全部。</summary>
+    /// <summary>可选：服务名。空 = 全部（API 蓝绿切换 + 重建 nginx 前端）；api/api-blue/api-green = 仅 API 蓝绿切换；其他服务名 = 直接重建该服务。</summary>
     public string? Service { get; set; }
 
     /// <summary>是否强制重建镜像（--build / --no-cache）。</summary>
