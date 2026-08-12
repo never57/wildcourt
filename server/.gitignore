@@ -15,3 +15,5 @@ dist/
 *.zip
 # MCP Server 发布产物
 publish/
+# 蓝绿部署运行时状态（deploy.sh 自动生成，不入库）
+.deploy-active

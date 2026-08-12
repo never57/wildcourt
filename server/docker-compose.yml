@@ -1,19 +1,68 @@
 # WildCourt 服务端部署（docker compose）
 # 用法（在 server/ 目录，即宿主代码根目录 /opt/wildcourt/server 下）：
 #   1. 复制 .env.example 为 .env 并填写密码
-#   2. docker compose up -d --build
+#   2. 迁移/初始部署：docker compose up -d --build
 #
 # 注意：
 #   - MySQL/Redis 为"服务器自装"方案（容器内）；若改用腾讯云托管版，
 #     删除 mysql/redis 两个服务，在 .env 里改连接串指向托管实例即可。
-#   - nginx 服务托管管理后台前端（admin-web 多阶段构建）并反代 /api、/hub 到 api。
-#     api 只绑 127.0.0.1:5000，公网 80 统一走 nginx；HTTPS 上线时挂证书加 443。
+#   - nginx 服务托管管理后台前端（admin-web 多阶段构建）并反代 /api、/hub 到 API。
+#     API 只绑 127.0.0.1:5000/5001，公网 80 统一走 nginx；HTTPS 上线时挂证书加 443。
+#   - API 采用蓝绿部署（api-blue / api-green 双容器）：
+#       · 同一时刻仅 active 容器被 nginx 承接流量；每次发布在 standby 上构建并启动，
+#         健康检查通过后改 nginx/nginx.conf 反代目标并 nginx -s reload（毫秒级），再停旧容器。
+#       · 发布入口统一走 deploy.sh（管理后台"构建部署"已自动调用），勿手动 docker compose up 单独重建 api 系列，
+#         否则可能误停/误起导致端口冲突。
+#       · nginx 反代目标配置文件已 bind mount（./nginx/nginx.conf），切换无需重建 nginx 容器。
+#       · 从旧单容器（wildcourt-api）迁移：先 docker rm -f wildcourt-api 再按 deploy.sh 首次部署。
 #   - API 容器挂载要求（管理后台"服务器监控/部署"依赖，勿随意移除）：
 #       · /var/run/docker.sock   → docker CLI 与宿主 daemon 通信（容器监控/日志/重启/部署）
 #       · /  → /host（只读）     → 宿主磁盘 df 统计
 #       · /proc → /host/proc     → 宿主内存/负载读取（必须覆盖在 /host 之上挂载）
 #       · /opt/wildcourt/server  → 宿主代码根目录同路径挂载（DeployService 在此执行 compose 部署）
 #     安全提醒：docker.sock 等于宿主 root 权限，管理后台务必绑定内网/Nginx+鉴权使用。
+
+# ---- API 蓝绿公共配置（api-blue / api-green 共用） ----
+# 两个容器共用同一份环境/挂载/健康检查，仅端口与容器名不同。
+# 部署请走 deploy.sh（构建 standby → 健康检查 → 切 nginx → 停旧容器），勿手动 up 单个 api 容器。
+x-api-common: &api-common
+  build: .
+  restart: always
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_started
+  environment:
+    ASPNETCORE_ENVIRONMENT: Production
+    ASPNETCORE_URLS: http://+:5000
+    WILDCOURT_CONFIG_DIR: /app/config
+    TZ: Asia/Shanghai   # 每日结算 Job 按 UTC+8 计算（04:00 结算边界）
+    # 覆盖 config/appsettings.Production.json 中的连接串（Program.cs 已支持环境变量）
+    ConnectionStrings__MySql: "Server=mysql;Port=3306;Database=wildcourt;User=wildcourt_app;Password=${MYSQL_APP_PASSWORD};CharSet=utf8mb4;"
+    # 数据库管理（可视化/SQL）连接串：appsettings.Production.json 里的占位符不可用，必须用环境变量覆盖
+    AdminDatabase__ConnectionString: "Server=mysql;Port=3306;Database=wildcourt;User=wildcourt_app;Password=${MYSQL_APP_PASSWORD};CharSet=utf8mb4;"
+    Redis__ConnectionString: "redis:6379"
+    # 管理后台安全配置（务必在 .env 里改为强随机值，否则 JWT 可伪造）
+    Admin__JwtSecret: ${ADMIN_JWT_SECRET:-CHANGE_ME_please_set_a_long_random_secret_in_production}
+    Admin__DefaultUsername: ${ADMIN_DEFAULT_USERNAME:-admin}
+    Admin__DefaultPassword: ${ADMIN_DEFAULT_PASSWORD:-CHANGE_ME_admin_password}
+  volumes:
+    - ./config:/app/config:ro   # 生产配置目录（含数值配置 JSON 也可放这里）
+    # ---- 管理后台依赖的挂载（见文件头说明，勿随意移除） ----
+    - /var/run/docker.sock:/var/run/docker.sock   # docker CLI 与宿主 daemon 通信
+    - /:/host:ro                                  # 宿主根目录（磁盘 df 统计）
+    - /proc:/host/proc:ro                         # 宿主 /proc（内存/负载），需覆盖在 /host 之上
+    - /opt/wildcourt/server:/opt/wildcourt/server # 宿主代码根目录同路径挂载（部署服务用）
+  # 收到停止信号后先处理完在途请求（ASP.NET Core 优雅停机）再退出
+  stop_grace_period: 30s
+  # 健康检查：仅确认进程可响应（不查 DB，避免迁移降级时拖慢就绪判断）；供 deploy.sh 与 --wait 使用
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/health"]
+    interval: 5s
+    timeout: 3s
+    retries: 20
+    start_period: 15s
 
 services:
   mysql:
@@ -48,46 +97,28 @@ services:
     ports:
       - "127.0.0.1:6379:6379"   # 仅本机可达
 
-  api:
-    build: .
-    container_name: wildcourt-api
-    restart: always
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_URLS: http://+:5000
-      WILDCOURT_CONFIG_DIR: /app/config
-      TZ: Asia/Shanghai   # 每日结算 Job 按 UTC+8 计算（04:00 结算边界）
-      # 覆盖 config/appsettings.Production.json 中的连接串（Program.cs 已支持环境变量）
-      ConnectionStrings__MySql: "Server=mysql;Port=3306;Database=wildcourt;User=wildcourt_app;Password=${MYSQL_APP_PASSWORD};CharSet=utf8mb4;"
-      # 数据库管理（可视化/SQL）连接串：appsettings.Production.json 里的占位符不可用，必须用环境变量覆盖
-      AdminDatabase__ConnectionString: "Server=mysql;Port=3306;Database=wildcourt;User=wildcourt_app;Password=${MYSQL_APP_PASSWORD};CharSet=utf8mb4;"
-      Redis__ConnectionString: "redis:6379"
-      # 管理后台安全配置（务必在 .env 里改为强随机值，否则 JWT 可伪造）
-      Admin__JwtSecret: ${ADMIN_JWT_SECRET:-CHANGE_ME_please_set_a_long_random_secret_in_production}
-      Admin__DefaultUsername: ${ADMIN_DEFAULT_USERNAME:-admin}
-      Admin__DefaultPassword: ${ADMIN_DEFAULT_PASSWORD:-CHANGE_ME_admin_password}
-    volumes:
-      - ./config:/app/config:ro   # 生产配置目录（含数值配置 JSON 也可放这里）
-      # ---- 管理后台依赖的挂载（见文件头说明，勿随意移除） ----
-      - /var/run/docker.sock:/var/run/docker.sock   # docker CLI 与宿主 daemon 通信
-      - /:/host:ro                                  # 宿主根目录（磁盘 df 统计）
-      - /proc:/host/proc:ro                         # 宿主 /proc（内存/负载），需覆盖在 /host 之上
-      - /opt/wildcourt/server:/opt/wildcourt/server # 宿主代码根目录同路径挂载（部署服务用）
+  # active 容器（默认由 nginx 承接流量，初始为 blue）
+  api-blue:
+    <<: *api-common
+    container_name: wildcourt-api-blue
     ports:
       - "127.0.0.1:5000:5000"   # 仅本机可达；公网访问统一走 nginx:80
+
+  # standby 容器（下个版本的目标；无流量直到 deploy.sh 完成切换）
+  api-green:
+    <<: *api-common
+    container_name: wildcourt-api-green
+    ports:
+      - "127.0.0.1:5001:5000"
 
   nginx:
     build:
       context: ./admin-web
     container_name: wildcourt-nginx
     restart: always
-    depends_on:
-      - api
+    volumes:
+      # 反代目标由宿主文件控制（蓝绿切换：改文件 + nginx -s reload，毫秒级，无需重建容器）
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "80:80"   # 管理后台前端 + API 统一入口；HTTPS 启用时挂证书加 443
 

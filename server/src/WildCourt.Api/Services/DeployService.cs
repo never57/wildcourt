@@ -362,7 +362,7 @@ public class DeployService
         AppendLog("===== 开始部署 =====");
         try
         {
-            _lastResult = await RunComposeAsync(noCache, service);
+            _lastResult = await RunDeployAsync(noCache, service);
             _lastDeployAt = DateTime.UtcNow;
             AppendLog(_lastResult);
         }
@@ -379,7 +379,40 @@ public class DeployService
         }
     }
 
-    private async Task<string> RunComposeAsync(bool noCache, string? service)
+    /// <summary>
+    /// 按目标服务分流部署方式：
+    ///  - api / api-blue / api-green / 未指定 → 蓝绿部署脚本（API 无中断切换）
+    ///  - 未指定（"全部"语义）时，蓝绿切换完成后另重建 nginx（托管前端，重建窗口约几秒）
+    ///  - nginx 等其他服务 → 原 docker compose up -d --build
+    /// </summary>
+    private async Task<string> RunDeployAsync(bool noCache, string? service)
+    {
+        var svc = service?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(svc) || svc is "api" or "api-blue" or "api-green")
+        {
+            var script = Path.Combine(_hostCodeRoot, "deploy.sh");
+            if (!File.Exists(script))
+            {
+                throw new BusinessException(ApiCodes.ServerError, $"蓝绿部署脚本不存在：{script}");
+            }
+
+            var argLine = noCache ? "--no-cache" : "";
+            await RunProcessAsync("bash", $"\"{script}\" {argLine}".TrimEnd());
+
+            if (string.IsNullOrEmpty(svc))
+            {
+                // "全部发布"语义：API 蓝绿切换完成后，再重建 nginx（前端）。
+                // nginx 重建窗口约几秒，管理后台短暂中断后由前端自动恢复；仅在前端有改动时需要
+                await RunComposeAsync(noCache, "nginx");
+            }
+            return "部署成功：API 蓝绿切换完成（无中断）";
+        }
+
+        await RunComposeAsync(noCache, svc);
+        return "部署成功：docker compose up -d --build 完成";
+    }
+
+    private async Task<string> RunComposeAsync(bool noCache, string service)
     {
         var composePath = Path.Combine(_hostCodeRoot, _composeFile);
         if (!File.Exists(composePath))
@@ -392,12 +425,16 @@ public class DeployService
         {
             args += " --no-cache";
         }
-        if (!string.IsNullOrWhiteSpace(service))
-        {
-            args += " " + service.Trim();
-        }
+        args += " " + service;
 
-        var psi = new ProcessStartInfo("docker", args)
+        await RunProcessAsync("docker", args);
+        return "部署成功：docker compose up -d --build 完成";
+    }
+
+    /// <summary>执行部署子进程，实时转发日志到部署日志队列，超时/失败抛业务异常。</summary>
+    private async Task RunProcessAsync(string fileName, string arguments)
+    {
+        var psi = new ProcessStartInfo(fileName, arguments)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -407,7 +444,7 @@ public class DeployService
         psi.Environment["DOCKER_HOST"] = _dockerHost;
 
         using var process = Process.Start(psi)
-            ?? throw new BusinessException(ApiCodes.ServerError, "无法启动 docker 进程");
+            ?? throw new BusinessException(ApiCodes.ServerError, $"无法启动进程：{fileName}");
         process.OutputDataReceived += (_, e) => AppendLog(e.Data);
         process.ErrorDataReceived += (_, e) => AppendLog(e.Data);
         process.BeginOutputReadLine();
@@ -429,7 +466,6 @@ public class DeployService
         {
             throw new BusinessException(ApiCodes.ServerError, $"部署失败（exit={process.ExitCode}），详见部署日志");
         }
-        return "部署成功：docker compose up -d --build 完成";
     }
 
     private void AppendLog(string? line)

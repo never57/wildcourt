@@ -104,6 +104,11 @@ app.UseMiddleware<AuthMiddleware>();
 app.UseMiddleware<LogMiddleware>();
 
 app.MapControllers();
+
+// 容器健康检查端点（蓝绿部署/healthcheck 用）：
+// 只确认进程可响应，不查 DB，避免迁移降级时误判并拖慢就绪判断
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
 app.MapHub<ChatHub>("/hub/chat");
 
 app.Run();
