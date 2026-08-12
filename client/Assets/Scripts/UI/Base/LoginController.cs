@@ -202,7 +202,6 @@ namespace WildCourt.UI
         /// </summary>
         private void PreloadYardPanel()
         {
-            if (YardPanel.YardPanelPrefab != null) return;
             if (yardMainUiPrefab != null) YardMainUI.YardMainUIPrefab = yardMainUiPrefab;
             if (yardPanelPrefab != null) YardPanel.YardPanelPrefab = yardPanelPrefab;
             if (farmPanelPrefab != null) FarmPanel.FarmPanelPrefab = farmPanelPrefab;

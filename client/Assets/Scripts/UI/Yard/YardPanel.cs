@@ -242,6 +242,13 @@ namespace WildCourt.UI.Yard
                 (code, msg) => SetHint(msg));
         }
 
+        /// <summary>重新打开面板时刷新：重拉背包数据并刷新商品格子（购买/摆放后数据可能变化）。</summary>
+        public void RefreshOnOpen()
+        {
+            LoadInventory();
+            RefreshList();
+        }
+
         public void BuyItem(DecorationConfig d)
         {
             NetManager.Instance.Post<BuyResponse>(ApiPaths.ShopBuy,

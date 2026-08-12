@@ -116,6 +116,7 @@ namespace WildCourt.UI.Yard
             if (_panel != null)
             {
                 _panel.gameObject.SetActive(true);
+                _panel.RefreshOnOpen();
                 gameObject.SetActive(false);
                 return;
             }
