@@ -82,6 +82,21 @@ if [ "$HEALTHY" != "1" ]; then
 fi
 echo "==> api-${STANDBY} 健康检查通过"
 
+# ---- 5.5 前置自检：nginx 必须挂载宿主配置，否则蓝绿切换静默失效 ----
+# 容器内 /etc/nginx/conf.d/default.conf 应与宿主 NGINX_CONF 完全一致（bind mount）。
+# 若不一致（如容器缺挂载、读到镜像内置旧配置），reload 只会作用于镜像内配置，
+# 切换永不生效；这里自动重建容器修复。
+echo "==> 自检 nginx bind mount（${NGINX_CONTAINER} ↔ ${NGINX_CONF}）"
+if ! docker exec "$NGINX_CONTAINER" cat /etc/nginx/conf.d/default.conf 2>/dev/null | diff -q - "$NGINX_CONF" >/dev/null 2>&1; then
+  echo "!! nginx 容器未加载宿主 nginx.conf（bind mount 未生效），蓝绿切换无法生效，自动重建 nginx 容器"
+  docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps nginx
+  if ! docker exec "$NGINX_CONTAINER" cat /etc/nginx/conf.d/default.conf 2>/dev/null | diff -q - "$NGINX_CONF" >/dev/null 2>&1; then
+    echo "!! nginx 容器重建后仍未挂载宿主配置，中止部署；请检查 docker-compose.yml 中 nginx 服务的 volumes 配置"
+    exit 1
+  fi
+  echo "==> nginx 容器已重建，bind mount 生效"
+fi
+
 # ---- 6. 切换 nginx 流量（改 bind mount 配置 → 校验 → reload） ----
 echo "==> 切换 nginx 反代目标：api-${ACTIVE} → api-${STANDBY}"
 sed -i "s|http://api-${ACTIVE}:5000|http://api-${STANDBY}:5000|g" "$NGINX_CONF"
@@ -93,6 +108,20 @@ if ! docker exec "$NGINX_CONTAINER" nginx -t >/dev/null 2>&1; then
   exit 1
 fi
 docker exec "$NGINX_CONTAINER" nginx -s reload
+
+# ---- 6.5 切换后自检：从 nginx 容器内实测反代连通性 ----
+# 失败即中止（不进入停旧容器步骤），此时 standby 与 active 均在运行，便于手动排查。
+echo "==> 切换后自检：nginx 反代 api-${STANDBY} 连通性"
+sleep 1
+HTTP_CODE="$(docker exec "$NGINX_CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/api/v1/admin/auth/captcha 2>/dev/null || echo '000')"
+if [ "$HTTP_CODE" != "200" ]; then
+  echo "!! 切换后自检失败：HTTP ${HTTP_CODE}（期望 200），nginx 容器内当前配置/日志："
+  docker exec "$NGINX_CONTAINER" nginx -T 2>&1 | grep -E 'proxy_pass|emerg' || true
+  docker logs --tail 5 "$NGINX_CONTAINER" 2>&1 || true
+  echo "   请排查 nginx 挂载与容器网络；此时 active 与 standby 容器均在运行，修复后重跑部署即可"
+  exit 1
+fi
+echo "==> 切换后自检通过（HTTP 200）"
 
 # ---- 7. 停掉旧容器（优雅停机，在途请求处理完再退出） ----
 echo "==> 停止旧容器 api-${ACTIVE}"
