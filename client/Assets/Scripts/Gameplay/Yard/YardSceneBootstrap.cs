@@ -4,7 +4,6 @@ using UnityEngine.SceneManagement;
 using WildCourt.Core;
 using WildCourt.Lua;
 using WildCourt.Net;
-using WildCourt.Net.Protocol;
 using WildCourt.UI.Yard;
 using WildCourt.UI.Farm;
 
@@ -12,7 +11,8 @@ namespace WildCourt.Gameplay.Yard
 {
     /// <summary>
     /// 庭院场景引导（阶段 C）：MainScene 加载后自动搭建庭院运行时（无需场景/预制体配置）。
-    /// 负责：EventSystem、YardManager、YardRenderer、YardPanel 的创建与初始数据拉取。
+    /// 负责：EventSystem、YardManager、YardRenderer、YardMainUI 的创建与初始数据拉取。
+    /// YardPanel（建造面板）由 YardMainUI 点击“建造”按钮时再实例化打开。
     /// </summary>
     public static class YardSceneBootstrap
     {
@@ -50,26 +50,13 @@ namespace WildCourt.Gameplay.Yard
             var host = new GameObject("YardRuntimeHost");
             var yard = host.AddComponent<YardManager>();
             host.AddComponent<YardRenderer>();
-            YardPanel.CreateOrInstantiate(yard);
+            // 主 UI 框架常驻显示；YardPanel（建造面板）由 YardMainUI 点击“建造”按钮时再实例化
+            YardMainUI.CreateOrInstantiate(yard);
 
-            // 初始数据：余额 → 背包 → 庭院布局
+            // 初始数据：庭院布局（玩家资料由 YardMainUI 拉取缓存，背包由 YardPanel 打开时自拉）
             var net = NetManager.Instance;
             if (net != null)
             {
-                net.Get<UserProfileResponse>(ApiPaths.UserProfile,
-                    resp =>
-                    {
-                        if (YardPanel.Instance != null) YardPanel.Instance.OnProfileLoaded(resp.data);
-                    },
-                    (code, msg) => Debug.LogWarning($"[Yard] profile 加载失败: {msg}"));
-
-                net.Get<InventoryResponse>(ApiPaths.UserInventory,
-                    resp =>
-                    {
-                        if (YardPanel.Instance != null) YardPanel.Instance.OnInventoryLoaded(resp.data);
-                    },
-                    (code, msg) => Debug.LogWarning($"[Yard] inventory 加载失败: {msg}"));
-
                 yard.LoadYard();
             }
             else

@@ -42,7 +42,10 @@ namespace WildCourt.UI
         public string gameSceneName = "MainScene";
 
         [Header("预加载")]
-        [Tooltip("拖入 YardPanel Prefab，登录成功后注入 YardPanel.YardPanelPrefab（支持热更）")]
+        [Tooltip("拖入 YardMainUI Prefab，登录成功后注入 YardMainUI.YardMainUIPrefab（主 UI 框架，支持热更）")]
+        public GameObject yardMainUiPrefab;
+
+        [Tooltip("拖入 YardPanel Prefab，登录成功后注入 YardPanel.YardPanelPrefab（建造面板，点击建造按钮时打开，支持热更）")]
         public GameObject yardPanelPrefab;
 
         [Tooltip("拖入 FarmPanel Prefab，登录成功后注入 FarmPanel.FarmPanelPrefab（支持热更）")]
@@ -200,6 +203,7 @@ namespace WildCourt.UI
         private void PreloadYardPanel()
         {
             if (YardPanel.YardPanelPrefab != null) return;
+            if (yardMainUiPrefab != null) YardMainUI.YardMainUIPrefab = yardMainUiPrefab;
             if (yardPanelPrefab != null) YardPanel.YardPanelPrefab = yardPanelPrefab;
             if (farmPanelPrefab != null) FarmPanel.FarmPanelPrefab = farmPanelPrefab;
         }
