@@ -34,6 +34,10 @@
           <el-icon><Bell /></el-icon>
           <template #title>公告管理</template>
         </el-menu-item>
+        <el-menu-item v-if="authStore.hasPermission('announcements:view')" index="/official-letters">
+          <el-icon><Message /></el-icon>
+          <template #title>官方发信</template>
+        </el-menu-item>
         <el-menu-item v-if="authStore.hasPermission('database:view')" index="/database">
           <el-icon><Coin /></el-icon>
           <template #title>数据库管理</template>

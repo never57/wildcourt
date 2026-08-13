@@ -89,6 +89,11 @@ namespace WildCourt.Net
             StartCoroutine(SendRequest<T>("PUT", path, bodyJson, onSuccess, onError, maxRetry));
         }
 
+        public void Delete<T>(string path, Action<ApiResponse<T>> onSuccess, Action<int, string> onError = null)
+        {
+            StartCoroutine(SendRequest<T>("DELETE", path, null, onSuccess, onError, maxRetry));
+        }
+
         // ---- 原始文本请求（WC.net 桥接用：Lua 侧自行解析信封，无需预知 DTO 类型） ----
 
         public void GetRaw(string path, Action<string> onSuccess, Action<int, string> onError = null)

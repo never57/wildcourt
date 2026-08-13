@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using WildCourt.Core;
 using WildCourt.UI.Yard;
 using WildCourt.UI.Farm;
+using WildCourt.UI.Letters;
 
 namespace WildCourt.UI
 {
@@ -50,6 +51,9 @@ namespace WildCourt.UI
 
         [Tooltip("拖入 FarmPanel Prefab，登录成功后注入 FarmPanel.FarmPanelPrefab（支持热更）")]
         public GameObject farmPanelPrefab;
+
+        [Tooltip("拖入 MailPanel Prefab，登录成功后注入 MailPanel.MailPanelPrefab（信箱面板，点击庭院 mail 按钮打开，支持热更）")]
+        public GameObject mailPanelPrefab;
 
         private AuthService _auth;
 
@@ -205,6 +209,7 @@ namespace WildCourt.UI
             if (yardMainUiPrefab != null) YardMainUI.YardMainUIPrefab = yardMainUiPrefab;
             if (yardPanelPrefab != null) YardPanel.YardPanelPrefab = yardPanelPrefab;
             if (farmPanelPrefab != null) FarmPanel.FarmPanelPrefab = farmPanelPrefab;
+            if (mailPanelPrefab != null) MailPanel.MailPanelPrefab = mailPanelPrefab;
         }
 
         /// <summary>

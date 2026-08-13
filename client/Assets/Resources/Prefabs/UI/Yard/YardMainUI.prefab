@@ -254,6 +254,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _buildButton: {fileID: 7504871451044200711}
+  _mailButton: {fileID: 7324471275013973819}
 --- !u!1 &4223649460554621797
 GameObject:
   m_ObjectHideFlags: 0

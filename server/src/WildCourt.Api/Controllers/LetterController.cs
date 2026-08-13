@@ -1,40 +1,55 @@
 using Microsoft.AspNetCore.Mvc;
 using WildCourt.Api.Models;
+using WildCourt.Api.Services;
 
 namespace WildCourt.Api.Controllers;
 
 /// <summary>
-/// 信件：写信、收信、回赠、审核状态（文档 02 §2.2）。
+/// 信箱（仅官方信息发放链路，文档 02 §2.2）：
+/// 收件箱 → 领取附件 → 删除已读。
+/// 玩家间写信（send/gift-back/审核）已剥离至独立写信系统，本控制器不再提供。
 /// </summary>
 [ApiController]
 [Route("api/v1/letter")]
 public class LetterController : ControllerBase
 {
-    /// <summary>写信（50 字 + 随附非遗）</summary>
-    [HttpPost("send")]
-    public Task<ApiResponse<long>> Send([FromBody] object request)
+    private readonly LetterService _letterService;
+
+    public LetterController(LetterService letterService)
     {
-        throw new NotImplementedException();
+        _letterService = letterService;
     }
 
-    /// <summary>收件箱</summary>
+    /// <summary>收件箱（官方信件，按时间倒序）。</summary>
     [HttpGet("inbox")]
-    public Task<ApiResponse<List<Letter>>> GetInbox()
+    public async Task<ApiResponse<List<Letter>>> GetInbox()
     {
-        throw new NotImplementedException();
+        var letters = await _letterService.InboxAsync(GetUserId());
+        return ApiResponse<List<Letter>>.Ok(letters);
     }
 
-    /// <summary>回赠</summary>
-    [HttpPost("gift-back")]
-    public Task<ApiResponse<object>> GiftBack([FromBody] object request)
+    /// <summary>领取邮件随附道具/物品（itemId 附件入背包，幂等防重复）。</summary>
+    [HttpPost("claim")]
+    public async Task<ApiResponse<ClaimResponse>> Claim([FromBody] ClaimLetterRequest request)
     {
-        throw new NotImplementedException();
+        var result = await _letterService.ClaimAsync(GetUserId(), request.LetterId);
+        return ApiResponse<ClaimResponse>.Ok(result);
     }
 
-    /// <summary>审核状态</summary>
-    [HttpGet("status/{letterId}")]
-    public Task<ApiResponse<Letter>> GetStatus(long letterId)
+    /// <summary>删除已读/已领取信件（软删除，仅本人可删）。</summary>
+    [HttpDelete("{letterId}")]
+    public async Task<ApiResponse<object>> Delete(long letterId)
     {
-        throw new NotImplementedException();
+        await _letterService.DeleteAsync(GetUserId(), letterId);
+        return ApiResponse<object>.Ok(new object());
+    }
+
+    private long GetUserId()
+    {
+        if (HttpContext.Items.TryGetValue("UserId", out var value) && value is long userId)
+        {
+            return userId;
+        }
+        throw new BusinessException(ApiCodes.Unauthorized, "未登录");
     }
 }

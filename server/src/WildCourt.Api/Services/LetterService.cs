@@ -1,27 +1,185 @@
+using Microsoft.EntityFrameworkCore;
 using WildCourt.Api.Models;
+using WildCourt.Data.DbContext;
+using WildCourt.Data.Entities;
 
 namespace WildCourt.Api.Services;
 
 /// <summary>
-/// 信件业务：状态机（撰写中→待审核→通过/退回→送达）、回赠、送达（文档 02 §2.3）。
+/// 信箱业务（仅官方信息发放链路）：
+/// 玩家间写信（Send/GiftBack/审核投递）已剥离至独立的写信系统，本服务不再提供。
+/// 本服务只负责：官方发信（由 AdminService 写库）→ 玩家收件箱 → 领取附件 → 删除已读。
+///
+/// 附件类型（reward_type）：
+///   shell  → 庭贝（直接改 user.Shell）
+///   coupon → 邮券（直接改 user.Coupon）
+///   item   → 背包道具/非遗（inventories 表 upsert）
+///   空      → 无附件
+///
+/// 状态约定（复用 letters.status 字段，官方链路不经过审核）：
+///   "送达"（官方信件初始状态，可领取/可删除）
+///   "已领取"（附件已发放，仅可删除）
+///   "已删除"（软删除标记，收件箱不再返回；物理删除留待清理任务）
 /// </summary>
 public class LetterService
 {
-    /// <summary>写信（入 letter_audit_queue）</summary>
-    public Task<long> SendAsync(long fromUserId, long toUserId, string content, string? nonfictionId)
+    private const string StatusDelivered = "送达";
+    private const string StatusClaimed = "已领取";
+    private const string StatusDeleted = "已删除";
+
+    private const string RewardShell = "shell";
+    private const string RewardCoupon = "coupon";
+    private const string RewardItem = "item";
+
+    private const string LetterClaimType = "letter_claim";
+
+    private readonly WildCourtDbContext _db;
+
+    public LetterService(WildCourtDbContext db)
     {
-        throw new NotImplementedException();
+        _db = db;
     }
 
-    /// <summary>收件箱</summary>
-    public Task<List<Letter>> InboxAsync(long userId)
+    /// <summary>收件箱：当前用户的官方信件（排除已删除），按时间倒序。</summary>
+    public async Task<List<Letter>> InboxAsync(long userId)
     {
-        throw new NotImplementedException();
+        var letters = await _db.Letters
+            .Where(l => l.ToUser == userId && l.Status != StatusDeleted)
+            .OrderByDescending(l => l.CreatedAt)
+            .ToListAsync();
+
+        return letters.Select(l => new Letter
+        {
+            LetterId = l.LetterId,
+            FromUser = l.FromUser,
+            ToUser = l.ToUser,
+            Content = l.Content,
+            ItemId = l.ItemId,
+            RewardType = l.RewardType,
+            RewardCount = l.RewardCount,
+            Status = l.Status,
+            CreatedAt = l.CreatedAt,
+        }).ToList();
     }
 
-    /// <summary>回赠（好友免审）</summary>
-    public Task GiftBackAsync(long letterId, string nonfictionId, string content)
+    /// <summary>领取邮件附件（按 reward_type 分派发放），幂等防重复。</summary>
+    public async Task<ClaimResponse> ClaimAsync(long userId, long letterId)
     {
-        throw new NotImplementedException();
+        var letter = await _db.Letters.FirstOrDefaultAsync(l => l.LetterId == letterId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "信件不存在");
+        if (letter.ToUser != userId)
+        {
+            throw new BusinessException(ApiCodes.Forbidden, "无权操作该信件");
+        }
+        if (letter.Status == StatusDeleted)
+        {
+            throw new BusinessException(ApiCodes.NotFound, "信件不存在");
+        }
+
+        var rewardType = string.IsNullOrWhiteSpace(letter.RewardType) ? null : letter.RewardType;
+        if (letter.Status == StatusClaimed)
+        {
+            // 幂等：已领取直接返回，不重复发奖
+            return new ClaimResponse
+            {
+                LetterId = letterId,
+                RewardType = rewardType ?? string.Empty,
+                ItemId = rewardType == RewardItem ? (letter.ItemId ?? string.Empty) : string.Empty,
+                Count = letter.RewardCount,
+            };
+        }
+
+        if (rewardType != null)
+        {
+            var user = await _db.Users.FindAsync(userId)
+                ?? throw new BusinessException(ApiCodes.NotFound, "用户不存在");
+            GrantReward(user, letter, rewardType);
+        }
+
+        letter.Status = StatusClaimed;
+        await _db.SaveChangesAsync();
+
+        return new ClaimResponse
+        {
+            LetterId = letterId,
+            RewardType = rewardType ?? string.Empty,
+            ItemId = rewardType == RewardItem ? (letter.ItemId ?? string.Empty) : string.Empty,
+            Count = letter.RewardCount,
+        };
+    }
+
+    /// <summary>删除已读/已领取信件（软删除，仅归属本人可删）。</summary>
+    public async Task DeleteAsync(long userId, long letterId)
+    {
+        var letter = await _db.Letters.FirstOrDefaultAsync(l => l.LetterId == letterId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "信件不存在");
+        if (letter.ToUser != userId)
+        {
+            throw new BusinessException(ApiCodes.Forbidden, "无权操作该信件");
+        }
+        if (letter.Status == StatusDeleted)
+        {
+            return; // 幂等
+        }
+
+        letter.Status = StatusDeleted;
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>按附件类型分派发放（对齐 SignInService/ShopService 模式）。</summary>
+    private void GrantReward(UserEntity user, LetterEntity letter, string rewardType)
+    {
+        var count = letter.RewardCount;
+        if (count <= 0)
+        {
+            return;
+        }
+
+        if (rewardType == RewardShell)
+        {
+            user.Shell += count;
+            AddTransaction(user.UserId, RewardShell, count);
+        }
+        else if (rewardType == RewardCoupon)
+        {
+            user.Coupon += count;
+            AddTransaction(user.UserId, RewardCoupon, count);
+        }
+        else if (rewardType == RewardItem)
+        {
+            var itemId = letter.ItemId;
+            if (string.IsNullOrWhiteSpace(itemId))
+            {
+                throw new BusinessException(ApiCodes.ServerError, "附件道具 ID 缺失");
+            }
+
+            var inventory = _db.Inventories.Local.FirstOrDefault(i => i.UserId == user.UserId && i.ItemId == itemId)
+                ?? _db.Inventories.FirstOrDefault(i => i.UserId == user.UserId && i.ItemId == itemId);
+            if (inventory == null)
+            {
+                _db.Inventories.Add(new InventoryEntity { UserId = user.UserId, ItemId = itemId, Count = count });
+            }
+            else
+            {
+                inventory.Count += count;
+            }
+            AddTransaction(user.UserId, itemId, count);
+        }
+        else
+        {
+            throw new BusinessException(ApiCodes.ServerError, $"未知附件类型：{rewardType}");
+        }
+    }
+
+    private void AddTransaction(long userId, string itemId, int count)
+    {
+        _db.Transactions.Add(new TransactionEntity
+        {
+            UserId = userId,
+            Type = LetterClaimType,
+            ItemId = itemId,
+            Count = count,
+            Price = 0,
+        });
     }
 }

@@ -712,4 +712,55 @@ public class AdminService
         // TODO: 通过后进入投递流程（LetterService.DeliverAsync 占位，骨架阶段直接改状态）。
         await _db.SaveChangesAsync();
     }
+
+    // ============ 官方信件 ============
+
+    /// <summary>
+    /// 官方发信：向指定玩家直接送达一封官方信件（from_user=0 标记系统），
+    /// 附件按 reward_type 携带（shell/coupon/item）。状态直接为“送达”，不经审核。
+    /// </summary>
+    public async Task<long> SendOfficialLetterAsync(OfficialLetterRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Content))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "信件内容不能为空");
+        }
+
+        var rewardType = string.IsNullOrWhiteSpace(req.RewardType) ? null : req.RewardType.Trim();
+        var allowedTypes = new[] { "shell", "coupon", "item" };
+        if (rewardType != null && !allowedTypes.Contains(rewardType))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "附件类型不合法（可选：shell/coupon/item）");
+        }
+
+        if (rewardType == "item" && string.IsNullOrWhiteSpace(req.ItemId))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "道具附件需指定 ItemId");
+        }
+        if (rewardType != null && req.RewardCount <= 0)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "附件数量必须大于 0");
+        }
+
+        var exists = await _db.Users.AnyAsync(u => u.UserId == req.ToUserId);
+        if (!exists)
+        {
+            throw new BusinessException(ApiCodes.NotFound, "收件玩家不存在");
+        }
+
+        var entity = new LetterEntity
+        {
+            FromUser = 0, // 0 表示系统/官方
+            ToUser = req.ToUserId,
+            Content = req.Content.Trim(),
+            ItemId = rewardType == "item" ? req.ItemId : null,
+            RewardType = rewardType,
+            RewardCount = rewardType == null ? 0 : req.RewardCount,
+            Status = "送达",
+            CreatedAt = DateTime.UtcNow,
+        };
+        _db.Letters.Add(entity);
+        await _db.SaveChangesAsync();
+        return entity.LetterId;
+    }
 }

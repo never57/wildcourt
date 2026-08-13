@@ -148,6 +148,8 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.ToUser).HasColumnName("to_user").IsRequired();
             e.Property(x => x.Content).HasColumnName("content").HasMaxLength(200).IsRequired();
             e.Property(x => x.ItemId).HasColumnName("item_id").HasMaxLength(64);
+            e.Property(x => x.RewardType).HasColumnName("reward_type").HasMaxLength(16);
+            e.Property(x => x.RewardCount).HasColumnName("reward_count").IsRequired();
             e.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         });

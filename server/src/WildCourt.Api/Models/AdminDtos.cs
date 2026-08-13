@@ -374,6 +374,27 @@ public class AnnouncementRequest
     public string Status { get; set; } = "draft";
 }
 
+// ============ 官方信件 ============
+
+/// <summary>官方发信请求：直接送达玩家信箱，可携带附件（庭贝/邮券/道具/非遗）。</summary>
+public class OfficialLetterRequest
+{
+    /// <summary>收件玩家 ID。</summary>
+    public long ToUserId { get; set; }
+
+    /// <summary>信件正文。</summary>
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>附件类型：shell（庭贝）/ coupon（邮券）/ item（道具/非遗）；空 = 无附件。</summary>
+    public string? RewardType { get; set; }
+
+    /// <summary>附件数量（shell/coupon 为货币数额，item 为背包数量）。</summary>
+    public int RewardCount { get; set; }
+
+    /// <summary>道具/非遗 ID（reward_type=item 时必填）。</summary>
+    public string? ItemId { get; set; }
+}
+
 // ============ 数据库 ============
 
 public class ExecuteSqlRequest

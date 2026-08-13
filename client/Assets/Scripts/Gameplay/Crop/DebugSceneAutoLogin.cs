@@ -6,6 +6,7 @@ using WildCourt.Net;
 using WildCourt.Net.Protocol;
 using WildCourt.UI;
 using WildCourt.UI.Farm;
+using WildCourt.UI.Letters;
 
 namespace WildCourt.Gameplay.Crop
 {
@@ -133,6 +134,15 @@ namespace WildCourt.Gameplay.Crop
             if (FarmPanel.FarmPanelPrefab == null)
             {
                 Debug.LogWarning("[DebugSceneAutoLogin] 未找到 FarmPanel 预制体（Resources/Prefabs/UI/Farm/FarmPanel）");
+            }
+
+            if (MailPanel.MailPanelPrefab == null)
+            {
+                MailPanel.MailPanelPrefab = Resources.Load<GameObject>("Prefabs/UI/Letters/MailPanel");
+                if (MailPanel.MailPanelPrefab == null)
+                {
+                    Debug.LogWarning("[DebugSceneAutoLogin] 未找到 MailPanel 预制体（Resources/Prefabs/UI/Letters/MailPanel）");
+                }
             }
         }
     }

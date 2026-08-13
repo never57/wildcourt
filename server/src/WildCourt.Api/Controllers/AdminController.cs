@@ -34,6 +34,15 @@ public class AdminController : AdminControllerBase
         return ApiResponse<List<ReviewQueueItemDto>>.Ok(await _adminService.GetAuditQueueAsync());
     }
 
+    /// <summary>官方发信：向指定玩家送达一封官方信件（可携带附件）。</summary>
+    [HttpPost("letters")]
+    public async Task<ApiResponse<object>> SendOfficialLetter([FromBody] OfficialLetterRequest request)
+    {
+        RequirePermission(AdminPermissions.AnnouncementsEdit);
+        var letterId = await _adminService.SendOfficialLetterAsync(request);
+        return ApiResponse<object>.Ok(new { LetterId = letterId });
+    }
+
     /// <summary>封禁用户（原始路由：POST /api/v1/admin/ban/{userId}）。</summary>
     [HttpPost("ban/{userId}")]
     public async Task<ApiResponse<object>> BanUser(long userId)

@@ -18,8 +18,10 @@ namespace WildCourt.Net.Protocol
         public long fromUserId;
         public string fromNickname;
         public string content;
-        public string itemId;     // 随附非遗
-        public string status;     // 撰写中/待审核/通过/退回/送达
+        public string itemId;     // rewardType=item 时的道具/非遗 ID
+        public string rewardType; // shell/coupon/item/空
+        public int rewardCount;   // shell/coupon 为货币数额，item 为背包数量
+        public string status;     // 送达/已领取/已删除
         public long createdAt;
     }
 
@@ -35,6 +37,22 @@ namespace WildCourt.Net.Protocol
         public long letterId;
         public string nonfictionId; // 回赠非遗（好友免审，文档 08 §8.5）
         public string content;
+    }
+
+    /// <summary>领取邮件随附道具/物品（收件方领取 itemId 附件）。</summary>
+    [Serializable]
+    public class ClaimLetterRequest
+    {
+        public long letterId;
+    }
+
+    [Serializable]
+    public class ClaimResponse
+    {
+        public long letterId;
+        public string rewardType; // shell/coupon/item/空
+        public string itemId;     // rewardType=item 时领取到的道具/非遗
+        public int count;         // 领取数量
     }
 
     [Serializable]

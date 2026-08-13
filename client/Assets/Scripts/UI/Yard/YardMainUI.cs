@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using WildCourt.Gameplay.Yard;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
+using WildCourt.UI.Letters;
 
 namespace WildCourt.UI.Yard
 {
@@ -28,6 +29,7 @@ namespace WildCourt.UI.Yard
 
         [Header("YardMainUI.prefab 内绑定")]
         [SerializeField] private Button _buildButton;      // bulidsystem 按钮
+        [SerializeField] private Button _mailButton;       // mail 按钮，点击打开信箱（MailPanel）
 
         private YardManager _yard;
         private YardPanel _panel;
@@ -78,6 +80,11 @@ namespace WildCourt.UI.Yard
                 _buildButton.onClick.RemoveAllListeners();
                 _buildButton.onClick.AddListener(OpenBuildPanel);
             }
+            if (_mailButton != null)
+            {
+                _mailButton.onClick.RemoveAllListeners();
+                _mailButton.onClick.AddListener(OpenMailPanel);
+            }
             YardPanel.BackPressed -= OnBuildPanelClosed;
             YardPanel.BackPressed += OnBuildPanelClosed;
         }
@@ -86,6 +93,7 @@ namespace WildCourt.UI.Yard
         {
             if (Instance == this) Instance = null;
             if (_buildButton != null) _buildButton.onClick.RemoveAllListeners();
+            if (_mailButton != null) _mailButton.onClick.RemoveAllListeners();
             YardPanel.BackPressed -= OnBuildPanelClosed;
         }
 
@@ -107,6 +115,13 @@ namespace WildCourt.UI.Yard
             net.Get<UserProfileResponse>(ApiPaths.UserProfile,
                 resp => _profile = resp.data,
                 (code, msg) => Debug.LogWarning($"[YardMainUI] profile 加载失败: {msg}"));
+        }
+
+        /// <summary>点击“信箱”按钮：实例化打开信箱面板（MailPanel）。MailPanel 为独立 Canvas 弹窗，覆盖在庭院 UI 之上。</summary>
+        private void OpenMailPanel()
+        {
+            var panel = MailPanel.CreateOrInstantiate();
+            if (panel != null) panel.Open();
         }
 
         /// <summary>点击“建造”按钮：实例化打开庭院建造面板（YardPanel），注入已缓存资料，并隐藏主 UI。</summary>

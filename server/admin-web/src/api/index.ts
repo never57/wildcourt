@@ -334,6 +334,21 @@ export const announcementApi = {
   publish: (id: number) => request<void>({ url: `/announcements/${id}/publish`, method: 'post' }),
 }
 
+// ================= 官方信件 =================
+
+export interface OfficialLetterPayload {
+  toUserId: number
+  content: string
+  rewardType?: 'shell' | 'coupon' | 'item'
+  rewardCount: number
+  itemId?: string
+}
+
+export const letterApi = {
+  sendOfficial: (data: OfficialLetterPayload) =>
+    request<{ letterId: number }>({ url: '/letters', method: 'post', data }),
+}
+
 // ================= 数据库管理 =================
 
 export const databaseApi = {
