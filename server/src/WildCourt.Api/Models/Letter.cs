@@ -1,15 +1,20 @@
 namespace WildCourt.Api.Models;
 
 /// <summary>
-/// 信件模型（对应 letters 表）。
+/// 信件模型（对应 letters 表，字段契约与客户端 LetterItem 对齐，camelCase 输出）。
 /// </summary>
 public class Letter
 {
     public long LetterId { get; set; }
 
-    public long FromUser { get; set; }
+    /// <summary>寄件人用户 ID（0 = 官方/系统）。</summary>
+    public long FromUserId { get; set; }
 
-    public long ToUser { get; set; }
+    /// <summary>寄件人昵称（官方信为“官方”）。</summary>
+    public string FromNickname { get; set; } = string.Empty;
+
+    /// <summary>收件人用户 ID。</summary>
+    public long ToUserId { get; set; }
 
     public string Content { get; set; } = string.Empty;
 
@@ -23,7 +28,14 @@ public class Letter
 
     public string Status { get; set; } = string.Empty;
 
-    public DateTime CreatedAt { get; set; }
+    /// <summary>创建时间（毫秒时间戳，对齐客户端 long createdAt）。</summary>
+    public long CreatedAt { get; set; }
+}
+
+/// <summary>收件箱响应（与客户端 InboxResponse 对齐）。</summary>
+public class InboxResponse
+{
+    public List<Letter> Letters { get; set; } = new();
 }
 
 /// <summary>领取邮件附件请求（与客户端 ClaimLetterRequest 字段对齐）。</summary>

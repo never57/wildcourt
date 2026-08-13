@@ -22,10 +22,10 @@ public class LetterController : ControllerBase
 
     /// <summary>收件箱（官方信件，按时间倒序）。</summary>
     [HttpGet("inbox")]
-    public async Task<ApiResponse<List<Letter>>> GetInbox()
+    public async Task<ApiResponse<InboxResponse>> GetInbox()
     {
-        var letters = await _letterService.InboxAsync(GetUserId());
-        return ApiResponse<List<Letter>>.Ok(letters);
+        var inbox = await _letterService.InboxAsync(GetUserId());
+        return ApiResponse<InboxResponse>.Ok(inbox);
     }
 
     /// <summary>领取邮件随附道具/物品（itemId 附件入背包，幂等防重复）。</summary>

@@ -41,25 +41,40 @@ public class LetterService
     }
 
     /// <summary>收件箱：当前用户的官方信件（排除已删除），按时间倒序。</summary>
-    public async Task<List<Letter>> InboxAsync(long userId)
+    public async Task<InboxResponse> InboxAsync(long userId)
     {
         var letters = await _db.Letters
             .Where(l => l.ToUser == userId && l.Status != StatusDeleted)
             .OrderByDescending(l => l.CreatedAt)
             .ToListAsync();
 
-        return letters.Select(l => new Letter
+        var fromIds = letters
+            .Select(l => l.FromUser)
+            .Where(id => id != 0)
+            .Distinct()
+            .ToList();
+        var nicknames = fromIds.Count == 0
+            ? new Dictionary<long, string>()
+            : await _db.Users
+                .Where(u => fromIds.Contains(u.UserId))
+                .ToDictionaryAsync(u => u.UserId, u => u.Nickname);
+
+        return new InboxResponse
         {
-            LetterId = l.LetterId,
-            FromUser = l.FromUser,
-            ToUser = l.ToUser,
-            Content = l.Content,
-            ItemId = l.ItemId,
-            RewardType = l.RewardType,
-            RewardCount = l.RewardCount,
-            Status = l.Status,
-            CreatedAt = l.CreatedAt,
-        }).ToList();
+            Letters = letters.Select(l => new Letter
+            {
+                LetterId = l.LetterId,
+                FromUserId = l.FromUser,
+                FromNickname = l.FromUser == 0 ? "官方" : (nicknames.TryGetValue(l.FromUser, out var n) ? n : ""),
+                ToUserId = l.ToUser,
+                Content = l.Content,
+                ItemId = l.ItemId,
+                RewardType = l.RewardType,
+                RewardCount = l.RewardCount,
+                Status = l.Status,
+                CreatedAt = new DateTimeOffset(l.CreatedAt).ToUnixTimeMilliseconds(),
+            }).ToList(),
+        };
     }
 
     /// <summary>领取邮件附件（按 reward_type 分派发放），幂等防重复。</summary>
