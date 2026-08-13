@@ -29,10 +29,10 @@ namespace WildCourt.UI.Letters
             }
         }
 
-        private static string FormatTime(long unixSec)
+        private static string FormatTime(long unixMs)
         {
-            if (unixSec <= 0) return string.Empty;
-            var t = System.DateTimeOffset.FromUnixTimeSeconds(unixSec).ToLocalTime();
+            if (unixMs <= 0) return string.Empty;
+            var t = System.DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToLocalTime();
             return t.ToString("MM-dd HH:mm");
         }
     }
