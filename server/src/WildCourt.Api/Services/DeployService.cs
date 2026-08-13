@@ -17,6 +17,13 @@ public class DeployService
 {
     private const int MaxLogLines = 500;
 
+    /// <summary>禁止重建的有状态/基础设施服务（重建会中断数据或存在数据风险）。</summary>
+    private static readonly HashSet<string> ForbiddenServices = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "mysql",
+        "redis",
+    };
+
     private static readonly TimeZoneInfo _cnTz = GetChinaTimeZone();
 
     private static TimeZoneInfo GetChinaTimeZone()
@@ -584,6 +591,14 @@ public class DeployService
     private async Task<string> RunDeployAsync(bool noCache, string? service)
     {
         var svc = service?.Trim().ToLowerInvariant();
+
+        // 禁止重建有状态/基础设施服务（mysql/redis 等），防止误操作导致数据风险
+        if (!string.IsNullOrEmpty(svc) && ForbiddenServices.Contains(svc))
+        {
+            throw new BusinessException(ApiCodes.BadRequest,
+                $"服务「{svc}」为有状态/基础设施服务，不允许通过部署系统重建");
+        }
+
         if (string.IsNullOrEmpty(svc) || svc is "api" or "api-blue" or "api-green")
         {
             var script = Path.Combine(_hostCodeRoot, "deploy.sh");

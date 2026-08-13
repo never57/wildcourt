@@ -312,6 +312,15 @@ namespace WildCourt.Data.Migrations
                         .HasColumnType("varchar(64)")
                         .HasColumnName("item_id");
 
+                    b.Property<int>("RewardCount")
+                        .HasColumnType("int")
+                        .HasColumnName("reward_count");
+
+                    b.Property<string>("RewardType")
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)")
+                        .HasColumnName("reward_type");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
