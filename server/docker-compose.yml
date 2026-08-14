@@ -124,6 +124,9 @@ services:
     volumes:
       # 反代目标由宿主文件控制（蓝绿切换：改文件 + nginx -s reload，毫秒级，无需重建容器）
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # 前端静态产物挂载：admin-web/dist 直接挂进容器，前端改动只需宿主 npm run build，
+      # 无需重建 nginx 镜像/容器，静态文件即时生效（零中断、无 502）
+      - ./admin-web/dist:/usr/share/nginx/html:ro
     ports:
       - "80:80"   # 管理后台前端 + API 统一入口；HTTPS 启用时挂证书加 443
 

@@ -612,9 +612,10 @@ public class DeployService
 
             if (string.IsNullOrEmpty(svc))
             {
-                // "全部发布"语义：API 蓝绿切换完成后，再重建 nginx（前端）。
-                // nginx 重建窗口约几秒，管理后台短暂中断后由前端自动恢复；仅在前端有改动时需要
-                await RunComposeAsync(noCache, "nginx");
+                // "全部发布"语义：API 蓝绿切换完成后，再构建前端并 reload nginx。
+                // admin-web/dist 已通过 bind mount 挂进 nginx 容器，前端改动只需
+                // 重新 npm run build 产物 + nginx -s reload，无需重建镜像/容器（零中断）。
+                await RunFrontendBuildAsync();
             }
             return "部署成功：API 蓝绿切换完成（无中断）";
         }
@@ -640,6 +641,31 @@ public class DeployService
 
         await RunProcessAsync("docker", args);
         return "部署成功：docker compose up -d --build 完成";
+    }
+
+    /// <summary>
+    /// 构建前端产物并 reload nginx：跑 build-frontend.sh（npm run build 生成 admin-web/dist），
+    /// dist 已通过 bind mount 挂进 nginx 容器，产物更新后 reload 即生效（无需重建镜像/容器，零中断）。
+    /// </summary>
+    private async Task<string> RunFrontendBuildAsync()
+    {
+        var script = Path.Combine(_hostCodeRoot, "build-frontend.sh");
+        if (!File.Exists(script))
+        {
+            // 脚本缺失时回退到旧的 docker compose 重建 nginx 方式（兼容）
+            AppendLog("!! build-frontend.sh 不存在，回退到 docker compose 重建 nginx");
+            await RunComposeAsync(noCache: false, "nginx");
+            return "部署成功：前端已通过 docker compose 重建 nginx";
+        }
+
+        AppendLog("==> 构建前端产物（build-frontend.sh）");
+        await RunProcessAsync("bash", script);
+
+        // 产物更新后 reload nginx，使其立即读取新 dist（bind mount 无需重启容器）
+        AppendLog("==> reload nginx 使前端生效");
+        await RunProcessAsync("docker", "exec wildcourt-nginx nginx -s reload");
+
+        return "部署成功：前端已构建并 reload nginx";
     }
 
     /// <summary>执行部署子进程，实时转发日志到部署日志队列，超时/失败抛业务异常。</summary>
