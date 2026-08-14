@@ -608,7 +608,11 @@ public class DeployService
             }
 
             var argLine = noCache ? "--no-cache" : "";
-            await RunProcessAsync("bash", $"\"{script}\" {argLine}".TrimEnd());
+            // 不重定向 stdout：deploy.sh 内部已有 tee 写日志（logs/deploy-*.log），
+            // 重定向会与 docker build/up 的海量输出叠加形成管道缓冲死锁，导致启动容器阶段卡死。
+            await RunProcessAsync("bash", $"\"{script}\" {argLine}".TrimEnd(), captureOutput: false);
+            // 部署完成后，把 deploy.sh 写的最新日志文件尾部补进内存队列供前端轮询
+            AppendDeployLogFileTail();
 
             if (string.IsNullOrEmpty(svc))
             {
@@ -668,13 +672,18 @@ public class DeployService
         return "部署成功：前端已构建并 reload nginx";
     }
 
-    /// <summary>执行部署子进程，实时转发日志到部署日志队列，超时/失败抛业务异常。</summary>
-    private async Task RunProcessAsync(string fileName, string arguments)
+    /// <summary>
+    /// 执行部署子进程，超时/失败抛业务异常。
+    /// <paramref name="captureOutput"/> 为 true 时把子进程 stdout/stderr 转发到日志队列；
+    /// 为 false 时不做重定向（避免 deploy.sh 内部 tee + docker 海量输出经管道传递时触发缓冲死锁，
+    /// 导致构建/启动容器阶段子进程卡死）。false 时日志由子进程自己写文件（deploy.sh 已写 logs/deploy-*.log）。
+    /// </summary>
+    private async Task RunProcessAsync(string fileName, string arguments, bool captureOutput = true)
     {
         var psi = new ProcessStartInfo(fileName, arguments)
         {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
+            RedirectStandardOutput = captureOutput,
+            RedirectStandardError = captureOutput,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
@@ -682,10 +691,14 @@ public class DeployService
 
         using var process = Process.Start(psi)
             ?? throw new BusinessException(ApiCodes.ServerError, $"无法启动进程：{fileName}");
-        process.OutputDataReceived += (_, e) => AppendLog(e.Data);
-        process.ErrorDataReceived += (_, e) => AppendLog(e.Data);
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
+
+        if (captureOutput)
+        {
+            process.OutputDataReceived += (_, e) => AppendLog(e.Data);
+            process.ErrorDataReceived += (_, e) => AppendLog(e.Data);
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
 
         if (!await WaitForExitAsync(process, TimeSpan.FromMinutes(30)))
         {
@@ -715,6 +728,40 @@ public class DeployService
         while (_log.Count > MaxLogLines)
         {
             _log.TryDequeue(out _);
+        }
+    }
+
+    /// <summary>
+    /// 把 deploy.sh 写的最新时间戳日志文件尾部读入内存日志队列，供前端轮询展示。
+    /// deploy.sh 用 exec &gt; &gt;(tee logs/deploy-*.log) 写文件；这里读最新文件的最后 N 行。
+    /// </summary>
+    private void AppendDeployLogFileTail()
+    {
+        try
+        {
+            var logsDir = Path.Combine(_hostCodeRoot, "logs");
+            if (!Directory.Exists(logsDir))
+            {
+                return;
+            }
+
+            var latest = Directory.GetFiles(logsDir, "deploy-*.log")
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+            if (latest == null)
+            {
+                return;
+            }
+
+            var lines = File.ReadLines(latest).TakeLast(MaxLogLines);
+            foreach (var line in lines)
+            {
+                AppendLog(line);
+            }
+        }
+        catch
+        {
+            // 日志读取失败不影响部署结果，静默忽略
         }
     }
 
