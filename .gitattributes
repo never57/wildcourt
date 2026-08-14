@@ -1,24 +1,20 @@
 # Unity项目文件规则
 # Git LFS rules for Unity project
-
 # Unity scripts & shaders, c-sharp
 *.cginc text
 *.cs diff=csharp
 *.shader text
-
 # Collapse Unity-generated files
 *.asset linguist-generated
 *.mat linguist-generated
 *.meta linguist-generated
 *.prefab linguist-generated
 *.unity linguist-generated
-
 # "physic" for 3D but "physics" for 2D
 *.physicMaterial2D merge=unityyamlmerge eol=lf
 *.physicMaterial merge=unityyamlmerge eol=lf
 *.physicsMaterial2D merge=unityyamlmerge eol=lf
 *.physicsMaterial merge=unityyamlmerge eol=lf
-
 # Unity YAML
 *.mat merge=unityyamlmerge eol=lf
 *.anim merge=unityyamlmerge eol=lf
@@ -27,9 +23,7 @@
 *.asset merge=unityyamlmerge eol=lf
 *.meta merge=unityyamlmerge eol=lf
 *.controller merge=unityyamlmerge eol=lf
-
 # Unity file types
-
 # 视频，video
 # oggtheora
 # m2t
@@ -61,7 +55,6 @@
 # arf
 # vcr
 # ogv
-
 # 音频, audio
 # ape
 # wav
@@ -78,7 +71,6 @@
 # bnk, Wwise audio
 # wem, Wwise
 # pca
-
 # 库文件，Library
 # a
 # o
@@ -118,7 +110,6 @@
 # h5
 # rns
 # reason
-
 # 压缩包，Archive format
 # =Archiving only=
 # ar
@@ -193,7 +184,6 @@
 # bin
 # cue
 # raw
-
 # Adobe
 # Photoshop
 # psd
@@ -201,7 +191,6 @@
 # ai
 # eps
 # pdf
-
 # 原始图片，Raw image
 # cr2
 # crw
@@ -255,7 +244,6 @@
 # step
 # fcstd
 # bim
-
 # 图像，Image
 # jpg
 # jpeg
@@ -285,8 +273,6 @@
 # cds
 # exr
 # bc
-
-
 # 文档，Document
 # Microsoft Excel
 # xls
@@ -317,7 +303,6 @@
 # pages, apple
 # Apple numbers
 # numbers, apple
-
 # 电子书，Book
 # chm
 # mobi
@@ -337,17 +322,14 @@
 # cbt
 # cba
 # pdb
-
 # 字体，font
 # ttf
 # otf
 # woff
 # woff2
-
 # 翻译，translate
 # po
-
 # 无后缀文件，non-suffix files
-
 # 强制 shell 脚本使用 LF 行尾，避免 Windows CRLF 导致服务器 bash 执行失败
 server/deploy.sh text eol=lf
+/client/Assets/Resources/Art/Fonts/MiSans-Regular[[:space:]]SDF-7000.asset filter=lfs diff=lfs merge=lfs -text
