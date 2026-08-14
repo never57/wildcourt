@@ -80,8 +80,12 @@ echo "==> 构建 api-${STANDBY} 镜像"
 docker compose -f "$COMPOSE_FILE" build $NO_CACHE "api-${STANDBY}"
 
 # ---- 4. 启动 standby 容器（--no-deps 避免连带动 mysql/redis） ----
+# 关键：先移除旧的 standby 容器再 create + start，避免 `docker compose up -d` 因配置变化
+# 走 recreate（先停旧容器再启动新容器）时被中断，留下"新容器 Created 未启动 + 旧容器已停"的中间态。
+# 蓝绿部署下 standby 本就不承接流量，直接 rm 旧 standby 无影响。
 echo "==> 启动 api-${STANDBY}"
-docker compose -f "$COMPOSE_FILE" up -d --no-deps "api-${STANDBY}"
+docker rm -f "wildcourt-api-${STANDBY}" 2>/dev/null || true
+docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate "api-${STANDBY}"
 
 # ---- 5. 等待健康检查通过（最多 180 秒），失败则回滚 ----
 # 窗口设计：compose healthcheck start_period=60s + retries=20×interval=5s ≈ 160s 才会判 unhealthy；
