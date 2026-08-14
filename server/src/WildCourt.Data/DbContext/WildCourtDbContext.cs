@@ -155,13 +155,14 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.ToUser).HasColumnName("to_user").IsRequired();
             e.Property(x => x.Title).HasColumnName("title").HasMaxLength(100);
             e.Property(x => x.Content).HasColumnName("content").HasMaxLength(200).IsRequired();
-            // 多附件：List<LetterAttachment> 序列化为 JSON 文本存储（旧 item_id/reward_type/reward_count 三列已迁移删除）
+            // 多附件：List<LetterAttachment>? 序列化为 JSON 文本存储（旧 item_id/reward_type/reward_count 三列已迁移删除）。
+            // 保留 null：无附件时存 SQL NULL，使列可空性与迁移快照对齐，避免 EF 判定模型 pending changes。
             e.Property(x => x.Attachments)
                 .HasColumnName("attachments")
                 .HasColumnType("longtext")
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v ?? new List<LetterAttachment>(), (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<LetterAttachment>>(v, (JsonSerializerOptions?)null) ?? new List<LetterAttachment>());
+                    v => v == null ? null : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => v == null ? null : JsonSerializer.Deserialize<List<LetterAttachment>>(v, (JsonSerializerOptions?)null));
             e.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         });
