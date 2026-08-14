@@ -44,6 +44,40 @@ namespace WildCourt.Net.Handler
         }
     }
 
+    /// <summary>好友私聊消息处理器：ChatHub ReceivePrivateMessage → 聊天模块。</summary>
+    public class PrivateMessageHandler : INetEventHandler
+    {
+        public static readonly PrivateMessageHandler Instance = new PrivateMessageHandler();
+
+        public void HandleNetEvent(NetEvent evt, string data)
+        {
+            switch (evt)
+            {
+                case NetEvent.PrivateMessage:
+                    // data 为 ChatMessageDto JSON（id/fromUserId/toUserId/content/isRead/createdAt）
+                    long id = 0, fromUserId = 0, toUserId = 0, createdAt = 0;
+                    var rId = JsonUtil.GetField(data, "id");
+                    var rFrom = JsonUtil.GetField(data, "fromUserId");
+                    var rTo = JsonUtil.GetField(data, "toUserId");
+                    var rCreated = JsonUtil.GetField(data, "createdAt");
+                    if (rId != null) long.TryParse(rId, out id);
+                    if (rFrom != null) long.TryParse(rFrom, out fromUserId);
+                    if (rTo != null) long.TryParse(rTo, out toUserId);
+                    if (rCreated != null) long.TryParse(rCreated, out createdAt);
+
+                    EventBus.Publish(new PrivateMessageEvent
+                    {
+                        Id = id,
+                        FromUserId = fromUserId,
+                        ToUserId = toUserId,
+                        Content = JsonUtil.GetField(data, "content") ?? string.Empty,
+                        CreatedAt = createdAt,
+                    });
+                    break;
+            }
+        }
+    }
+
     /// <summary>通用通知处理器（访问留下/空盆离开等）。</summary>
     public class NoticeHandler : INetEventHandler
     {
@@ -115,6 +149,7 @@ namespace WildCourt.Net.Handler
             var center = HandlerCenter.Instance;
             center.Register(NetEvent.LetterArrived, LetterHandler.Instance);
             center.Register(NetEvent.FriendApply, FriendHandler.Instance);
+            center.Register(NetEvent.PrivateMessage, PrivateMessageHandler.Instance);
             center.Register(NetEvent.Notice, NoticeHandler.Instance);
             center.Register(NetEvent.DailySettlement, SettlementHandler.Instance);
             center.Register(NetEvent.BadgeUnlocked, SystemStateHandler.Instance);

@@ -126,10 +126,145 @@ public class FriendService
         return new StealResultDto { TargetUserId = targetUserId, CropId = crop.Id, Count = stolen };
     }
 
-    /// <summary>好友申请（占位）。</summary>
-    public Task ApplyAsync(long fromUserId, long toUserId)
+    /// <summary>好友申请：A 申请 B（待 B 接受后写入 friends 表）。幂等：已有 pending 申请则不重复建。</summary>
+    public async Task ApplyAsync(long fromUserId, long toUserId)
     {
-        throw new NotImplementedException();
+        if (fromUserId == toUserId)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "不能添加自己为好友");
+        }
+        var targetExists = await _db.Users.AnyAsync(u => u.UserId == toUserId);
+        if (!targetExists)
+        {
+            throw new BusinessException(ApiCodes.NotFound, "目标玩家不存在");
+        }
+        var isFriend = await _db.Friends.AnyAsync(f =>
+            (f.UserId == fromUserId && f.FriendId == toUserId) ||
+            (f.UserId == toUserId && f.FriendId == fromUserId));
+        if (isFriend)
+        {
+            throw new BusinessException(ApiCodes.Conflict, "你们已经是好友了");
+        }
+
+        var pending = await _db.FriendRequests.FirstOrDefaultAsync(r =>
+            r.FromUserId == fromUserId && r.ToUserId == toUserId && r.Status == "pending");
+        if (pending != null)
+        {
+            return; // 已有待处理申请，幂等
+        }
+
+        _db.FriendRequests.Add(new FriendRequestEntity
+        {
+            FromUserId = fromUserId,
+            ToUserId = toUserId,
+            Status = "pending",
+            CreatedAt = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>接受好友申请：把 pending 申请置为 accepted，并双向写入 friends 表。</summary>
+    public async Task AcceptAsync(long userId, long fromUserId)
+    {
+        var request = await _db.FriendRequests.FirstOrDefaultAsync(r =>
+            r.FromUserId == fromUserId && r.ToUserId == userId && r.Status == "pending")
+            ?? throw new BusinessException(ApiCodes.NotFound, "好友申请不存在或已处理");
+
+        var isFriend = await _db.Friends.AnyAsync(f =>
+            (f.UserId == userId && f.FriendId == fromUserId) ||
+            (f.UserId == fromUserId && f.FriendId == userId));
+        if (!isFriend)
+        {
+            _db.Friends.Add(new FriendEntity { UserId = userId, FriendId = fromUserId, CreatedAt = DateTime.UtcNow });
+        }
+
+        request.Status = "accepted";
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>拒绝好友申请。</summary>
+    public async Task RejectAsync(long userId, long fromUserId)
+    {
+        var request = await _db.FriendRequests.FirstOrDefaultAsync(r =>
+            r.FromUserId == fromUserId && r.ToUserId == userId && r.Status == "pending")
+            ?? throw new BusinessException(ApiCodes.NotFound, "好友申请不存在或已处理");
+
+        request.Status = "rejected";
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>好友列表（含昵称/头像/等级）。</summary>
+    public async Task<FriendListResponse> ListAsync(long userId)
+    {
+        var friendIds = await _db.Friends
+            .Where(f => f.UserId == userId || f.FriendId == userId)
+            .Select(f => f.UserId == userId ? f.FriendId : f.UserId)
+            .Distinct()
+            .ToListAsync();
+
+        var users = await _db.Users
+            .Where(u => friendIds.Contains(u.UserId))
+            .ToDictionaryAsync(u => u.UserId, u => u);
+
+        var list = friendIds
+            .Where(users.ContainsKey)
+            .Select(id =>
+            {
+                var u = users[id];
+                return new FriendDto
+                {
+                    UserId = u.UserId,
+                    Nickname = u.Nickname,
+                    AvatarUrl = u.AvatarUrl ?? string.Empty,
+                    Level = u.Level,
+                };
+            })
+            .ToList();
+
+        return new FriendListResponse { Friends = list };
+    }
+
+    /// <summary>删除好友（双向删除）。</summary>
+    public async Task DeleteAsync(long userId, long friendUserId)
+    {
+        var rows = await _db.Friends.Where(f =>
+            (f.UserId == userId && f.FriendId == friendUserId) ||
+            (f.UserId == friendUserId && f.FriendId == userId)).ToListAsync();
+        if (rows.Count == 0)
+        {
+            throw new BusinessException(ApiCodes.NotFound, "不是好友关系");
+        }
+        _db.Friends.RemoveRange(rows);
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>待处理的好友申请列表（我是被申请人）。</summary>
+    public async Task<FriendRequestListResponse> PendingRequestsAsync(long userId)
+    {
+        var requests = await _db.FriendRequests
+            .Where(r => r.ToUserId == userId && r.Status == "pending")
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+
+        var fromIds = requests.Select(r => r.FromUserId).Distinct().ToList();
+        var users = await _db.Users.Where(u => fromIds.Contains(u.UserId))
+            .ToDictionaryAsync(u => u.UserId, u => u);
+
+        var list = requests.Select(r =>
+        {
+            users.TryGetValue(r.FromUserId, out var u);
+            return new FriendRequestDto
+            {
+                Id = r.Id,
+                FromUserId = r.FromUserId,
+                FromNickname = u?.Nickname ?? string.Empty,
+                AvatarUrl = u?.AvatarUrl ?? string.Empty,
+                Status = r.Status,
+                CreatedAt = new DateTimeOffset(r.CreatedAt).ToUnixTimeMilliseconds(),
+            };
+        }).ToList();
+
+        return new FriendRequestListResponse { Requests = list };
     }
 
     /// <summary>喂食（占位，文档 08 §8.4）。</summary>

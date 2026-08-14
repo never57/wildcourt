@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR.Client;
 using UnityEngine;
 using WildCourt.Core;
 using WildCourt.Net.Protocol;
@@ -8,13 +10,8 @@ namespace WildCourt.Net.WebSocket
 {
     /// <summary>
     /// SignalR 长连接客户端（文档 02 §2.5 ChatHub / 03 §3.6 / 14 §14.4）。
-    /// <para>Unity 无内置 SignalR 客户端，需二选一接入（库文件放入 Assets/Plugins/）：</para>
-    /// <list type="number">
-    /// <item><b>Microsoft.AspNetCore.SignalR.Client</b>（.NET Standard 2.0）——推荐，与服务端 ChatHub 直接互通；</item>
-    /// <item><b>WebSocketSharp</b>——手写 JSON 事件帧协议。</item>
-    /// </list>
-    /// 未接入第三方库时仅打印日志（骨架保持可编译），接入后填充 <see cref="OpenConnection"/> 即可。
-    /// 断线重连：指数退避，重连成功后重置计数（文档 14 §14.4：下载/连接失败处理）。
+    /// 基于 Microsoft.AspNetCore.SignalR.Client（.NET Standard 2.0，dll 在 Assets/Plugins/SignalR/）。
+    /// 断线重连：指数退避，重连成功后重置计数。
     /// </summary>
     public class SignalRClient : MonoBehaviour, IRealtimeClient
     {
@@ -34,8 +31,7 @@ namespace WildCourt.Net.WebSocket
         private int _reconnectAttempt;
         private Coroutine _reconnectRoutine;
 
-        // TODO: 第三方连接对象（接入 SignalR Client / WebSocketSharp 后在此声明）
-        // private HubConnection _connection;
+        private HubConnection _connection;
 
         private void Awake()
         {
@@ -73,26 +69,64 @@ namespace WildCourt.Net.WebSocket
             }
             Debug.Log($"[SignalR] 连接 {_wsUrl} ...");
 
-            // TODO: 建立真实连接（二选一，见类注释）。示例（Microsoft.AspNetCore.SignalR.Client）：
-            //   _connection = new HubConnectionBuilder()
-            //       .WithUrl(_wsUrl, o => o.AccessTokenProvider = () => Task.FromResult(_token))
-            //       .Build();
-            //   _connection.On<string>("LetterArrived", payload => Dispatch(NetEvent.LetterArrived, payload));
-            //   _connection.On<string>("FriendApply",   payload => Dispatch(NetEvent.FriendApply, payload));
-            //   _connection.On<string>("Notice",        payload => Dispatch(NetEvent.Notice, payload));
-            //   _connection.On<string>("DailySettlement", payload => Dispatch(NetEvent.DailySettlement, payload));
-            //   _connection.On<string>("BadgeUnlocked", payload => Dispatch(NetEvent.BadgeUnlocked, payload));
-            //   _connection.On<string>("CurrencyChanged", payload => Dispatch(NetEvent.CurrencyChanged, payload));
-            //   _connection.On<string>("ActivityChanged", payload => Dispatch(NetEvent.ActivityChanged, payload));
-            //   _connection.StartAsync();
-            //
-            // 连接成功回调：IsConnected = true; _reconnectAttempt = 0; EventBus.Publish(new RealtimeConnectedEvent());
-            // 连接失败/断开回调：IsConnected = false; EventBus.Publish(new RealtimeDisconnectedEvent{...}); ScheduleReconnect();
+            // 释放旧连接（重连时避免泄漏）
+            CloseConnectionCore();
+
+            _connection = new HubConnectionBuilder()
+                .WithUrl(_wsUrl, options =>
+                {
+                    // 服务端 SignalRUserIdProvider 从 ?access_token= 解析用户
+                    options.AccessTokenProvider = () => Task.FromResult(_token);
+                })
+                .Build();
+
+            // 服务端推送事件注册（payload 为 JSON 字符串，交由 HandlerCenter 反序列化）
+            _connection.On<string>("ReceivePrivateMessage", payload => Dispatch(NetEvent.PrivateMessage, payload));
+            _connection.On<string>("LetterArrived", payload => Dispatch(NetEvent.LetterArrived, payload));
+            _connection.On<string>("FriendApply", payload => Dispatch(NetEvent.FriendApply, payload));
+            _connection.On<string>("Notice", payload => Dispatch(NetEvent.Notice, payload));
+            _connection.On<string>("DailySettlement", payload => Dispatch(NetEvent.DailySettlement, payload));
+            _connection.On<string>("BadgeUnlocked", payload => Dispatch(NetEvent.BadgeUnlocked, payload));
+            _connection.On<string>("CurrencyChanged", payload => Dispatch(NetEvent.CurrencyChanged, payload));
+            _connection.On<string>("ActivityChanged", payload => Dispatch(NetEvent.ActivityChanged, payload));
+
+            // 断线回调（被动断开 → 自动重连）
+            _connection.Closed += OnConnectionClosed;
+
+            StartAsync(_connection);
+        }
+
+        private async void StartAsync(HubConnection connection)
+        {
+            try
+            {
+                await connection.StartAsync();
+                IsConnected = true;
+                _reconnectAttempt = 0;
+                Debug.Log("[SignalR] 连接成功");
+                EventBus.Publish(new RealtimeConnectedEvent());
+            }
+            catch (Exception ex)
+            {
+                IsConnected = false;
+                Debug.LogWarning($"[SignalR] 连接失败：{ex.Message}");
+                EventBus.Publish(new RealtimeDisconnectedEvent { Reason = ex.Message });
+                ScheduleReconnect();
+            }
+        }
+
+        private Task OnConnectionClosed(Exception ex)
+        {
+            IsConnected = false;
+            Debug.LogWarning($"[SignalR] 连接断开：{ex?.Message ?? "remote"}");
+            EventBus.Publish(new RealtimeDisconnectedEvent { Reason = ex?.Message ?? "连接断开" });
+            ScheduleReconnect();
+            return Task.CompletedTask;
         }
 
         private void CloseConnection()
         {
-            // TODO: _connection?.StopAsync();
+            CloseConnectionCore();
             if (IsConnected)
             {
                 IsConnected = false;
@@ -100,7 +134,24 @@ namespace WildCourt.Net.WebSocket
             }
         }
 
-        /// <summary>收到服务端事件帧 → 路由分发（接入后由 Hub 回调调用）。</summary>
+        private void CloseConnectionCore()
+        {
+            if (_connection != null)
+            {
+                _connection.Closed -= OnConnectionClosed;
+                try
+                {
+                    _ = _connection.DisposeAsync();
+                }
+                catch
+                {
+                    // 忽略释放异常
+                }
+                _connection = null;
+            }
+        }
+
+        /// <summary>收到服务端事件帧 → 路由分发。</summary>
         private void Dispatch(NetEvent evt, string data)
         {
             OnPush?.Invoke(evt, data);

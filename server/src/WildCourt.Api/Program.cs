@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using WildCourt.Api.Hubs;
 using WildCourt.Api.Middleware;
@@ -44,6 +45,7 @@ builder.Services.AddScoped<PlayerService>();
 builder.Services.AddScoped<ShopService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<FriendService>();
+builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<SignInService>();
 builder.Services.AddScoped<LetterService>();
 
@@ -67,6 +69,7 @@ builder.Services.AddControllers()
         opt.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<IUserIdProvider, SignalRUserIdProvider>();
 
 var app = builder.Build();
 

@@ -45,6 +45,10 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public DbSet<AdminOperationLogEntity> AdminOperationLogs => Set<AdminOperationLogEntity>();
 
+    public DbSet<FriendRequestEntity> FriendRequests => Set<FriendRequestEntity>();
+
+    public DbSet<ChatMessageEntity> ChatMessages => Set<ChatMessageEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureUser(modelBuilder);
@@ -60,6 +64,8 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
         ConfigureAdmin(modelBuilder);
         ConfigureAnnouncement(modelBuilder);
         ConfigureAdminOperationLog(modelBuilder);
+        ConfigureFriendRequest(modelBuilder);
+        ConfigureChatMessage(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -170,6 +176,38 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
             e.Property(x => x.FriendId).HasColumnName("friend_id").IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+        });
+    }
+
+    private static void ConfigureFriendRequest(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<FriendRequestEntity>(e =>
+        {
+            e.ToTable("friend_requests");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            e.Property(x => x.FromUserId).HasColumnName("from_user_id").IsRequired();
+            e.Property(x => x.ToUserId).HasColumnName("to_user_id").IsRequired();
+            e.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.HasIndex(x => new { x.ToUserId, x.Status }).HasDatabaseName("idx_friend_requests_to_status");
+        });
+    }
+
+    private static void ConfigureChatMessage(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ChatMessageEntity>(e =>
+        {
+            e.ToTable("chat_messages");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            e.Property(x => x.FromUserId).HasColumnName("from_user_id").IsRequired();
+            e.Property(x => x.ToUserId).HasColumnName("to_user_id").IsRequired();
+            e.Property(x => x.Content).HasColumnName("content").HasMaxLength(1000).IsRequired();
+            e.Property(x => x.IsRead).HasColumnName("is_read").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.HasIndex(x => new { x.ToUserId, x.IsRead }).HasDatabaseName("idx_chat_messages_to_read");
+            e.HasIndex(x => new { x.FromUserId, x.ToUserId }).HasDatabaseName("idx_chat_messages_from_to");
         });
     }
 
