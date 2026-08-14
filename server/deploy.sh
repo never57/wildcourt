@@ -27,6 +27,16 @@ NGINX_CONF="$HOST_CODE_ROOT/nginx/nginx.conf"
 ACTIVE_FILE="$HOST_CODE_ROOT/.deploy-active"
 NGINX_CONTAINER="${NGINX_CONTAINER:-wildcourt-nginx}"
 
+# ---- 0. 日志：每次部署独立文件（带时间戳），避免被外部 tee 覆盖 ----
+# 之前用 /tmp/deploy-last.log 会被下次部署覆盖，失败后无法追溯；
+# 现在写到 logs/deploy-YYYYMMDD-HHMMSS.log，保留历史便于排查。
+LOG_DIR="$HOST_CODE_ROOT/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/deploy-$(date +%Y%m%d-%H%M%S).log"
+# 同时输出到终端和日志文件（>log 2>&1 + tee 让 stdout/stderr 都进文件，终端也能实时看）
+exec > >(tee "$LOG_FILE") 2>&1
+echo "==== deploy.sh 开始：$(date '+%F %T') 日志文件：$LOG_FILE ===="
+
 # 从模板生成 nginx.conf（用 sed | tee 原地写回，保持 inode，bind mount 立即对容器生效）
 gen_nginx_conf() {
   local target="$1"   # 目标：api-blue / api-green
@@ -73,11 +83,14 @@ docker compose -f "$COMPOSE_FILE" build $NO_CACHE "api-${STANDBY}"
 echo "==> 启动 api-${STANDBY}"
 docker compose -f "$COMPOSE_FILE" up -d --no-deps "api-${STANDBY}"
 
-# ---- 5. 等待健康检查通过（最多 120 秒），失败则回滚 ----
-echo "==> 等待 api-${STANDBY} 健康检查通过"
+# ---- 5. 等待健康检查通过（最多 180 秒），失败则回滚 ----
+# 窗口设计：compose healthcheck start_period=60s + retries=20×interval=5s ≈ 160s 才会判 unhealthy；
+# 这里给 180s 留余量，避免 deploy.sh 先于 docker healthcheck 判定失败而误回滚。
+# DB 相关部署（含迁移）容器启动会跑 Migrate，首次/大表迁移可能 20-30s+，必须留够窗口。
+echo "==> 等待 api-${STANDBY} 健康检查通过（最多 180 秒，迁移期间耐心等待）"
 HEALTHY=0
 STATUS="none"
-for i in $(seq 1 60); do
+for i in $(seq 1 90); do
   STATUS="$(docker inspect --format '{{.State.Health.Status}}' "wildcourt-api-${STANDBY}" 2>/dev/null || echo 'none')"
   if [ "$STATUS" = "healthy" ]; then
     HEALTHY=1
@@ -90,7 +103,19 @@ for i in $(seq 1 60); do
 done
 
 if [ "$HEALTHY" != "1" ]; then
-  echo "!! api-${STANDBY} 健康检查未通过（status=${STATUS}），回滚：停止新容器，保留 ${ACTIVE} 继续服务"
+  echo "!! api-${STANDBY} 健康检查未通过（status=${STATUS}），准备回滚"
+  # ---- 回滚保护：先确认 active 容器还在运行，避免停 standby 后两边全空 → 502 ----
+  # 历史教训：若前一次部署失败/中断导致 active 已停，这次回滚停 standby 后会无上游，
+  # nginx 502。这里显式检查 active 状态，缺失则告警但不自动 start（无法判断镜像版本）。
+  ACTIVE_RUNNING="$(docker inspect --format '{{.State.Running}}' "wildcourt-api-${ACTIVE}" 2>/dev/null || echo 'false')"
+  if [ "$ACTIVE_RUNNING" != "true" ]; then
+    echo "!!! 严重：active 容器 api-${ACTIVE} 未运行（前次部署可能已中断/失败）"
+    echo "!!! 停 standby 后将无可用上游 → nginx 必然 502。中止回滚，保留 standby 供排查："
+    echo "    docker logs --tail 100 wildcourt-api-${STANDBY}"
+    echo "    docker start wildcourt-api-${ACTIVE}  # 手动恢复旧 active 后重试部署"
+    exit 1
+  fi
+  echo "   active 容器 api-${ACTIVE} 仍在运行，安全回滚：停 standby，保留 active 继续服务"
   docker compose -f "$COMPOSE_FILE" stop "api-${STANDBY}" || true
   exit 1
 fi

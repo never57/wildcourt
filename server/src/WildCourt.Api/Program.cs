@@ -23,8 +23,12 @@ builder.Configuration
 // 数据层：MySQL（Pomelo）+ Redis（会话/匹配池/队列）
 var connectionString = builder.Configuration.GetConnectionString("MySql")
     ?? "Server=localhost;Port=3306;Database=wildcourt_dev;User=root;Password=;CharSet=utf8mb4;";
+// ServerVersion.AutoDetect 会同步连 MySQL 探版本，连不上直接抛异常让 builder 失败。
+// 生产环境 MySQL 偶发抖动/启动顺序问题时，降级为固定版本（与 docker-compose mysql:8.4 对齐），
+// 避免容器因 AutoDetect 失败而崩溃 → 蓝绿部署误判 → 502。
+var serverVersion = TryDetectMySqlVersion(connectionString);
 builder.Services.AddDbContext<WildCourtDbContext>(opt =>
-    opt.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    opt.UseMySql(connectionString, serverVersion));
 
 var redisConn = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
 builder.Services.AddSingleton(new RedisUtil(redisConn));
@@ -67,19 +71,25 @@ builder.Services.AddSignalR();
 var app = builder.Build();
 
 // 4. 启动时确保数据库与表结构就绪（EF Core 迁移）
-//    降级策略：MySQL 不可达仅记录错误并继续启动（本地无库/库未起时服务可起，
-//    业务接口此时返回 500；生产建议保证 MySQL 就绪再启动，见 docs/deployment-issues.md）。
+//    降级策略：迁移失败直接让进程退出（非 0），让 docker healthcheck 判定 unhealthy →
+//    deploy.sh 回滚到旧 active 容器，避免新容器"看似启动但 schema 不对/业务 500"的半死状态。
+//    （旧实现是 catch 后只记日志继续启动，导致 /health 仍 200 但业务全崩，蓝绿切换后才发现 → 已切流量无法回滚）
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<WildCourtDbContext>();
+    var migrateLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
         db.Database.Migrate();
     }
     catch (Exception ex)
     {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "数据库迁移失败：服务以降级模式启动（MySQL 不可用）");
+        migrateLogger.LogCritical(ex, "数据库迁移失败：进程退出。deploy.sh 健康检查将判定 unhealthy 并回滚到旧容器");
+        // 非零退出码：docker 标记容器 Exited(1)，healthcheck 立即 unhealthy，deploy.sh 回滚
+        Environment.ExitCode = 1;
+        // 给日志刷盘时间再退出
+        await Task.Delay(500);
+        return;
     }
 
     // 5. 初始化默认管理员（仅当 admins 表为空，密码取配置，生产务必修改）
@@ -114,3 +124,20 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapHub<ChatHub>("/hub/chat");
 
 app.Run();
+return;
+
+// AutoDetect 失败时降级为固定 8.4.x 版本（与 docker-compose.yml 的 mysql:8.4 对齐）。
+// 连不上 MySQL 通常是启动顺序/网络抖动，不应用致命异常阻断容器启动；
+// 后续 Migrate 仍会真正连库，那时再失败由 Migrate 的 catch 决定是否退出。
+static ServerVersion TryDetectMySqlVersion(string connectionString)
+{
+    try
+    {
+        return ServerVersion.AutoDetect(connectionString);
+    }
+    catch (Exception)
+    {
+        // 降级：与 docker-compose.yml 的 mysql:8.4 主版本对齐
+        return new MySqlServerVersion(new Version(8, 4, 0));
+    }
+}

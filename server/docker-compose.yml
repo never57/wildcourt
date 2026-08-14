@@ -60,12 +60,14 @@ x-api-common: &api-common
   # 收到停止信号后先处理完在途请求（ASP.NET Core 优雅停机）再退出
   stop_grace_period: 30s
   # 健康检查：仅确认进程可响应（不查 DB，避免迁移降级时拖慢就绪判断）；供 deploy.sh 与 --wait 使用
+  # start_period 60s：给 EF Migrate + Kestrel 启动足够宽限期（迁移 ALTER TABLE 可能 1-2 秒，
+  # 但首次部署/大表加索引时可能更久；宽限期失败不计入 retries，避免误判 unhealthy 触发回滚→502）
   healthcheck:
     test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/health"]
     interval: 5s
     timeout: 3s
     retries: 20
-    start_period: 15s
+    start_period: 60s
 
 services:
   mysql:
