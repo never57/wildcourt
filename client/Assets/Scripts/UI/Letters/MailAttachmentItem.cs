@@ -47,8 +47,9 @@ namespace WildCourt.UI.Letters
         {
             if (iconImage != null)
             {
+                // 图标字段已配置则替换 sprite；未配置（null）则保留 Items 预制体默认 sprite，不隐藏
                 if (icon != null) iconImage.sprite = icon;
-                iconImage.gameObject.SetActive(icon != null);
+                iconImage.gameObject.SetActive(true);
             }
             if (typeText != null) typeText.text = name;
             if (countText != null) countText.text = count > 0 ? "x" + count : string.Empty;

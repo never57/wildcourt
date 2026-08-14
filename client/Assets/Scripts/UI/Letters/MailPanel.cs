@@ -210,9 +210,10 @@ namespace WildCourt.UI.Letters
             // 详情区标题：优先 title，为空回退 content
             var title = string.IsNullOrEmpty(letter.title) ? letter.content : letter.title;
             if (detailTitleText != null) detailTitleText.text = title;
-            if (fromText != null) fromText.text = "发件人：" + (letter.fromUserId == 0 ? "官方" : letter.fromNickname);
+            if (fromText != null) fromText.text = "发件人：" + (letter.fromUserId == 0 ? "系统管理员" : letter.fromNickname);
             if (contentText != null) contentText.text = letter.content;
-            if (itemText != null) itemText.text = DescribeReward(letter);
+            // itemText 作为附件区标题，固定显示"附件"
+            if (itemText != null) itemText.text = "附件";
 
             // 附件格子：无附件隐藏，有附件显示并绑定图标/名称/数量
             BindAttachment(letter);
@@ -235,6 +236,9 @@ namespace WildCourt.UI.Letters
             if (!hasReward) return;
 
             if (attachmentPrefab == null) return;
+
+            // 确保附件容器有网格布局（每行 5 个，动态数量自动换行，类似背包）
+            EnsureAttachmentLayout();
 
             // 确保格子实例数量足够（复用已有，不足补实例化，多余隐藏）
             int need = attachments.Length;
@@ -263,6 +267,29 @@ namespace WildCourt.UI.Letters
                     slot.gameObject.SetActive(false);
                 }
             }
+        }
+
+        /// <summary>
+        /// 确保附件容器带网格布局（每行 5 个，动态数量自动换行，类似背包）。
+        /// 用代码动态添加避免在 prefab 里手写 GridLayoutGroup 序列化导致布局不匹配。
+        /// </summary>
+        private void EnsureAttachmentLayout()
+        {
+            if (attachmentRoot == null) return;
+
+            var grid = attachmentRoot.GetComponent<GridLayoutGroup>();
+            if (grid == null)
+            {
+                grid = attachmentRoot.gameObject.AddComponent<GridLayoutGroup>();
+            }
+
+            grid.cellSize = new Vector2(100f, 100f);   // 格子 100x100
+            grid.spacing = new Vector2(10f, 10f);      // 间距 10
+            grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+            grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+            grid.childAlignment = TextAnchor.UpperLeft;
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 5;                  // 每行 5 个
         }
 
         /// <summary>标记信件已读（未读 → 已读），成功后更新本地状态并刷新对应列表项。</summary>
@@ -501,27 +528,6 @@ namespace WildCourt.UI.Letters
                 tipText.gameObject.SetActive(false);
             }
             _tipCoroutine = null;
-        }
-
-        /// <summary>附件描述：按多附件列表展示庭贝/邮券/道具/非遗/无附件。</summary>
-        private static string DescribeReward(LetterItem letter)
-        {
-            if (letter.attachments == null || letter.attachments.Length == 0)
-            {
-                return "随附附件：无";
-            }
-
-            var parts = new System.Collections.Generic.List<string>();
-            foreach (var att in letter.attachments)
-            {
-                switch (att.type)
-                {
-                    case "shell": parts.Add("庭贝 ×" + att.count); break;
-                    case "coupon": parts.Add("邮券 ×" + att.count); break;
-                    case "item": parts.Add((string.IsNullOrEmpty(att.itemId) ? "道具" : att.itemId) + " ×" + att.count); break;
-                }
-            }
-            return "随附附件：" + (parts.Count > 0 ? string.Join("、", parts) : "无");
         }
 
         // ---------- Lua 值转换 ----------
