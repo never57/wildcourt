@@ -121,7 +121,7 @@
         "com.unity.profiling.core": "1.0.2",
         "com.unity.modules.subsystems": "1.0.0"
       },
-      "url": "https://packages.unity.cn"
+      "url": "https://packages.unity.com"
     },
     "com.unity.adaptiveperformance.google.android": {
       "version": "5.1.6",
@@ -132,7 +132,7 @@
         "com.unity.modules.subsystems": "1.0.0",
         "com.unity.adaptiveperformance": "5.1.0"
       },
-      "url": "https://packages.unity.cn"
+      "url": "https://packages.unity.com"
     },
     "com.unity.ads": {
       "version": "4.4.2",
@@ -255,7 +255,7 @@
       "depth": 1,
       "source": "registry",
       "dependencies": {},
-      "url": "https://packages.unity.cn"
+      "url": "https://packages.unity.com"
     },
     "com.unity.purchasing": {
       "version": "4.11.0",
