@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using WildCourt.Core;
 using WildCourt.Gameplay.Yard;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
@@ -70,6 +71,15 @@ namespace WildCourt.UI.Yard
             }
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            // 订阅货币变化：邮箱领取附件等场景会广播，收到后重拉 profile 对齐权威余额
+            EventBus.Subscribe<CurrencyChangedEvent>(OnCurrencyChanged);
+        }
+
+        /// <summary>货币变化（领取附件/购买等）：重拉玩家资料，保证建筑面板余额显示最新值。</summary>
+        private void OnCurrencyChanged(CurrencyChangedEvent evt)
+        {
+            LoadProfile();
         }
 
         private void BindYard(YardManager yard)
@@ -95,6 +105,7 @@ namespace WildCourt.UI.Yard
             if (_buildButton != null) _buildButton.onClick.RemoveAllListeners();
             if (_mailButton != null) _mailButton.onClick.RemoveAllListeners();
             YardPanel.BackPressed -= OnBuildPanelClosed;
+            EventBus.Unsubscribe<CurrencyChangedEvent>(OnCurrencyChanged);
         }
 
         /// <summary>建造面板返回：隐藏建造面板，恢复显示主 UI。</summary>

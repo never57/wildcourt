@@ -51,10 +51,17 @@ namespace WildCourt.UI.Letters
         [SerializeField, FormerlySerializedAs("giftBackButton")] private Button claimButton;
         [SerializeField, FormerlySerializedAs("backButton")] private Button deleteReadButton;
 
+        [Header("附件格子（DetailRoot 内，展示随附物品）")]
+        [SerializeField] private RectTransform attachmentRoot;   // 附件容器（运行时实例化 Items 格子挂在这里）
+        [SerializeField] private GameObject attachmentPrefab;    // Items 预制体（MailAttachmentItem 组件）
+
         private readonly List<MailItem> _items = new();
         private LetterItem _selected;
         private bool _subscribed;
         private Coroutine _tipCoroutine;
+        private bool _pendingSelectAfterDelete;   // 删除后自动跳转标记
+        private int _preferIndex = -1;            // 删除项在原列表中的位置，删除后选中该位置的项
+        private readonly List<MailAttachmentItem> _attachmentSlots = new();  // 附件格子实例池（复用）
 
         public static MailPanel CreateOrInstantiate()
         {
@@ -150,10 +157,10 @@ namespace WildCourt.UI.Letters
                             letterId = Long(row.Get<object>("letterId")),
                             fromUserId = Long(row.Get<object>("fromUserId")),
                             fromNickname = Str(row.Get<object>("fromNickname")),
+                            title = Str(row.Get<object>("title")),
                             content = Str(row.Get<object>("content")),
-                            itemId = Str(row.Get<object>("itemId")),
-                            rewardType = Str(row.Get<object>("rewardType")),
-                            rewardCount = (int)Long(row.Get<object>("rewardCount")),
+                            // 附件在 Lua 降级分支暂不解析（官方信件链路走 C# REST，见 RenderInbox）
+                            attachments = null,
                             status = Str(row.Get<object>("status")),
                             createdAt = Long(row.Get<object>("createdAt")),
                         };
@@ -203,14 +210,58 @@ namespace WildCourt.UI.Letters
             // 详情区标题：优先 title，为空回退 content
             var title = string.IsNullOrEmpty(letter.title) ? letter.content : letter.title;
             if (detailTitleText != null) detailTitleText.text = title;
-            if (fromText != null) fromText.text = "寄件人：" + (letter.fromUserId == 0 ? "官方" : letter.fromNickname);
+            if (fromText != null) fromText.text = "发件人：" + (letter.fromUserId == 0 ? "官方" : letter.fromNickname);
             if (contentText != null) contentText.text = letter.content;
             if (itemText != null) itemText.text = DescribeReward(letter);
+
+            // 附件格子：无附件隐藏，有附件显示并绑定图标/名称/数量
+            BindAttachment(letter);
 
             // 点击即标记已读：未读 → 已读（领取/删除不影响该转换）
             if (letter.status == "未读")
             {
                 MarkRead(letter);
+            }
+        }
+
+        /// <summary>绑定附件格子：无附件隐藏容器；有附件按数量实例化多个 Items 格子并填充。</summary>
+        private void BindAttachment(LetterItem letter)
+        {
+            if (attachmentRoot == null) return;
+
+            var attachments = letter.attachments;
+            bool hasReward = attachments != null && attachments.Length > 0;
+            attachmentRoot.gameObject.SetActive(hasReward);
+            if (!hasReward) return;
+
+            if (attachmentPrefab == null) return;
+
+            // 确保格子实例数量足够（复用已有，不足补实例化，多余隐藏）
+            int need = attachments.Length;
+            while (_attachmentSlots.Count < need)
+            {
+                var go = Instantiate(attachmentPrefab, attachmentRoot);
+                var slot = go.GetComponent<MailAttachmentItem>();
+                if (slot == null)
+                {
+                    Destroy(go);
+                    break;
+                }
+                _attachmentSlots.Add(slot);
+            }
+
+            for (int i = 0; i < _attachmentSlots.Count; i++)
+            {
+                var slot = _attachmentSlots[i];
+                if (i < need)
+                {
+                    slot.gameObject.SetActive(true);
+                    slot.Bind(attachments[i].type, attachments[i].count, attachments[i].itemId);
+                }
+                else
+                {
+                    slot.gameObject.SetActive(false);
+                }
             }
         }
 
@@ -253,7 +304,7 @@ namespace WildCourt.UI.Letters
                 SetHint("已经领取过了哦~");
                 return;
             }
-            if (string.IsNullOrEmpty(_selected.rewardType))
+            if (_selected.attachments == null || _selected.attachments.Length == 0)
             {
                 SetHint("该邮件没有附带物品");
                 return;
@@ -263,15 +314,61 @@ namespace WildCourt.UI.Letters
             {
                 NetManager.Instance.Post<ClaimResponse>(ApiPaths.LetterClaim,
                     new ClaimLetterRequest { letterId = letterId },
-                    resp => { SetHint("领取成功"); ShowList(); },
+                    resp =>
+                    {
+                        // 领取成功后同步本地状态为「已领取」，否则再次点击时 _selected.status
+                        // 仍是旧值（已读），无法命中「已经领取过了」的幂等提示，会重复调领取接口。
+                        _selected.status = "已领取";
+                        RefreshItemStatus(_selected);
+                        SetHint("领取成功");
+
+                        // 领取附件后广播货币变化，通知建筑/农场等依赖庭贝显示的 UI 刷新。
+                        // 服务端 ClaimResponse 不含权威余额，故通过事件触发 YardMainUI 重拉 profile。
+                        NotifyCurrencyChanged(resp.data);
+                        ShowList();
+                    },
                     (code, msg) => SetHint("领取失败: " + msg));
             }
+        }
+
+        /// <summary>
+        /// 领取附件后广播货币变化事件，通知依赖庭贝/邮券显示的 UI（建筑/农场等）刷新。
+        /// 由于服务端 ClaimResponse 不含权威余额，仅做本地预估 + 触发订阅方重拉 profile 对齐权威值。
+        /// </summary>
+        private void NotifyCurrencyChanged(ClaimResponse resp)
+        {
+            // 本地预估：庭贝/邮券按领取数量累加（遍历多附件，type 决定归属）
+            long shellDelta = 0;
+            long couponDelta = 0;
+            if (resp != null && resp.attachments != null)
+            {
+                foreach (var att in resp.attachments)
+                {
+                    if (att.type == "shell") shellDelta += att.count;
+                    else if (att.type == "coupon") couponDelta += att.count;
+                }
+            }
+
+            // 通过 EventBus 广播：订阅方（YardMainUI 等）收到后重拉 profile 对齐权威余额
+            EventBus.Publish(new CurrencyChangedEvent
+            {
+                Shell = shellDelta,
+                Coupon = couponDelta,
+            });
         }
 
         /// <summary>删除已读信件（删除后自动打开下一封/回列表）。</summary>
         private void DeleteRead()
         {
             if (_selected == null) return;
+
+            // 附件有物品且未领取时不允许删除：先领取附件（或明确放弃）才能删除，防止误删丢失奖励
+            if (_selected.attachments != null && _selected.attachments.Length > 0 && _selected.status != "已领取")
+            {
+                SetHint("该信件有未领取的附件，请先领取");
+                return;
+            }
+
             long letterId = _selected.letterId;
             if (NetManager.Instance != null)
             {
@@ -281,10 +378,24 @@ namespace WildCourt.UI.Letters
             }
         }
 
-        /// <summary>删除成功后刷新，停留在列表页。</summary>
+        /// <summary>删除成功后刷新，并自动跳转到相邻信件。</summary>
         private void OnDeleteDone()
         {
+            // 记录删除项在原列表中的位置，刷新后选中同位置（视觉上顶替它）的信件
+            _preferIndex = -1;
+            if (_selected != null)
+            {
+                for (int i = 0; i < _items.Count; i++)
+                {
+                    if (_items[i] != null && _items[i].Letter != null && _items[i].Letter.letterId == _selected.letterId)
+                    {
+                        _preferIndex = i;
+                        break;
+                    }
+                }
+            }
             _selected = null;
+            _pendingSelectAfterDelete = true;
             ShowList();
         }
 
@@ -334,6 +445,39 @@ namespace WildCourt.UI.Letters
 
             // 全部实例化完成后一次性重排布局
             if (layout != null) layout.enabled = true;
+
+            // 自动选中逻辑：
+            // 1) 删除后跳转：按删除项相邻位置选中一封
+            // 2) 打开信箱无选中：自动选中第一封
+            if (_pendingSelectAfterDelete)
+            {
+                _pendingSelectAfterDelete = false;
+                AutoSelectAfterDelete(letters);
+            }
+            else if (_selected == null && letters.Length > 0)
+            {
+                OnLetterClicked(letters[0]);
+            }
+        }
+
+        /// <summary>删除后自动选中相邻信件：优先选中原删除项位置的项，越界选最后一封。</summary>
+        private void AutoSelectAfterDelete(LetterItem[] letters)
+        {
+            if (letters == null || letters.Length == 0)
+            {
+                // 无剩余信件：清空详情
+                if (detailRoot != null) detailRoot.SetActive(false);
+                _selected = null;
+                return;
+            }
+
+            // 删除后列表少一项，原 index 处的项（如果存在）即视觉上顶替删除项的那一封
+            int idx = _preferIndex;
+            if (idx < 0 || idx >= letters.Length)
+            {
+                idx = letters.Length - 1; // 越界（如删的是最后一封）则选新的最后一封
+            }
+            OnLetterClicked(letters[idx]);
         }
 
         private void SetHint(string msg)
@@ -359,16 +503,25 @@ namespace WildCourt.UI.Letters
             _tipCoroutine = null;
         }
 
-        /// <summary>附件描述：按 rewardType 展示庭贝/邮券/道具/非遗/无附件。</summary>
+        /// <summary>附件描述：按多附件列表展示庭贝/邮券/道具/非遗/无附件。</summary>
         private static string DescribeReward(LetterItem letter)
         {
-            switch (letter.rewardType)
+            if (letter.attachments == null || letter.attachments.Length == 0)
             {
-                case "shell": return "随附庭贝：" + letter.rewardCount;
-                case "coupon": return "随附邮券：" + letter.rewardCount;
-                case "item": return "随附道具：" + (string.IsNullOrEmpty(letter.itemId) ? "未知" : letter.itemId) + " ×" + letter.rewardCount;
-                default: return "随附附件：无";
+                return "随附附件：无";
             }
+
+            var parts = new System.Collections.Generic.List<string>();
+            foreach (var att in letter.attachments)
+            {
+                switch (att.type)
+                {
+                    case "shell": parts.Add("庭贝 ×" + att.count); break;
+                    case "coupon": parts.Add("邮券 ×" + att.count); break;
+                    case "item": parts.Add((string.IsNullOrEmpty(att.itemId) ? "道具" : att.itemId) + " ×" + att.count); break;
+                }
+            }
+            return "随附附件：" + (parts.Count > 0 ? string.Join("、", parts) : "无");
         }
 
         // ---------- Lua 值转换 ----------

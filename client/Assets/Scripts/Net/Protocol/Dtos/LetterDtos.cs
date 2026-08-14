@@ -12,6 +12,14 @@ namespace WildCourt.Net.Protocol
     }
 
     [Serializable]
+    public class LetterAttachmentDto
+    {
+        public string type;     // shell/coupon/item
+        public string itemId;   // type=item 时的道具/非遗 ID
+        public int count;       // 数量
+    }
+
+    [Serializable]
     public class LetterItem
     {
         public long letterId;
@@ -19,10 +27,8 @@ namespace WildCourt.Net.Protocol
         public string fromNickname;
         public string title;
         public string content;
-        public string itemId;     // rewardType=item 时的道具/非遗 ID
-        public string rewardType; // shell/coupon/item/空
-        public int rewardCount;   // shell/coupon 为货币数额，item 为背包数量
-        public string status;     // 送达/已领取/已删除
+        public LetterAttachmentDto[] attachments; // 附件列表（多附件），空 = 无附件
+        public string status;     // 未读/已读/已领取/已删除
         public long createdAt;
     }
 
@@ -51,9 +57,7 @@ namespace WildCourt.Net.Protocol
     public class ClaimResponse
     {
         public long letterId;
-        public string rewardType; // shell/coupon/item/空
-        public string itemId;     // rewardType=item 时领取到的道具/非遗
-        public int count;         // 领取数量
+        public LetterAttachmentDto[] attachments; // 领取到的附件列表（多附件）
     }
 
     [Serializable]

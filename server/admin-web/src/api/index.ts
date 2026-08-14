@@ -348,22 +348,24 @@ export const announcementApi = {
 
 // ================= 官方信件 =================
 
+export interface LetterAttachment {
+  type: 'shell' | 'coupon' | 'item'
+  itemId?: string
+  count: number
+}
+
 export interface OfficialLetterPayload {
   toUserId: number
   title?: string
   content: string
-  rewardType?: 'shell' | 'coupon' | 'item'
-  rewardCount: number
-  itemId?: string
+  attachments: LetterAttachment[]
 }
 
 export interface OfficialLetterBatchPayload {
   toUserIds: number[]
   title?: string
   content: string
-  rewardType?: 'shell' | 'coupon' | 'item'
-  rewardCount: number
-  itemId?: string
+  attachments: LetterAttachment[]
 }
 
 export interface BroadcastFilter {
@@ -376,9 +378,7 @@ export interface BroadcastFilter {
 export interface OfficialLetterBroadcastPayload {
   title?: string
   content: string
-  rewardType?: 'shell' | 'coupon' | 'item'
-  rewardCount: number
-  itemId?: string
+  attachments: LetterAttachment[]
   filter?: BroadcastFilter
 }
 

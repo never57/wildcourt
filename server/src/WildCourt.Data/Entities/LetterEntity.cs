@@ -18,13 +18,8 @@ public class LetterEntity
 
     public string Content { get; set; } = string.Empty;
 
-    public string? ItemId { get; set; }
-
-    /// <summary>附件类型：shell（庭贝）/ coupon（邮券）/ item（背包道具/非遗）；空 = 无附件。</summary>
-    public string? RewardType { get; set; }
-
-    /// <summary>附件数量（shell/coupon 为货币数额，item 为背包数量）。</summary>
-    public int RewardCount { get; set; }
+    /// <summary>附件列表（多附件，JSON 序列化）。空 = 无附件。</summary>
+    public List<LetterAttachment> Attachments { get; set; } = new();
 
     /// <summary>撰写中 / 待审核 / 通过 / 退回 / 送达</summary>
     public string Status { get; set; } = string.Empty;

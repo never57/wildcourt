@@ -400,7 +400,7 @@ public class AnnouncementRequest
 
 // ============ 官方信件 ============
 
-/// <summary>官方发信请求：直接送达玩家信箱，可携带附件（庭贝/邮券/道具/非遗）。</summary>
+/// <summary>官方发信请求：直接送达玩家信箱，可携带多附件（庭贝/邮券/道具/非遗）。</summary>
 public class OfficialLetterRequest
 {
     /// <summary>收件玩家 ID。</summary>
@@ -412,14 +412,8 @@ public class OfficialLetterRequest
     /// <summary>信件正文。</summary>
     public string Content { get; set; } = string.Empty;
 
-    /// <summary>附件类型：shell（庭贝）/ coupon（邮券）/ item（道具/非遗）；空 = 无附件。</summary>
-    public string? RewardType { get; set; }
-
-    /// <summary>附件数量（shell/coupon 为货币数额，item 为背包数量）。</summary>
-    public int RewardCount { get; set; }
-
-    /// <summary>道具/非遗 ID（reward_type=item 时必填）。</summary>
-    public string? ItemId { get; set; }
+    /// <summary>附件列表（多附件，类型不可重复）。空 = 无附件。</summary>
+    public List<LetterAttachmentDto> Attachments { get; set; } = new();
 }
 
 /// <summary>批量发信请求：向多个玩家发送同一封官方信件。</summary>
@@ -434,14 +428,8 @@ public class OfficialLetterBatchRequest
     /// <summary>信件正文。</summary>
     public string Content { get; set; } = string.Empty;
 
-    /// <summary>附件类型：shell/coupon/item；空 = 无附件。</summary>
-    public string? RewardType { get; set; }
-
-    /// <summary>附件数量。</summary>
-    public int RewardCount { get; set; }
-
-    /// <summary>道具/非遗 ID（reward_type=item 时必填）。</summary>
-    public string? ItemId { get; set; }
+    /// <summary>附件列表（多附件，类型不可重复）。空 = 无附件。</summary>
+    public List<LetterAttachmentDto> Attachments { get; set; } = new();
 }
 
 /// <summary>按条件群发请求：按筛选条件匹配玩家后群发官方信件。</summary>
@@ -453,14 +441,8 @@ public class OfficialLetterBroadcastRequest
     /// <summary>信件正文。</summary>
     public string Content { get; set; } = string.Empty;
 
-    /// <summary>附件类型：shell/coupon/item；空 = 无附件。</summary>
-    public string? RewardType { get; set; }
-
-    /// <summary>附件数量。</summary>
-    public int RewardCount { get; set; }
-
-    /// <summary>道具/非遗 ID（reward_type=item 时必填）。</summary>
-    public string? ItemId { get; set; }
+    /// <summary>附件列表（多附件，类型不可重复）。空 = 无附件。</summary>
+    public List<LetterAttachmentDto> Attachments { get; set; } = new();
 
     /// <summary>筛选条件（可空 = 全部玩家）。</summary>
     public BroadcastFilter? Filter { get; set; }

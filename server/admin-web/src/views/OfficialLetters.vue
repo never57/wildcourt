@@ -7,7 +7,7 @@
     </template>
 
     <el-alert type="info" :closable="false" show-icon class="tip">
-      向玩家发送官方信件（直接送达，不经审核）。支持单发、多选批量发信、按条件群发。附件可选：庭贝 / 邮券 / 道具 / 非遗。
+      向玩家发送官方信件（直接送达，不经审核）。支持单发、多选批量发信、按条件群发。附件可携带多种：庭贝 / 邮券 / 道具 / 非遗。
     </el-alert>
 
     <el-tabs v-model="mode">
@@ -56,21 +56,8 @@
             <el-input v-model="form.content" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="信件正文" />
           </el-form-item>
 
-          <el-form-item label="附件类型">
-            <el-radio-group v-model="form.rewardType">
-              <el-radio value="">无附件</el-radio>
-              <el-radio value="shell">庭贝</el-radio>
-              <el-radio value="coupon">邮券</el-radio>
-              <el-radio value="item">道具 / 非遗</el-radio>
-            </el-radio-group>
-          </el-form-item>
-
-          <el-form-item v-if="form.rewardType" label="附件数量" prop="rewardCount">
-            <el-input-number v-model="form.rewardCount" :min="1" :max="99999999" style="width: 200px" />
-          </el-form-item>
-
-          <el-form-item v-if="form.rewardType === 'item'" label="道具ID" prop="itemId">
-            <el-input v-model="form.itemId" placeholder="道具/非遗 ID，如 decoration_xxx 或 crop_xxx" maxlength="64" />
+          <el-form-item label="附件">
+            <AttachmentEditor v-model="form.attachments" />
           </el-form-item>
 
           <el-form-item>
@@ -111,21 +98,8 @@
             <el-input v-model="broadcastForm.content" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="信件正文" />
           </el-form-item>
 
-          <el-form-item label="附件类型">
-            <el-radio-group v-model="broadcastForm.rewardType">
-              <el-radio value="">无附件</el-radio>
-              <el-radio value="shell">庭贝</el-radio>
-              <el-radio value="coupon">邮券</el-radio>
-              <el-radio value="item">道具 / 非遗</el-radio>
-            </el-radio-group>
-          </el-form-item>
-
-          <el-form-item v-if="broadcastForm.rewardType" label="附件数量" prop="rewardCount">
-            <el-input-number v-model="broadcastForm.rewardCount" :min="1" :max="99999999" style="width: 200px" />
-          </el-form-item>
-
-          <el-form-item v-if="broadcastForm.rewardType === 'item'" label="道具ID" prop="itemId">
-            <el-input v-model="broadcastForm.itemId" placeholder="道具/非遗 ID" maxlength="64" />
+          <el-form-item label="附件">
+            <AttachmentEditor v-model="broadcastForm.attachments" />
           </el-form-item>
 
           <el-form-item>
@@ -142,7 +116,8 @@
 import { reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { letterApi, playerApi, type PlayerItem, type BatchOperationResult } from '@/api'
+import AttachmentEditor from '@/components/AttachmentEditor.vue'
+import { letterApi, playerApi, type PlayerItem, type BatchOperationResult, type LetterAttachment } from '@/api'
 
 const mode = ref<'direct' | 'broadcast'>('direct')
 const formRef = ref<FormInstance>()
@@ -153,16 +128,12 @@ const form = reactive({
   toUserIds: [] as number[],
   title: '',
   content: '',
-  rewardType: '' as '' | 'shell' | 'coupon' | 'item',
-  rewardCount: 1,
-  itemId: '',
+  attachments: [] as LetterAttachment[],
 })
 
 const rules: FormRules = {
   toUserIds: [{ required: true, message: '请选择至少一个收件玩家', trigger: 'change' }],
   content: [{ required: true, message: '请输入信件内容', trigger: 'blur' }],
-  rewardCount: [{ required: true, message: '请输入附件数量', trigger: 'blur' }],
-  itemId: [{ required: true, message: '请输入道具/非遗 ID', trigger: 'blur' }],
 }
 
 // ---- 条件群发表单 ----
@@ -172,15 +143,11 @@ const broadcastForm = reactive({
   isBanned: undefined as boolean | undefined,
   title: '',
   content: '',
-  rewardType: '' as '' | 'shell' | 'coupon' | 'item',
-  rewardCount: 1,
-  itemId: '',
+  attachments: [] as LetterAttachment[],
 })
 
 const broadcastRules: FormRules = {
   content: [{ required: true, message: '请输入信件内容', trigger: 'blur' }],
-  rewardCount: [{ required: true, message: '请输入附件数量', trigger: 'blur' }],
-  itemId: [{ required: true, message: '请输入道具/非遗 ID', trigger: 'blur' }],
 }
 
 const playerKeyword = ref('')
@@ -210,9 +177,7 @@ async function submit() {
       toUserIds: form.toUserIds,
       title: form.title || undefined,
       content: form.content,
-      rewardType: form.rewardType || undefined,
-      rewardCount: form.rewardType ? form.rewardCount : 0,
-      itemId: form.rewardType === 'item' ? form.itemId : undefined,
+      attachments: form.attachments,
     })
     ElMessage.success(`已发送 ${result.succeeded} 封${result.failed ? `，失败 ${result.failed} 封` : ''}`)
     if (result.failed) {
@@ -244,9 +209,7 @@ async function submitBroadcast() {
     const result: BatchOperationResult = await letterApi.broadcast({
       title: broadcastForm.title || undefined,
       content: broadcastForm.content,
-      rewardType: broadcastForm.rewardType || undefined,
-      rewardCount: broadcastForm.rewardType ? broadcastForm.rewardCount : 0,
-      itemId: broadcastForm.rewardType === 'item' ? broadcastForm.itemId : undefined,
+      attachments: broadcastForm.attachments,
       filter: {
         minLevel: broadcastForm.minLevel,
         maxLevel: broadcastForm.maxLevel,
@@ -266,9 +229,7 @@ function reset() {
   form.toUserIds = []
   form.title = ''
   form.content = ''
-  form.rewardType = ''
-  form.rewardCount = 1
-  form.itemId = ''
+  form.attachments = []
   playerKeyword.value = ''
   playerOptions.value = []
   formRef.value?.clearValidate()
@@ -280,9 +241,7 @@ function resetBroadcast() {
   broadcastForm.isBanned = undefined
   broadcastForm.title = ''
   broadcastForm.content = ''
-  broadcastForm.rewardType = ''
-  broadcastForm.rewardCount = 1
-  broadcastForm.itemId = ''
+  broadcastForm.attachments = []
   broadcastFormRef.value?.clearValidate()
 }
 </script>

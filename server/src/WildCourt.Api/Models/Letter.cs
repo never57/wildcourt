@@ -21,18 +21,26 @@ public class Letter
 
     public string Content { get; set; } = string.Empty;
 
-    public string? ItemId { get; set; }
-
-    /// <summary>附件类型：shell（庭贝）/ coupon（邮券）/ item（背包道具/非遗）；空 = 无附件。</summary>
-    public string? RewardType { get; set; }
-
-    /// <summary>附件数量（shell/coupon 为货币数额，item 为背包数量）。</summary>
-    public int RewardCount { get; set; }
+    /// <summary>附件列表（多附件）。空 = 无附件。</summary>
+    public List<LetterAttachmentDto> Attachments { get; set; } = new();
 
     public string Status { get; set; } = string.Empty;
 
     /// <summary>创建时间（毫秒时间戳，对齐客户端 long createdAt）。</summary>
     public long CreatedAt { get; set; }
+}
+
+/// <summary>附件项（响应契约，camelCase 输出，与客户端 LetterItem.attachments 元素对齐）。</summary>
+public class LetterAttachmentDto
+{
+    /// <summary>附件类型：shell / coupon / item。</summary>
+    public string Type { get; set; } = string.Empty;
+
+    /// <summary>道具/非遗 ID（type=item 时有值）。</summary>
+    public string? ItemId { get; set; }
+
+    /// <summary>数量。</summary>
+    public int Count { get; set; }
 }
 
 /// <summary>收件箱响应（与客户端 InboxResponse 对齐）。</summary>
@@ -52,12 +60,6 @@ public class ClaimResponse
 {
     public long LetterId { get; set; }
 
-    /// <summary>附件类型：shell / coupon / item；空 = 无附件。</summary>
-    public string RewardType { get; set; } = string.Empty;
-
-    /// <summary>领取到的道具/非遗 ID（reward_type=item 时有值）。</summary>
-    public string ItemId { get; set; } = string.Empty;
-
-    /// <summary>领取数量（shell/coupon 为货币数额，item 为背包数量）。</summary>
-    public int Count { get; set; }
+    /// <summary>领取到的附件列表（多附件）。</summary>
+    public List<LetterAttachmentDto> Attachments { get; set; } = new();
 }

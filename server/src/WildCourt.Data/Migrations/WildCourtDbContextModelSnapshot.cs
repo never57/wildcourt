@@ -293,6 +293,10 @@ namespace WildCourt.Data.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("LetterId"));
 
+                    b.Property<string>("Attachments")
+                        .HasColumnType("longtext")
+                        .HasColumnName("attachments");
+
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -306,20 +310,6 @@ namespace WildCourt.Data.Migrations
                     b.Property<long>("FromUser")
                         .HasColumnType("bigint")
                         .HasColumnName("from_user");
-
-                    b.Property<string>("ItemId")
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)")
-                        .HasColumnName("item_id");
-
-                    b.Property<int>("RewardCount")
-                        .HasColumnType("int")
-                        .HasColumnName("reward_count");
-
-                    b.Property<string>("RewardType")
-                        .HasMaxLength(16)
-                        .HasColumnType("varchar(16)")
-                        .HasColumnName("reward_type");
 
                     b.Property<string>("Status")
                         .IsRequired()

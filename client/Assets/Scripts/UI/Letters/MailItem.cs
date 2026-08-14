@@ -11,6 +11,7 @@ namespace WildCourt.UI.Letters
         [SerializeField] private Text contentText;
         [SerializeField] private Text statusText;
         [SerializeField] private Text timeText;
+        [SerializeField] private GameObject statusImage;
         [SerializeField] private Button button;
 
         public LetterItem Letter { get; private set; }
@@ -18,11 +19,13 @@ namespace WildCourt.UI.Letters
         public void Bind(LetterItem letter, System.Action<LetterItem> onClick)
         {
             Letter = letter;
-            if (fromText != null) fromText.text = letter.fromUserId == 0 ? "官方" : letter.fromNickname;
+            if (fromText != null) fromText.text = "发件人：" + (letter.fromUserId == 0 ? "官方" : letter.fromNickname);
             // 列表项 contentText 显示标题：优先 title，为空回退 content
             if (contentText != null) contentText.text = string.IsNullOrEmpty(letter.title) ? letter.content : letter.title;
             if (statusText != null) statusText.text = letter.status;
             if (timeText != null) timeText.text = FormatTime(letter.createdAt);
+            // 未读红点/标记：仅「未读」状态显示，其余（已读/已领取等）隐藏
+            if (statusImage != null) statusImage.SetActive(letter.status == "未读");
             if (button != null)
             {
                 button.onClick.RemoveAllListeners();

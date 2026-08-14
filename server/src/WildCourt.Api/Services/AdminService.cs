@@ -717,11 +717,11 @@ public class AdminService
 
     /// <summary>
     /// 官方发信：向指定玩家直接送达一封官方信件（from_user=0 标记系统），
-    /// 附件按 reward_type 携带（shell/coupon/item）。状态直接为“未读”，不经审核。
+    /// 附件按 attachments 携带多附件（shell/coupon/item，类型不可重复）。状态直接为“未读”，不经审核。
     /// </summary>
     public async Task<long> SendOfficialLetterAsync(OfficialLetterRequest req)
     {
-        var rewardType = ValidateLetterPayload(req.Content, req.RewardType, req.RewardCount, req.ItemId);
+        var attachments = ValidateLetterAttachments(req.Content, req.Attachments);
 
         var exists = await _db.Users.AnyAsync(u => u.UserId == req.ToUserId);
         if (!exists)
@@ -729,7 +729,7 @@ public class AdminService
             throw new BusinessException(ApiCodes.NotFound, "收件玩家不存在");
         }
 
-        var entity = BuildLetter(req.ToUserId, req.Title, req.Content.Trim(), rewardType, req.RewardCount, req.ItemId);
+        var entity = BuildLetter(req.ToUserId, req.Title, req.Content.Trim(), attachments);
         _db.Letters.Add(entity);
         await _db.SaveChangesAsync();
         return entity.LetterId;
@@ -747,7 +747,7 @@ public class AdminService
             throw new BusinessException(ApiCodes.BadRequest, "单次最多批量发送 500 个玩家");
         }
 
-        var rewardType = ValidateLetterPayload(req.Content, req.RewardType, req.RewardCount, req.ItemId);
+        var attachments = ValidateLetterAttachments(req.Content, req.Attachments);
         var ids = req.ToUserIds.Distinct().ToList();
         var existing = await _db.Users
             .Where(u => ids.Contains(u.UserId))
@@ -764,7 +764,7 @@ public class AdminService
                 result.Failures.Add(new BatchFailure { UserId = id, Reason = "玩家不存在" });
                 continue;
             }
-            _db.Letters.Add(BuildLetter(id, req.Title, req.Content.Trim(), rewardType, req.RewardCount, req.ItemId));
+            _db.Letters.Add(BuildLetter(id, req.Title, req.Content.Trim(), attachments));
             result.Succeeded++;
         }
 
@@ -775,7 +775,7 @@ public class AdminService
     /// <summary>按条件群发：按筛选条件匹配玩家后群发官方信件。</summary>
     public async Task<BatchOperationResult> BroadcastOfficialLetterAsync(OfficialLetterBroadcastRequest req)
     {
-        var rewardType = ValidateLetterPayload(req.Content, req.RewardType, req.RewardCount, req.ItemId);
+        var attachments = ValidateLetterAttachments(req.Content, req.Attachments);
 
         var query = _db.Users.AsQueryable();
         var filter = req.Filter;
@@ -800,7 +800,7 @@ public class AdminService
         var now = DateTime.UtcNow;
         foreach (var id in ids)
         {
-            _db.Letters.Add(BuildLetter(id, req.Title, req.Content.Trim(), rewardType, req.RewardCount, req.ItemId, now));
+            _db.Letters.Add(BuildLetter(id, req.Title, req.Content.Trim(), attachments, now));
         }
 
         await _db.SaveChangesAsync();
@@ -921,36 +921,60 @@ public class AdminService
         }
     }
 
-    /// <summary>校验信件正文/附件参数，返回规范化后的 rewardType（null=无附件）。</summary>
-    private static string? ValidateLetterPayload(string? content, string? rewardTypeRaw, int rewardCount, string? itemId)
+    /// <summary>校验信件正文/多附件参数，返回规范化后的附件实体列表（空=无附件）。</summary>
+    private static List<LetterAttachment> ValidateLetterAttachments(string? content, List<LetterAttachmentDto>? attachments)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
             throw new BusinessException(ApiCodes.BadRequest, "信件内容不能为空");
         }
 
-        var rewardType = string.IsNullOrWhiteSpace(rewardTypeRaw) ? null : rewardTypeRaw.Trim();
+        if (attachments == null || attachments.Count == 0)
+        {
+            return new List<LetterAttachment>();
+        }
+
         var allowedTypes = new[] { "shell", "coupon", "item" };
-        if (rewardType != null && !allowedTypes.Contains(rewardType))
+        var result = new List<LetterAttachment>();
+        var seenTypes = new HashSet<string>();
+
+        foreach (var a in attachments)
         {
-            throw new BusinessException(ApiCodes.BadRequest, "附件类型不合法（可选：shell/coupon/item）");
+            var type = (a.Type ?? string.Empty).Trim();
+            if (!allowedTypes.Contains(type))
+            {
+                throw new BusinessException(ApiCodes.BadRequest, "附件类型不合法（可选：shell/coupon/item）");
+            }
+            if (a.Count <= 0)
+            {
+                throw new BusinessException(ApiCodes.BadRequest, "附件数量必须大于 0");
+            }
+            if (type == "item" && string.IsNullOrWhiteSpace(a.ItemId))
+            {
+                throw new BusinessException(ApiCodes.BadRequest, "道具附件需指定 ItemId");
+            }
+
+            // 类型不可重复：shell/coupon 全局唯一；item 按 ItemId 唯一
+            var dupKey = type == "item" ? $"item:{a.ItemId}" : type;
+            if (!seenTypes.Add(dupKey))
+            {
+                throw new BusinessException(ApiCodes.BadRequest, $"附件类型重复：{type}");
+            }
+
+            result.Add(new LetterAttachment
+            {
+                Type = type,
+                ItemId = type == "item" ? a.ItemId?.Trim() : null,
+                Count = a.Count,
+            });
         }
 
-        if (rewardType == "item" && string.IsNullOrWhiteSpace(itemId))
-        {
-            throw new BusinessException(ApiCodes.BadRequest, "道具附件需指定 ItemId");
-        }
-        if (rewardType != null && rewardCount <= 0)
-        {
-            throw new BusinessException(ApiCodes.BadRequest, "附件数量必须大于 0");
-        }
-
-        return rewardType;
+        return result;
     }
 
     /// <summary>构造信件实体（from_user=0 表示官方，状态未读）。</summary>
     private static LetterEntity BuildLetter(long toUserId, string? title, string content,
-        string? rewardType, int rewardCount, string? itemId, DateTime? createdAt = null)
+        List<LetterAttachment> attachments, DateTime? createdAt = null)
     {
         return new LetterEntity
         {
@@ -958,9 +982,7 @@ public class AdminService
             ToUser = toUserId,
             Title = string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
             Content = content,
-            ItemId = rewardType == "item" ? itemId : null,
-            RewardType = rewardType,
-            RewardCount = rewardType == null ? 0 : rewardCount,
+            Attachments = attachments,
             Status = "未读",
             CreatedAt = createdAt ?? DateTime.UtcNow,
         };

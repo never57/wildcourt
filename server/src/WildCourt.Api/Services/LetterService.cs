@@ -72,9 +72,12 @@ public class LetterService
                 ToUserId = l.ToUser,
                 Title = l.Title ?? string.Empty,
                 Content = l.Content,
-                ItemId = l.ItemId,
-                RewardType = l.RewardType,
-                RewardCount = l.RewardCount,
+                Attachments = l.Attachments.Select(a => new LetterAttachmentDto
+                {
+                    Type = a.Type,
+                    ItemId = a.ItemId,
+                    Count = a.Count,
+                }).ToList(),
                 Status = l.Status,
                 CreatedAt = new DateTimeOffset(l.CreatedAt).ToUnixTimeMilliseconds(),
             }).ToList(),
@@ -111,35 +114,40 @@ public class LetterService
             throw new BusinessException(ApiCodes.NotFound, "信件不存在");
         }
 
-        var rewardType = string.IsNullOrWhiteSpace(letter.RewardType) ? null : letter.RewardType;
+        var attachments = letter.Attachments ?? new List<LetterAttachment>();
         if (letter.Status == StatusClaimed)
         {
             // 幂等：已领取直接返回，不重复发奖
-            return new ClaimResponse
-            {
-                LetterId = letterId,
-                RewardType = rewardType ?? string.Empty,
-                ItemId = rewardType == RewardItem ? (letter.ItemId ?? string.Empty) : string.Empty,
-                Count = letter.RewardCount,
-            };
+            return BuildClaimResponse(letterId, attachments);
         }
 
-        if (rewardType != null)
+        if (attachments.Count > 0)
         {
             var user = await _db.Users.FindAsync(userId)
                 ?? throw new BusinessException(ApiCodes.NotFound, "用户不存在");
-            GrantReward(user, letter, rewardType);
+            foreach (var att in attachments)
+            {
+                GrantReward(user, att);
+            }
         }
 
         letter.Status = StatusClaimed;
         await _db.SaveChangesAsync();
 
+        return BuildClaimResponse(letterId, attachments);
+    }
+
+    private static ClaimResponse BuildClaimResponse(long letterId, List<LetterAttachment> attachments)
+    {
         return new ClaimResponse
         {
             LetterId = letterId,
-            RewardType = rewardType ?? string.Empty,
-            ItemId = rewardType == RewardItem ? (letter.ItemId ?? string.Empty) : string.Empty,
-            Count = letter.RewardCount,
+            Attachments = attachments.Select(a => new LetterAttachmentDto
+            {
+                Type = a.Type,
+                ItemId = a.ItemId,
+                Count = a.Count,
+            }).ToList(),
         };
     }
 
@@ -161,14 +169,15 @@ public class LetterService
         await _db.SaveChangesAsync();
     }
 
-    /// <summary>按附件类型分派发放（对齐 SignInService/ShopService 模式）。</summary>
-    private void GrantReward(UserEntity user, LetterEntity letter, string rewardType)
+    /// <summary>按单个附件发放（对齐 SignInService/ShopService 模式）。</summary>
+    private void GrantReward(UserEntity user, LetterAttachment attachment)
     {
-        var count = letter.RewardCount;
+        var count = attachment.Count;
         if (count <= 0)
         {
             return;
         }
+        var rewardType = attachment.Type;
 
         if (rewardType == RewardShell)
         {
@@ -182,7 +191,7 @@ public class LetterService
         }
         else if (rewardType == RewardItem)
         {
-            var itemId = letter.ItemId;
+            var itemId = attachment.ItemId;
             if (string.IsNullOrWhiteSpace(itemId))
             {
                 throw new BusinessException(ApiCodes.ServerError, "附件道具 ID 缺失");

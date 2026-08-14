@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using WildCourt.Data.Entities;
 
@@ -148,9 +149,13 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.ToUser).HasColumnName("to_user").IsRequired();
             e.Property(x => x.Title).HasColumnName("title").HasMaxLength(100);
             e.Property(x => x.Content).HasColumnName("content").HasMaxLength(200).IsRequired();
-            e.Property(x => x.ItemId).HasColumnName("item_id").HasMaxLength(64);
-            e.Property(x => x.RewardType).HasColumnName("reward_type").HasMaxLength(16);
-            e.Property(x => x.RewardCount).HasColumnName("reward_count").IsRequired();
+            // 多附件：List<LetterAttachment> 序列化为 JSON 文本存储（旧 item_id/reward_type/reward_count 三列已迁移删除）
+            e.Property(x => x.Attachments)
+                .HasColumnName("attachments")
+                .HasColumnType("longtext")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v ?? new List<LetterAttachment>(), (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<LetterAttachment>>(v, (JsonSerializerOptions?)null) ?? new List<LetterAttachment>());
             e.Property(x => x.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         });
