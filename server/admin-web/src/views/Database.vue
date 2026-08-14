@@ -30,8 +30,14 @@
                 <template #default="{ data }">
                   <span class="tree-node">
                     <span class="tree-label">{{ data.label }}</span>
-                    <el-tag v-if="data.tableName && data.comment" size="small" type="info" effect="plain" class="tree-comment">
-                      {{ data.comment }}
+                    <el-tag
+                      v-if="data.tableName && (data.comment || tableZh(data.label) !== data.label)"
+                      size="small"
+                      type="info"
+                      effect="plain"
+                      class="tree-comment"
+                    >
+                      {{ data.comment || tableZh(data.label) }}
                     </el-tag>
                   </span>
                 </template>
@@ -43,7 +49,9 @@
                 <div class="table-toolbar">
                   <div class="table-title">
                     <span class="table-name">{{ currentDb }}.<b>{{ currentTable }}</b></span>
-                    <el-tag v-if="tableComment" size="small" type="info" effect="plain">{{ tableComment }}</el-tag>
+                    <el-tag v-if="tableComment || tableZh(currentTable) !== currentTable" size="small" type="info" effect="plain">
+                      {{ tableComment || tableZh(currentTable) }}
+                    </el-tag>
                     <span class="table-total">共 {{ total }} 行</span>
                   </div>
                   <div class="toolbar-actions">
@@ -86,11 +94,12 @@
                   <el-table-column v-for="col in columns" :key="col.name" :prop="col.name" min-width="150" show-overflow-tooltip sortable="custom">
                     <template #header>
                       <el-tooltip
-                        :content="`${col.columnType}${col.nullable ? ' · 可空' : ''}${col.comment ? ' · ' + col.comment : ''}`"
+                        :content="`${col.name} · ${col.columnType}${col.nullable ? ' · 可空' : ''}${col.comment ? ' · ' + col.comment : ''}`"
                         placement="top"
                       >
                         <span class="col-header">
-                          {{ col.name }}
+                          <span class="col-name">{{ col.name }}</span>
+                          <span v-if="columnZh(col.name) !== col.name" class="col-zh">{{ columnZh(col.name) }}</span>
                           <el-tag v-if="col.isPrimaryKey" size="small" type="warning">PK</el-tag>
                         </span>
                       </el-tooltip>
@@ -217,7 +226,7 @@ CREATE TABLE IF NOT EXISTS `gift_codes` (
       :close-on-click-modal="false"
     >
       <el-form label-width="170px" label-position="left" class="edit-form">
-        <el-form-item v-for="col in columns" :key="col.name" :label="col.name">
+        <el-form-item v-for="col in columns" :key="col.name" :label="`${col.name}${columnZh(col.name) !== col.name ? ' · ' + columnZh(col.name) : ''}`">
           <template v-if="isBoolCol(col)">
             <el-switch v-model="editForm[col.name]" />
           </template>
@@ -255,7 +264,12 @@ CREATE TABLE IF NOT EXISTS `gift_codes` (
       </el-alert>
       <div v-for="(f, i) in filterRows" :key="i" class="filter-row">
         <el-select v-model="f.column" placeholder="列" filterable style="width: 170px" @change="onFilterColumnChange(f)">
-          <el-option v-for="c in columns" :key="c.name" :label="c.name" :value="c.name" />
+          <el-option
+            v-for="c in columns"
+            :key="c.name"
+            :label="columnZh(c.name) !== c.name ? `${c.name} · ${columnZh(c.name)}` : c.name"
+            :value="c.name"
+          />
         </el-select>
         <el-select v-model="f.op" style="width: 130px">
           <el-option v-for="op in filterOps" :key="op.value" :label="op.label" :value="op.value" />
@@ -278,7 +292,11 @@ CREATE TABLE IF NOT EXISTS `gift_codes` (
         <div class="schema-title">{{ schemaData.database }}.<b>{{ schemaData.table }}</b></div>
         <h4 class="schema-sub">列定义（{{ schemaData.columns.length }}）</h4>
         <el-table :data="schemaData.columns" border stripe size="small" max-height="320">
-          <el-table-column prop="name" label="列名" width="160" />
+          <el-table-column label="列名" width="180">
+            <template #default="{ row }">
+              {{ row.name }}<span v-if="columnZh(row.name) !== row.name" class="col-zh-inline"> · {{ columnZh(row.name) }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="columnType" label="类型" width="150" />
           <el-table-column label="可空" width="70" align="center">
             <template #default="{ row }">
@@ -292,7 +310,11 @@ CREATE TABLE IF NOT EXISTS `gift_codes` (
             </template>
           </el-table-column>
           <el-table-column prop="defaultValue" label="默认值" width="130" show-overflow-tooltip />
-          <el-table-column prop="comment" label="备注" min-width="160" show-overflow-tooltip />
+          <el-table-column label="备注" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">
+              {{ row.comment || (columnZh(row.name) !== row.name ? columnZh(row.name) : '') }}
+            </template>
+          </el-table-column>
         </el-table>
         <h4 class="schema-sub">索引（{{ schemaData.indexes.length }}）</h4>
         <el-table :data="schemaData.indexes" border stripe size="small" max-height="240">
@@ -328,6 +350,7 @@ import {
   type TableSchemaResult,
 } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { tableZh, columnZh } from '@/utils/dbDict'
 
 const authStore = useAuthStore()
 const canExecute = computed(() => authStore.hasPermission('database:execute'))
@@ -878,6 +901,20 @@ async function removeRow(row: Record<string, unknown>) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.col-name {
+  font-weight: 600;
+}
+
+.col-zh {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.col-zh-inline {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 
 .cell-null {
