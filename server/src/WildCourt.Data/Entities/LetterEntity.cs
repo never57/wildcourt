@@ -18,8 +18,8 @@ public class LetterEntity
 
     public string Content { get; set; } = string.Empty;
 
-    /// <summary>附件列表（多附件，JSON 序列化）。空 = 无附件。</summary>
-    public List<LetterAttachment> Attachments { get; set; } = new();
+    /// <summary>附件列表（多附件，JSON 序列化）。null/空 = 无附件。</summary>
+    public List<LetterAttachment>? Attachments { get; set; }
 
     /// <summary>撰写中 / 待审核 / 通过 / 退回 / 送达</summary>
     public string Status { get; set; } = string.Empty;

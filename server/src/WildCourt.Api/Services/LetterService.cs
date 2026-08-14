@@ -72,7 +72,7 @@ public class LetterService
                 ToUserId = l.ToUser,
                 Title = l.Title ?? string.Empty,
                 Content = l.Content,
-                Attachments = l.Attachments.Select(a => new LetterAttachmentDto
+                Attachments = (l.Attachments ?? new List<LetterAttachment>()).Select(a => new LetterAttachmentDto
                 {
                     Type = a.Type,
                     ItemId = a.ItemId,
