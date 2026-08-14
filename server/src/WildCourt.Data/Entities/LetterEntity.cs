@@ -13,6 +13,9 @@ public class LetterEntity
 
     public long ToUser { get; set; }
 
+    /// <summary>信件标题。</summary>
+    public string? Title { get; set; }
+
     public string Content { get; set; } = string.Empty;
 
     public string? ItemId { get; set; }

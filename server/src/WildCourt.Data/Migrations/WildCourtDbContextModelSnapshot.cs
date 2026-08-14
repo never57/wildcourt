@@ -327,6 +327,11 @@ namespace WildCourt.Data.Migrations
                         .HasColumnType("varchar(16)")
                         .HasColumnName("status");
 
+                    b.Property<string>("Title")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("title");
+
                     b.Property<long>("ToUser")
                         .HasColumnType("bigint")
                         .HasColumnName("to_user");
