@@ -17,6 +17,7 @@ namespace WildCourt.Net.Protocol
         public long letterId;
         public long fromUserId;
         public string fromNickname;
+        public string title;
         public string content;
         public string itemId;     // rewardType=item 时的道具/非遗 ID
         public string rewardType; // shell/coupon/item/空

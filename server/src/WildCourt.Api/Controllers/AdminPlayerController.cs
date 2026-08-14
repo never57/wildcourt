@@ -68,4 +68,28 @@ public class AdminPlayerController : AdminControllerBase
         var changed = await _adminService.UnbanAsync(userId);
         return ApiResponse<object>.Ok(new { Changed = changed });
     }
+
+    /// <summary>批量封禁玩家。</summary>
+    [HttpPost("players/batch-ban")]
+    public async Task<ApiResponse<BatchOperationResult>> BatchBan([FromBody] BatchBanRequest request)
+    {
+        RequirePermission(AdminPermissions.PlayersBan);
+        return ApiResponse<BatchOperationResult>.Ok(await _adminService.BanBatchAsync(request.UserIds));
+    }
+
+    /// <summary>批量解封玩家。</summary>
+    [HttpPost("players/batch-unban")]
+    public async Task<ApiResponse<BatchOperationResult>> BatchUnban([FromBody] BatchBanRequest request)
+    {
+        RequirePermission(AdminPermissions.PlayersBan);
+        return ApiResponse<BatchOperationResult>.Ok(await _adminService.UnbanBatchAsync(request.UserIds));
+    }
+
+    /// <summary>批量修改玩家货币/等级/经验。</summary>
+    [HttpPut("players/batch-currency")]
+    public async Task<ApiResponse<BatchOperationResult>> BatchUpdateCurrency([FromBody] BatchUpdateCurrencyRequest request)
+    {
+        RequirePermission(AdminPermissions.PlayersEdit);
+        return ApiResponse<BatchOperationResult>.Ok(await _adminService.UpdateCurrencyBatchAsync(request));
+    }
 }

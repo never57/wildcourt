@@ -18,8 +18,9 @@ namespace WildCourt.Net.Protocol
         public const string PetDispatch = Base + "/pet/dispatch";
         public const string PetRecall = Base + "/pet/recall";
 
-        // LetterController（仅官方信息发放：收件箱 → 领取附件 → 删除已读）
+        // LetterController（仅官方信息发放：收件箱 → 已读 → 领取附件 → 删除已读）
         public const string LetterInbox = Base + "/letter/inbox";
+        public const string LetterMarkRead = Base + "/letter/mark-read";
         public const string LetterClaim = Base + "/letter/claim";
         public static string LetterDelete(long letterId) => Base + $"/letter/{letterId}";
 

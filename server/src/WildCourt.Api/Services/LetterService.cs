@@ -17,13 +17,16 @@ namespace WildCourt.Api.Services;
 ///   空      → 无附件
 ///
 /// 状态约定（复用 letters.status 字段，官方链路不经过审核）：
-///   "送达"（官方信件初始状态，可领取/可删除）
-///   "已领取"（附件已发放，仅可删除）
+///   "未读"（官方信件初始状态，点击后转已读）
+///   "已读"（玩家点击阅读过，可领取附件/可删除）
+///   "已领取"（附件已发放，仅可删除；领取幂等标记）
 ///   "已删除"（软删除标记，收件箱不再返回；物理删除留待清理任务）
+/// 状态机：未读 →（点击）已读 →（领取附件）已领取；未读/已读/已领取 →（删除）已删除
 /// </summary>
 public class LetterService
 {
-    private const string StatusDelivered = "送达";
+    private const string StatusUnread = "未读";
+    private const string StatusRead = "已读";
     private const string StatusClaimed = "已领取";
     private const string StatusDeleted = "已删除";
 
@@ -67,6 +70,7 @@ public class LetterService
                 FromUserId = l.FromUser,
                 FromNickname = l.FromUser == 0 ? "官方" : (nicknames.TryGetValue(l.FromUser, out var n) ? n : ""),
                 ToUserId = l.ToUser,
+                Title = l.Title ?? string.Empty,
                 Content = l.Content,
                 ItemId = l.ItemId,
                 RewardType = l.RewardType,
@@ -75,6 +79,22 @@ public class LetterService
                 CreatedAt = new DateTimeOffset(l.CreatedAt).ToUnixTimeMilliseconds(),
             }).ToList(),
         };
+    }
+
+    /// <summary>标记信件已读（未读 → 已读，幂等：已读/已领取不重复操作）。</summary>
+    public async Task MarkReadAsync(long userId, long letterId)
+    {
+        var letter = await _db.Letters.FirstOrDefaultAsync(l => l.LetterId == letterId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "信件不存在");
+        if (letter.ToUser != userId)
+        {
+            throw new BusinessException(ApiCodes.Forbidden, "无权操作该信件");
+        }
+        if (letter.Status == StatusUnread)
+        {
+            letter.Status = StatusRead;
+            await _db.SaveChangesAsync();
+        }
     }
 
     /// <summary>领取邮件附件（按 reward_type 分派发放），幂等防重复。</summary>

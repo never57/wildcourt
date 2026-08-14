@@ -19,7 +19,8 @@ namespace WildCourt.UI.Letters
         {
             Letter = letter;
             if (fromText != null) fromText.text = letter.fromUserId == 0 ? "官方" : letter.fromNickname;
-            if (contentText != null) contentText.text = letter.content;
+            // 列表项 contentText 显示标题：优先 title，为空回退 content
+            if (contentText != null) contentText.text = string.IsNullOrEmpty(letter.title) ? letter.content : letter.title;
             if (statusText != null) statusText.text = letter.status;
             if (timeText != null) timeText.text = FormatTime(letter.createdAt);
             if (button != null)

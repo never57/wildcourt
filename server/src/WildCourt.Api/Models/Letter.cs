@@ -16,6 +16,9 @@ public class Letter
     /// <summary>收件人用户 ID。</summary>
     public long ToUserId { get; set; }
 
+    /// <summary>信件标题。</summary>
+    public string Title { get; set; } = string.Empty;
+
     public string Content { get; set; } = string.Empty;
 
     public string? ItemId { get; set; }

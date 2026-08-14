@@ -43,6 +43,22 @@ public class AdminController : AdminControllerBase
         return ApiResponse<object>.Ok(new { LetterId = letterId });
     }
 
+    /// <summary>批量发信：向多个玩家发送同一封官方信件。</summary>
+    [HttpPost("letters/batch")]
+    public async Task<ApiResponse<BatchOperationResult>> SendOfficialLetterBatch([FromBody] OfficialLetterBatchRequest request)
+    {
+        RequirePermission(AdminPermissions.AnnouncementsEdit);
+        return ApiResponse<BatchOperationResult>.Ok(await _adminService.SendOfficialLetterBatchAsync(request));
+    }
+
+    /// <summary>按条件群发：按筛选条件匹配玩家后群发官方信件。</summary>
+    [HttpPost("letters/broadcast")]
+    public async Task<ApiResponse<BatchOperationResult>> BroadcastOfficialLetter([FromBody] OfficialLetterBroadcastRequest request)
+    {
+        RequirePermission(AdminPermissions.AnnouncementsEdit);
+        return ApiResponse<BatchOperationResult>.Ok(await _adminService.BroadcastOfficialLetterAsync(request));
+    }
+
     /// <summary>封禁用户（原始路由：POST /api/v1/admin/ban/{userId}）。</summary>
     [HttpPost("ban/{userId}")]
     public async Task<ApiResponse<object>> BanUser(long userId)

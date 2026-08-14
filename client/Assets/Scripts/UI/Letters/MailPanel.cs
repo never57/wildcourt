@@ -43,6 +43,7 @@ namespace WildCourt.UI.Letters
         [SerializeField] private GameObject mailItemPrefab;
         [SerializeField] private Text emptyText;
         [SerializeField] private GameObject detailRoot;
+        [SerializeField] private Text detailTitleText;
         [SerializeField] private Text fromText;
         [SerializeField] private Text contentText;
         [SerializeField] private Text itemText;
@@ -199,9 +200,47 @@ namespace WildCourt.UI.Letters
             _selected = letter;
             // 只更新右侧详情内容，不隐藏左侧列表
             if (detailRoot != null) detailRoot.SetActive(true);
+            // 详情区标题：优先 title，为空回退 content
+            var title = string.IsNullOrEmpty(letter.title) ? letter.content : letter.title;
+            if (detailTitleText != null) detailTitleText.text = title;
             if (fromText != null) fromText.text = "寄件人：" + (letter.fromUserId == 0 ? "官方" : letter.fromNickname);
             if (contentText != null) contentText.text = letter.content;
             if (itemText != null) itemText.text = DescribeReward(letter);
+
+            // 点击即标记已读：未读 → 已读（领取/删除不影响该转换）
+            if (letter.status == "未读")
+            {
+                MarkRead(letter);
+            }
+        }
+
+        /// <summary>标记信件已读（未读 → 已读），成功后更新本地状态并刷新对应列表项。</summary>
+        private void MarkRead(LetterItem letter)
+        {
+            if (NetManager.Instance != null)
+            {
+                NetManager.Instance.Post<LetterStatusResponse>(ApiPaths.LetterMarkRead,
+                    new ClaimLetterRequest { letterId = letter.letterId },
+                    resp =>
+                    {
+                        letter.status = "已读";
+                        RefreshItemStatus(letter);
+                    },
+                    (code, msg) => { /* 已读标记失败不打断阅读，静默忽略 */ });
+            }
+        }
+
+        /// <summary>按 letter 引用刷新对应列表项的 statusText（避免整列表重建）。</summary>
+        private void RefreshItemStatus(LetterItem letter)
+        {
+            foreach (var item in _items)
+            {
+                if (item != null && item.Letter != null && item.Letter.letterId == letter.letterId)
+                {
+                    item.Bind(letter, OnLetterClicked);
+                    break;
+                }
+            }
         }
 
         // ---------- 交互 ----------

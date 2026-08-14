@@ -28,6 +28,14 @@ public class LetterController : ControllerBase
         return ApiResponse<InboxResponse>.Ok(inbox);
     }
 
+    /// <summary>标记信件已读（玩家点击 MailItem 时调用，未读 → 已读）。</summary>
+    [HttpPost("mark-read")]
+    public async Task<ApiResponse<object>> MarkRead([FromBody] ClaimLetterRequest request)
+    {
+        await _letterService.MarkReadAsync(GetUserId(), request.LetterId);
+        return ApiResponse<object>.Ok(new object());
+    }
+
     /// <summary>领取邮件随附道具/物品（itemId 附件入背包，幂等防重复）。</summary>
     [HttpPost("claim")]
     public async Task<ApiResponse<ClaimResponse>> Claim([FromBody] ClaimLetterRequest request)

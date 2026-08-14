@@ -302,6 +302,12 @@ export const serverApi = {
 
 // ================= 玩家管理 =================
 
+export interface BatchOperationResult {
+  succeeded: number
+  failed: number
+  failures: { userId: number; reason: string }[]
+}
+
 export const playerApi = {
   list: (params: { keyword?: string; page?: number; pageSize?: number }) =>
     request<PagedResult<PlayerItem>>({ url: '/players', params }),
@@ -312,6 +318,12 @@ export const playerApi = {
     request<void>({ url: `/players/${userId}/profile`, method: 'put', data }),
   ban: (userId: number) => request<{ changed: boolean }>({ url: `/players/${userId}/ban`, method: 'post' }),
   unban: (userId: number) => request<{ changed: boolean }>({ url: `/players/${userId}/unban`, method: 'post' }),
+  batchBan: (userIds: number[]) =>
+    request<BatchOperationResult>({ url: '/players/batch-ban', method: 'post', data: { userIds } }),
+  batchUnban: (userIds: number[]) =>
+    request<BatchOperationResult>({ url: '/players/batch-unban', method: 'post', data: { userIds } }),
+  batchUpdateCurrency: (data: { userIds: number[]; shell?: number; coupon?: number; level?: number; exp?: number }) =>
+    request<BatchOperationResult>({ url: '/players/batch-currency', method: 'put', data }),
 }
 
 // ================= 运营审核 =================
@@ -338,15 +350,45 @@ export const announcementApi = {
 
 export interface OfficialLetterPayload {
   toUserId: number
+  title?: string
   content: string
   rewardType?: 'shell' | 'coupon' | 'item'
   rewardCount: number
   itemId?: string
 }
 
+export interface OfficialLetterBatchPayload {
+  toUserIds: number[]
+  title?: string
+  content: string
+  rewardType?: 'shell' | 'coupon' | 'item'
+  rewardCount: number
+  itemId?: string
+}
+
+export interface BroadcastFilter {
+  minLevel?: number
+  maxLevel?: number
+  isBanned?: boolean
+  registeredAfter?: string
+}
+
+export interface OfficialLetterBroadcastPayload {
+  title?: string
+  content: string
+  rewardType?: 'shell' | 'coupon' | 'item'
+  rewardCount: number
+  itemId?: string
+  filter?: BroadcastFilter
+}
+
 export const letterApi = {
   sendOfficial: (data: OfficialLetterPayload) =>
     request<{ letterId: number }>({ url: '/letters', method: 'post', data }),
+  sendBatch: (data: OfficialLetterBatchPayload) =>
+    request<BatchOperationResult>({ url: '/letters/batch', method: 'post', data }),
+  broadcast: (data: OfficialLetterBroadcastPayload) =>
+    request<BatchOperationResult>({ url: '/letters/broadcast', method: 'post', data }),
 }
 
 // ================= 数据库管理 =================

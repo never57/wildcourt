@@ -301,6 +301,30 @@ public class UpdatePlayerProfileRequest
     public string? AvatarUrl { get; set; }
 }
 
+/// <summary>批量玩家操作请求：对多个玩家执行同一操作。</summary>
+public class BatchPlayerRequest
+{
+    /// <summary>玩家 ID 列表（至少 1 个）。</summary>
+    public List<long> UserIds { get; set; } = new();
+}
+
+/// <summary>批量封禁/解封请求。</summary>
+public class BatchBanRequest : BatchPlayerRequest
+{
+}
+
+/// <summary>批量修改货币/等级请求（字段为 null 表示不修改）。</summary>
+public class BatchUpdateCurrencyRequest : BatchPlayerRequest
+{
+    public int? Shell { get; set; }
+
+    public int? Coupon { get; set; }
+
+    public int? Level { get; set; }
+
+    public int? Exp { get; set; }
+}
+
 public class AdminPlayerSearchRequest
 {
     public string? Keyword { get; set; }
@@ -382,6 +406,9 @@ public class OfficialLetterRequest
     /// <summary>收件玩家 ID。</summary>
     public long ToUserId { get; set; }
 
+    /// <summary>信件标题。</summary>
+    public string Title { get; set; } = string.Empty;
+
     /// <summary>信件正文。</summary>
     public string Content { get; set; } = string.Empty;
 
@@ -393,6 +420,87 @@ public class OfficialLetterRequest
 
     /// <summary>道具/非遗 ID（reward_type=item 时必填）。</summary>
     public string? ItemId { get; set; }
+}
+
+/// <summary>批量发信请求：向多个玩家发送同一封官方信件。</summary>
+public class OfficialLetterBatchRequest
+{
+    /// <summary>收件玩家 ID 列表（至少 1 个）。</summary>
+    public List<long> ToUserIds { get; set; } = new();
+
+    /// <summary>信件标题。</summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>信件正文。</summary>
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>附件类型：shell/coupon/item；空 = 无附件。</summary>
+    public string? RewardType { get; set; }
+
+    /// <summary>附件数量。</summary>
+    public int RewardCount { get; set; }
+
+    /// <summary>道具/非遗 ID（reward_type=item 时必填）。</summary>
+    public string? ItemId { get; set; }
+}
+
+/// <summary>按条件群发请求：按筛选条件匹配玩家后群发官方信件。</summary>
+public class OfficialLetterBroadcastRequest
+{
+    /// <summary>信件标题。</summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>信件正文。</summary>
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>附件类型：shell/coupon/item；空 = 无附件。</summary>
+    public string? RewardType { get; set; }
+
+    /// <summary>附件数量。</summary>
+    public int RewardCount { get; set; }
+
+    /// <summary>道具/非遗 ID（reward_type=item 时必填）。</summary>
+    public string? ItemId { get; set; }
+
+    /// <summary>筛选条件（可空 = 全部玩家）。</summary>
+    public BroadcastFilter? Filter { get; set; }
+}
+
+/// <summary>群发筛选条件（各字段为 null 表示不筛选该项）。</summary>
+public class BroadcastFilter
+{
+    /// <summary>最低等级（含）。</summary>
+    public int? MinLevel { get; set; }
+
+    /// <summary>最高等级（含）。</summary>
+    public int? MaxLevel { get; set; }
+
+    /// <summary>是否已封禁（null = 不限）。</summary>
+    public bool? IsBanned { get; set; }
+
+    /// <summary>注册时间起点（UTC，含）。</summary>
+    public DateTime? RegisteredAfter { get; set; }
+}
+
+/// <summary>批量操作结果（发信/封禁/改数据等）。</summary>
+public class BatchOperationResult
+{
+    /// <summary>成功处理的数量。</summary>
+    public int Succeeded { get; set; }
+
+    /// <summary>失败的数量。</summary>
+    public int Failed { get; set; }
+
+    /// <summary>失败的玩家 ID 及原因。</summary>
+    public List<BatchFailure> Failures { get; set; } = new();
+}
+
+/// <summary>单个批量操作的失败项。</summary>
+public class BatchFailure
+{
+    public long UserId { get; set; }
+
+    public string Reason { get; set; } = string.Empty;
 }
 
 // ============ 数据库 ============

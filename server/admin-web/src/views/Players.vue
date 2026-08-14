@@ -14,9 +14,32 @@
       </el-input>
       <el-button type="primary" :loading="loading" @click="search">搜索</el-button>
       <el-button @click="resetSearch">重置</el-button>
+      <div class="batch-actions" v-if="selectedRows.length">
+        <span class="batch-count">已选 {{ selectedRows.length }} 人</span>
+        <el-button
+          v-if="authStore.hasPermission('players:ban')"
+          type="danger"
+          size="small"
+          @click="batchBan"
+        >批量封禁</el-button>
+        <el-button
+          v-if="authStore.hasPermission('players:ban')"
+          type="success"
+          size="small"
+          @click="batchUnban"
+        >批量解封</el-button>
+        <el-button
+          v-if="authStore.hasPermission('players:edit')"
+          type="warning"
+          size="small"
+          @click="openBatchEdit"
+        >批量改数据</el-button>
+        <el-button size="small" @click="clearSelection">取消选择</el-button>
+      </div>
     </div>
 
-    <el-table :data="players" v-loading="loading" stripe>
+    <el-table :data="players" v-loading="loading" stripe @selection-change="onSelectionChange">
+      <el-table-column type="selection" width="50" />
       <el-table-column prop="userId" label="ID" width="80" />
       <el-table-column prop="username" label="账号" min-width="120" show-overflow-tooltip />
       <el-table-column prop="nickname" label="昵称" min-width="120" show-overflow-tooltip />
@@ -131,6 +154,31 @@
         <el-button type="primary" :loading="editLoading" @click="submitEdit">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 批量改数据弹窗 -->
+    <el-dialog v-model="batchEditVisible" :title="`批量修改玩家数据（已选 ${selectedRows.length} 人）`" width="480px">
+      <el-alert type="warning" :closable="false" show-icon class="batch-tip">
+        数值为覆盖设置；留空表示不修改该项。
+      </el-alert>
+      <el-form label-width="90px">
+        <el-form-item label="贝壳">
+          <el-input-number v-model="batchEditForm.shell" :min="0" :max="99999999" style="width: 100%" placeholder="留空不修改" />
+        </el-form-item>
+        <el-form-item label="代金券">
+          <el-input-number v-model="batchEditForm.coupon" :min="0" :max="99999999" style="width: 100%" placeholder="留空不修改" />
+        </el-form-item>
+        <el-form-item label="等级">
+          <el-input-number v-model="batchEditForm.level" :min="1" :max="99" style="width: 100%" placeholder="留空不修改" />
+        </el-form-item>
+        <el-form-item label="经验">
+          <el-input-number v-model="batchEditForm.exp" :min="0" :max="9999999" style="width: 100%" placeholder="留空不修改" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchEditVisible = false">取消</el-button>
+        <el-button type="primary" :loading="batchEditLoading" @click="submitBatchEdit">保存</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
@@ -138,7 +186,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { playerApi, type PlayerDetail, type PlayerItem } from '@/api'
+import { playerApi, type PlayerDetail, type PlayerItem, type BatchOperationResult } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -264,6 +312,107 @@ async function unban(row: PlayerItem) {
   }
 }
 
+// ---- 批量操作 ----
+const selectedRows = ref<PlayerItem[]>([])
+
+function onSelectionChange(rows: PlayerItem[]) {
+  selectedRows.value = rows
+}
+
+function clearSelection() {
+  selectedRows.value = []
+}
+
+function reportBatchResult(action: string, result: BatchOperationResult) {
+  if (result.failed > 0) {
+    ElMessage.warning(
+      `${action}完成：成功 ${result.succeeded}，失败 ${result.failed}。` +
+      result.failures.slice(0, 5).map(f => `#${f.userId}(${f.reason})`).join('、') +
+      (result.failures.length > 5 ? ` 等 ${result.failures.length} 项` : ''),
+    )
+  } else {
+    ElMessage.success(`${action}完成：成功 ${result.succeeded} 人`)
+  }
+}
+
+async function batchBan() {
+  const userIds = selectedRows.value.map(r => r.userId)
+  try {
+    await ElMessageBox.confirm(
+      `将批量封禁 ${userIds.length} 名玩家并踢下线，确认？`,
+      '批量封禁确认',
+      { type: 'warning', confirmButtonText: '封禁', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  try {
+    const result = await playerApi.batchBan(userIds)
+    reportBatchResult('批量封禁', result)
+    fetchList()
+  } catch {
+    // 拦截器提示
+  }
+}
+
+async function batchUnban() {
+  const userIds = selectedRows.value.map(r => r.userId)
+  try {
+    await ElMessageBox.confirm(
+      `将批量解封 ${userIds.length} 名玩家，确认？`,
+      '批量解封确认',
+      { type: 'warning', confirmButtonText: '解封', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  try {
+    const result = await playerApi.batchUnban(userIds)
+    reportBatchResult('批量解封', result)
+    fetchList()
+  } catch {
+    // 拦截器提示
+  }
+}
+
+// ---- 批量改数据 ----
+const batchEditVisible = ref(false)
+const batchEditLoading = ref(false)
+const batchEditForm = reactive<{ shell?: number; coupon?: number; level?: number; exp?: number }>({})
+
+function openBatchEdit() {
+  batchEditForm.shell = undefined
+  batchEditForm.coupon = undefined
+  batchEditForm.level = undefined
+  batchEditForm.exp = undefined
+  batchEditVisible.value = true
+}
+
+async function submitBatchEdit() {
+  const userIds = selectedRows.value.map(r => r.userId)
+  if (Object.values(batchEditForm).every(v => v === undefined)) {
+    ElMessage.warning('请至少填写一个要修改的字段')
+    return
+  }
+  batchEditLoading.value = true
+  try {
+    const result = await playerApi.batchUpdateCurrency({
+      userIds,
+      shell: batchEditForm.shell,
+      coupon: batchEditForm.coupon,
+      level: batchEditForm.level,
+      exp: batchEditForm.exp,
+    })
+    reportBatchResult('批量改数据', result)
+    batchEditVisible.value = false
+    fetchList()
+  } catch {
+    // 拦截器提示
+  } finally {
+    batchEditLoading.value = false
+  }
+}
+
 function formatDate(value?: string): string {
   if (!value) return '-'
   // 后端时间均为 UTC 且无时区标记（如 2026-08-10T18:13:31），补 Z 让浏览器按 UTC 解析
@@ -282,7 +431,25 @@ onMounted(fetchList)
 
 .toolbar {
   display: flex;
+  align-items: center;
   gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.batch-count {
+  color: #606266;
+  font-size: 13px;
+}
+
+.batch-tip {
   margin-bottom: 16px;
 }
 

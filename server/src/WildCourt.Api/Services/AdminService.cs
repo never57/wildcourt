@@ -717,30 +717,11 @@ public class AdminService
 
     /// <summary>
     /// 官方发信：向指定玩家直接送达一封官方信件（from_user=0 标记系统），
-    /// 附件按 reward_type 携带（shell/coupon/item）。状态直接为“送达”，不经审核。
+    /// 附件按 reward_type 携带（shell/coupon/item）。状态直接为“未读”，不经审核。
     /// </summary>
     public async Task<long> SendOfficialLetterAsync(OfficialLetterRequest req)
     {
-        if (string.IsNullOrWhiteSpace(req.Content))
-        {
-            throw new BusinessException(ApiCodes.BadRequest, "信件内容不能为空");
-        }
-
-        var rewardType = string.IsNullOrWhiteSpace(req.RewardType) ? null : req.RewardType.Trim();
-        var allowedTypes = new[] { "shell", "coupon", "item" };
-        if (rewardType != null && !allowedTypes.Contains(rewardType))
-        {
-            throw new BusinessException(ApiCodes.BadRequest, "附件类型不合法（可选：shell/coupon/item）");
-        }
-
-        if (rewardType == "item" && string.IsNullOrWhiteSpace(req.ItemId))
-        {
-            throw new BusinessException(ApiCodes.BadRequest, "道具附件需指定 ItemId");
-        }
-        if (rewardType != null && req.RewardCount <= 0)
-        {
-            throw new BusinessException(ApiCodes.BadRequest, "附件数量必须大于 0");
-        }
+        var rewardType = ValidateLetterPayload(req.Content, req.RewardType, req.RewardCount, req.ItemId);
 
         var exists = await _db.Users.AnyAsync(u => u.UserId == req.ToUserId);
         if (!exists)
@@ -748,19 +729,240 @@ public class AdminService
             throw new BusinessException(ApiCodes.NotFound, "收件玩家不存在");
         }
 
-        var entity = new LetterEntity
-        {
-            FromUser = 0, // 0 表示系统/官方
-            ToUser = req.ToUserId,
-            Content = req.Content.Trim(),
-            ItemId = rewardType == "item" ? req.ItemId : null,
-            RewardType = rewardType,
-            RewardCount = rewardType == null ? 0 : req.RewardCount,
-            Status = "送达",
-            CreatedAt = DateTime.UtcNow,
-        };
+        var entity = BuildLetter(req.ToUserId, req.Title, req.Content.Trim(), rewardType, req.RewardCount, req.ItemId);
         _db.Letters.Add(entity);
         await _db.SaveChangesAsync();
         return entity.LetterId;
+    }
+
+    /// <summary>批量发信：向多个玩家发送同一封官方信件，逐个失败不影响整体。</summary>
+    public async Task<BatchOperationResult> SendOfficialLetterBatchAsync(OfficialLetterBatchRequest req)
+    {
+        if (req.ToUserIds == null || req.ToUserIds.Count == 0)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "请至少选择一个收件玩家");
+        }
+        if (req.ToUserIds.Count > 500)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "单次最多批量发送 500 个玩家");
+        }
+
+        var rewardType = ValidateLetterPayload(req.Content, req.RewardType, req.RewardCount, req.ItemId);
+        var ids = req.ToUserIds.Distinct().ToList();
+        var existing = await _db.Users
+            .Where(u => ids.Contains(u.UserId))
+            .Select(u => u.UserId)
+            .ToListAsync();
+        var existingSet = existing.ToHashSet();
+
+        var result = new BatchOperationResult();
+        foreach (var id in ids)
+        {
+            if (!existingSet.Contains(id))
+            {
+                result.Failed++;
+                result.Failures.Add(new BatchFailure { UserId = id, Reason = "玩家不存在" });
+                continue;
+            }
+            _db.Letters.Add(BuildLetter(id, req.Title, req.Content.Trim(), rewardType, req.RewardCount, req.ItemId));
+            result.Succeeded++;
+        }
+
+        await _db.SaveChangesAsync();
+        return result;
+    }
+
+    /// <summary>按条件群发：按筛选条件匹配玩家后群发官方信件。</summary>
+    public async Task<BatchOperationResult> BroadcastOfficialLetterAsync(OfficialLetterBroadcastRequest req)
+    {
+        var rewardType = ValidateLetterPayload(req.Content, req.RewardType, req.RewardCount, req.ItemId);
+
+        var query = _db.Users.AsQueryable();
+        var filter = req.Filter;
+        if (filter != null)
+        {
+            if (filter.MinLevel.HasValue) query = query.Where(u => u.Level >= filter.MinLevel.Value);
+            if (filter.MaxLevel.HasValue) query = query.Where(u => u.Level <= filter.MaxLevel.Value);
+            if (filter.IsBanned.HasValue) query = query.Where(u => u.IsBanned == filter.IsBanned.Value);
+            if (filter.RegisteredAfter.HasValue) query = query.Where(u => u.CreatedAt >= filter.RegisteredAfter.Value);
+        }
+
+        var ids = await query.Select(u => u.UserId).ToListAsync();
+        if (ids.Count == 0)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "没有匹配到符合条件的玩家");
+        }
+        if (ids.Count > 10000)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, $"匹配到 {ids.Count} 个玩家，超过单次群发上限 10000，请缩小筛选范围");
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var id in ids)
+        {
+            _db.Letters.Add(BuildLetter(id, req.Title, req.Content.Trim(), rewardType, req.RewardCount, req.ItemId, now));
+        }
+
+        await _db.SaveChangesAsync();
+        return new BatchOperationResult { Succeeded = ids.Count, Failed = 0 };
+    }
+
+    // ============ 玩家批量操作 ============
+
+    /// <summary>批量封禁：逐个执行，不存在的玩家计为失败但不中断。</summary>
+    public async Task<BatchOperationResult> BanBatchAsync(List<long> userIds)
+    {
+        ValidateBatchIds(userIds);
+        var ids = userIds.Distinct().ToList();
+        var players = await _db.Users.Where(u => ids.Contains(u.UserId)).ToListAsync();
+        var result = new BatchOperationResult();
+
+        foreach (var id in ids)
+        {
+            var player = players.FirstOrDefault(p => p.UserId == id);
+            if (player == null)
+            {
+                result.Failed++;
+                result.Failures.Add(new BatchFailure { UserId = id, Reason = "玩家不存在" });
+                continue;
+            }
+            if (player.IsBanned)
+            {
+                result.Failed++;
+                result.Failures.Add(new BatchFailure { UserId = id, Reason = "已封禁" });
+                continue;
+            }
+            player.IsBanned = true;
+            result.Succeeded++;
+        }
+
+        await _db.SaveChangesAsync();
+
+        // 批量踢下线 + 清在线标记（已封禁玩家）
+        foreach (var player in players.Where(p => p.IsBanned && ids.Contains(p.UserId)))
+        {
+            await _redis.DeleteSessionsOfUserAsync(player.UserId);
+            await _redis.DeleteAsync(RedisUtil.OnlineKeyPrefix + player.UserId);
+        }
+
+        return result;
+    }
+
+    /// <summary>批量解封。</summary>
+    public async Task<BatchOperationResult> UnbanBatchAsync(List<long> userIds)
+    {
+        ValidateBatchIds(userIds);
+        var ids = userIds.Distinct().ToList();
+        var players = await _db.Users.Where(u => ids.Contains(u.UserId)).ToListAsync();
+        var result = new BatchOperationResult();
+
+        foreach (var id in ids)
+        {
+            var player = players.FirstOrDefault(p => p.UserId == id);
+            if (player == null)
+            {
+                result.Failed++;
+                result.Failures.Add(new BatchFailure { UserId = id, Reason = "玩家不存在" });
+                continue;
+            }
+            if (!player.IsBanned)
+            {
+                result.Failed++;
+                result.Failures.Add(new BatchFailure { UserId = id, Reason = "未被封禁" });
+                continue;
+            }
+            player.IsBanned = false;
+            result.Succeeded++;
+        }
+
+        await _db.SaveChangesAsync();
+        return result;
+    }
+
+    /// <summary>批量修改货币/等级/经验（覆盖语义，字段为 null 表示不修改）。</summary>
+    public async Task<BatchOperationResult> UpdateCurrencyBatchAsync(BatchUpdateCurrencyRequest req)
+    {
+        ValidateBatchIds(req.UserIds);
+        var ids = req.UserIds.Distinct().ToList();
+        var players = await _db.Users.Where(u => ids.Contains(u.UserId)).ToListAsync();
+        var result = new BatchOperationResult();
+
+        foreach (var id in ids)
+        {
+            var player = players.FirstOrDefault(p => p.UserId == id);
+            if (player == null)
+            {
+                result.Failed++;
+                result.Failures.Add(new BatchFailure { UserId = id, Reason = "玩家不存在" });
+                continue;
+            }
+            if (req.Shell.HasValue) player.Shell = Math.Max(0, req.Shell.Value);
+            if (req.Coupon.HasValue) player.Coupon = Math.Max(0, req.Coupon.Value);
+            if (req.Level.HasValue) player.Level = Math.Max(1, req.Level.Value);
+            if (req.Exp.HasValue) player.Exp = Math.Max(0, req.Exp.Value);
+            result.Succeeded++;
+        }
+
+        await _db.SaveChangesAsync();
+        return result;
+    }
+
+    // ============ 批量操作辅助 ============
+
+    private void ValidateBatchIds(List<long> userIds)
+    {
+        if (userIds == null || userIds.Count == 0)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "请至少选择一个玩家");
+        }
+        if (userIds.Count > 500)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "单次最多操作 500 个玩家");
+        }
+    }
+
+    /// <summary>校验信件正文/附件参数，返回规范化后的 rewardType（null=无附件）。</summary>
+    private static string? ValidateLetterPayload(string? content, string? rewardTypeRaw, int rewardCount, string? itemId)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "信件内容不能为空");
+        }
+
+        var rewardType = string.IsNullOrWhiteSpace(rewardTypeRaw) ? null : rewardTypeRaw.Trim();
+        var allowedTypes = new[] { "shell", "coupon", "item" };
+        if (rewardType != null && !allowedTypes.Contains(rewardType))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "附件类型不合法（可选：shell/coupon/item）");
+        }
+
+        if (rewardType == "item" && string.IsNullOrWhiteSpace(itemId))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "道具附件需指定 ItemId");
+        }
+        if (rewardType != null && rewardCount <= 0)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "附件数量必须大于 0");
+        }
+
+        return rewardType;
+    }
+
+    /// <summary>构造信件实体（from_user=0 表示官方，状态未读）。</summary>
+    private static LetterEntity BuildLetter(long toUserId, string? title, string content,
+        string? rewardType, int rewardCount, string? itemId, DateTime? createdAt = null)
+    {
+        return new LetterEntity
+        {
+            FromUser = 0, // 0 表示系统/官方
+            ToUser = toUserId,
+            Title = string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
+            Content = content,
+            ItemId = rewardType == "item" ? itemId : null,
+            RewardType = rewardType,
+            RewardCount = rewardType == null ? 0 : rewardCount,
+            Status = "未读",
+            CreatedAt = createdAt ?? DateTime.UtcNow,
+        };
     }
 }
