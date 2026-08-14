@@ -93,7 +93,7 @@ const statCards = computed(() => [
   { key: 'online', label: '实时在线', value: summary.value?.onlinePlayers ?? '-', icon: UserFilled, color: '#e6a23c' },
   { key: 'active', label: '今日活跃', value: summary.value?.todayActivePlayers ?? '-', icon: DataAnalysis, color: '#f56c6c' },
   { key: 'shell', label: '贝壳存量', value: formatNum(summary.value?.totalShell ?? 0), icon: Coin, color: '#909399' },
-  { key: 'coupon', label: '代金券存量', value: formatNum(summary.value?.totalCoupon ?? 0), icon: CreditCard, color: '#9c27b0' },
+  { key: 'coupon', label: '邮券存量', value: formatNum(summary.value?.totalCoupon ?? 0), icon: CreditCard, color: '#9c27b0' },
 ])
 
 const summary = ref<{ totalPlayers: number; todayNewPlayers: number; onlinePlayers: number; todayActivePlayers: number; totalShell: number; totalCoupon: number } | null>(null)

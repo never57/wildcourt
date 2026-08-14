@@ -45,7 +45,7 @@
       <el-table-column prop="nickname" label="昵称" min-width="120" show-overflow-tooltip />
       <el-table-column prop="level" label="等级" width="70" />
       <el-table-column prop="shell" label="贝壳" width="90" />
-      <el-table-column prop="coupon" label="代金券" width="90" />
+      <el-table-column prop="coupon" label="邮券" width="90" />
       <el-table-column prop="exp" label="经验" width="90" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
@@ -96,7 +96,7 @@
           </el-descriptions-item>
           <el-descriptions-item label="等级">{{ detail.player.level }}</el-descriptions-item>
           <el-descriptions-item label="贝壳">{{ detail.player.shell }}</el-descriptions-item>
-          <el-descriptions-item label="代金券">{{ detail.player.coupon }}</el-descriptions-item>
+          <el-descriptions-item label="邮券">{{ detail.player.coupon }}</el-descriptions-item>
           <el-descriptions-item label="经验">{{ detail.player.exp }}</el-descriptions-item>
           <el-descriptions-item label="好友数">{{ detail.friendCount }}</el-descriptions-item>
           <el-descriptions-item label="状态">
@@ -139,7 +139,7 @@
         <el-form-item label="贝壳">
           <el-input-number v-model="editForm.shell" :min="0" :max="99999999" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="代金券">
+        <el-form-item label="邮券">
           <el-input-number v-model="editForm.coupon" :min="0" :max="99999999" style="width: 100%" />
         </el-form-item>
         <el-form-item label="等级">
@@ -164,7 +164,7 @@
         <el-form-item label="贝壳">
           <el-input-number v-model="batchEditForm.shell" :min="0" :max="99999999" style="width: 100%" placeholder="留空不修改" />
         </el-form-item>
-        <el-form-item label="代金券">
+        <el-form-item label="邮券">
           <el-input-number v-model="batchEditForm.coupon" :min="0" :max="99999999" style="width: 100%" placeholder="留空不修改" />
         </el-form-item>
         <el-form-item label="等级">
