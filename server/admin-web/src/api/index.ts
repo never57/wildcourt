@@ -491,9 +491,10 @@ export const deployApi = {
     return request<{ files: number; message: string }>({ url: '/deploy/upload', method: 'post', data: form })
   },
   gitStatus: () => request<GitStatus>({ url: '/deploy/git/status' }),
-  gitPull: () => request<GitPullResult>({ url: '/deploy/git/pull', method: 'post' }),
+  // 拉取代码/构建部署耗时长（git pull + dotnet publish + docker build 可能数分钟），单独放宽超时到 10 分钟
+  gitPull: () => request<GitPullResult>({ url: '/deploy/git/pull', method: 'post', timeout: 600000 }),
   build: (noCache = false, service?: string) =>
-    request<{ started: boolean; message: string }>({ url: '/deploy/build', method: 'post', data: { noCache, service } }),
+    request<{ started: boolean; message: string }>({ url: '/deploy/build', method: 'post', data: { noCache, service }, timeout: 600000 }),
   listFiles: (path = '') => request<FileEntry[]>({ url: '/deploy/files', params: { path } }),
   uploadFile: (dirPath: string, file: File) => {
     const form = new FormData()
