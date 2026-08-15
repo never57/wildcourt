@@ -42,6 +42,7 @@ public class ChatManner : MonoBehaviour
 
     void Start()
     {
+        inputField.text = "";
         //chatWindow.SetActive(false);
         //将窗口组件全部禁止喵
         chatWindow.GetComponent<CanvasGroup>().blocksRaycasts = false;
