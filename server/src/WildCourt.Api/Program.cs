@@ -137,10 +137,16 @@ if (string.IsNullOrEmpty(webRoot))
 }
 Directory.CreateDirectory(webRoot);
 // 以 webRoot 为静态根（不带 RequestPath 前缀），使 URL /uploads/avatar/x.png 映射到 webRoot/uploads/avatar/x.png
+var contentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+// 显式补全图片 MIME，避免 .png 被误判为 application/json
+contentTypeProvider.Mappings[".png"] = "image/png";
+contentTypeProvider.Mappings[".jpg"] = "image/jpeg";
+contentTypeProvider.Mappings[".jpeg"] = "image/jpeg";
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRoot),
-    RequestPath = ""
+    RequestPath = "",
+    ContentTypeProvider = contentTypeProvider
 });
 
 // 容器健康检查端点（蓝绿部署/healthcheck 用）：
