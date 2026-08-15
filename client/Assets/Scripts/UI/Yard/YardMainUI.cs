@@ -5,6 +5,7 @@ using WildCourt.Gameplay.Yard;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
 using WildCourt.UI.Letters;
+using WildCourt.UI.User;
 
 namespace WildCourt.UI.Yard
 {
@@ -32,6 +33,7 @@ namespace WildCourt.UI.Yard
         [SerializeField] private Button _buildButton;      // bulidsystem 按钮
         [SerializeField] private Button _mailButton;       // mail 按钮，点击打开信箱（MailPanel）
         [SerializeField] private Button _friendsButton;    // friends 按钮，点击打开好友聊天（ChatManner）
+        [SerializeField] private Button _editorButton;     // editor 按钮，点击打开玩家信息面板（UserPanel）
 
         private YardManager _yard;
         private YardPanel _panel;
@@ -101,6 +103,11 @@ namespace WildCourt.UI.Yard
                 _friendsButton.onClick.RemoveAllListeners();
                 _friendsButton.onClick.AddListener(OpenChat);
             }
+            if (_editorButton != null)
+            {
+                _editorButton.onClick.RemoveAllListeners();
+                _editorButton.onClick.AddListener(OpenUserPanel);
+            }
             YardPanel.BackPressed -= OnBuildPanelClosed;
             YardPanel.BackPressed += OnBuildPanelClosed;
         }
@@ -111,6 +118,7 @@ namespace WildCourt.UI.Yard
             if (_buildButton != null) _buildButton.onClick.RemoveAllListeners();
             if (_mailButton != null) _mailButton.onClick.RemoveAllListeners();
             if (_friendsButton != null) _friendsButton.onClick.RemoveAllListeners();
+            if (_editorButton != null) _editorButton.onClick.RemoveAllListeners();
             YardPanel.BackPressed -= OnBuildPanelClosed;
             EventBus.Unsubscribe<CurrencyChangedEvent>(OnCurrencyChanged);
         }
@@ -146,6 +154,13 @@ namespace WildCourt.UI.Yard
         private void OpenChat()
         {
             ChatManner.CreateOrInstantiate();
+        }
+
+        /// <summary>点击“editor”按钮：实例化打开玩家信息面板（UserPanel）。</summary>
+        private void OpenUserPanel()
+        {
+            var panel = UserPanel.CreateOrInstantiate();
+            if (panel != null) panel.Open();
         }
 
         /// <summary>点击“建造”按钮：实例化打开庭院建造面板（YardPanel），注入已缓存资料，并隐藏主 UI。</summary>

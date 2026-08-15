@@ -50,6 +50,14 @@ public class UserController : ControllerBase
         return ApiResponse<User>.Ok(user);
     }
 
+    /// <summary>修改昵称（玩家自助，token 鉴权）。</summary>
+    [HttpPut("nickname")]
+    public async Task<ApiResponse<User>> UpdateNickname([FromBody] UpdateNicknameRequest request)
+    {
+        var user = await _userService.UpdateNicknameAsync(GetUserId(), request.Nickname);
+        return ApiResponse<User>.Ok(user);
+    }
+
     /// <summary>玩家等级与经验（PlayerService 权威）。</summary>
     [HttpGet("level")]
     public async Task<ApiResponse<LevelResponse>> GetLevel()

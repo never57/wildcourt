@@ -260,7 +260,8 @@ namespace WildCourt.UI.Letters
                 if (i < need)
                 {
                     slot.gameObject.SetActive(true);
-                    slot.Bind(attachments[i].type, attachments[i].count, attachments[i].itemId);
+                    bool claimed = letter != null && letter.status == "已领取";
+                    slot.Bind(attachments[i].type, attachments[i].count, attachments[i].itemId, claimed);
                 }
                 else
                 {

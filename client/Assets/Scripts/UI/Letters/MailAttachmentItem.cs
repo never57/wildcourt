@@ -14,17 +14,19 @@ namespace WildCourt.UI.Letters
         [SerializeField] private Image iconImage;              // 图标（Image 子节点）
         [SerializeField] private TextMeshProUGUI typeText;     // 名称（type 子节点，TMP）
         [SerializeField] private TextMeshProUGUI countText;    // 数量（count 子节点，TMP）
+        [SerializeField] private GameObject statusImage;       // 领取状态图（Status 子节点，领取后置 true 显示）
 
         [Header("本地图标映射（按 rewardType）")]
         [SerializeField] private Sprite shellIcon;   // 庭贝
         [SerializeField] private Sprite couponIcon;  // 邮券
         [SerializeField] private Sprite itemIcon;    // 道具/非遗
 
-        /// <summary>绑定附件：按 rewardType 设置图标、名称、数量。</summary>
+        /// <summary>绑定附件：按 rewardType 设置图标、名称、数量，并按领取状态控制 Status 图片显隐。</summary>
         /// <param name="rewardType">shell / coupon / item / 空</param>
         /// <param name="count">数量</param>
         /// <param name="itemId">道具/非遗 ID（item 类型时用于名称回退）</param>
-        public void Bind(string rewardType, int count, string itemId)
+        /// <param name="claimed">所属信件是否已领取（true 时显示 Status 图片）</param>
+        public void Bind(string rewardType, int count, string itemId, bool claimed = false)
         {
             switch (rewardType)
             {
@@ -41,6 +43,8 @@ namespace WildCourt.UI.Letters
                     SetVisual(null, "无附件", 0);
                     break;
             }
+            // 领取状态图片：仅已领取时显示
+            if (statusImage != null) statusImage.SetActive(claimed);
         }
 
         private void SetVisual(Sprite icon, string name, int count)
