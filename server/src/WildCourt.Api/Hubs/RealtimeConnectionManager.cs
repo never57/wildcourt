@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace WildCourt.Api.Hubs;
@@ -13,11 +14,13 @@ namespace WildCourt.Api.Hubs;
 /// </summary>
 public class RealtimeConnectionManager
 {
-    /// <summary>与 REST API 一致的 camelCase 序列化（对齐客户端小写字段 DTO）。</summary>
+    /// <summary>与 REST API 一致的 camelCase 序列化（对齐客户端小写字段 DTO）。
+    /// UnsafeRelaxedJsonEscaping：中文等非 ASCII 字符不转义为 \uXXXX，直接输出 UTF-8，避免客户端乱码。</summary>
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     /// <summary>userId → 该用户的所有活跃 WebSocket 连接。</summary>
