@@ -1,6 +1,8 @@
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
@@ -31,6 +33,10 @@ namespace WildCourt.UI.User
         [SerializeField] private TextMeshProUGUI idText;       // ID：显示玩家 ID
         [SerializeField] private TMP_InputField userNameInput; // UserName：昵称输入框
         [SerializeField] private TextMeshProUGUI levelText;    // UserLevel：庭院等级（纯文本显示）
+
+        [Header("头像")]
+        [SerializeField] private Button avatarButton;          // Avatar 按钮：点击换头像
+        [SerializeField] private Image avatarImage;            // Avatar/Image：头像显示图
 
         private UserProfileResponse _profile;
         private string _lastNickname;
@@ -77,6 +83,7 @@ namespace WildCourt.UI.User
             if (editorButton != null) editorButton.onClick.AddListener(OnEditClicked);
             if (editorNameButton != null) editorNameButton.onClick.AddListener(OnEditClicked);
             if (userNameInput != null) userNameInput.onEndEdit.AddListener(OnNicknameEndEdit);
+            if (avatarButton != null) avatarButton.onClick.AddListener(OnAvatarClicked);
         }
 
         private void OnDestroy()
@@ -86,6 +93,7 @@ namespace WildCourt.UI.User
             if (editorButton != null) editorButton.onClick.RemoveAllListeners();
             if (editorNameButton != null) editorNameButton.onClick.RemoveAllListeners();
             if (userNameInput != null) userNameInput.onEndEdit.RemoveAllListeners();
+            if (avatarButton != null) avatarButton.onClick.RemoveAllListeners();
         }
 
         public void Open()
@@ -128,6 +136,21 @@ namespace WildCourt.UI.User
                 _lastNickname = userNameInput.text;
             }
             SetEditEnabled(false);
+
+            // 头像：有 URL 则加载显示
+            if (!string.IsNullOrEmpty(data.avatarUrl))
+            {
+                LoadAvatar(ToAbsoluteUrl(data.avatarUrl));
+            }
+        }
+
+        /// <summary>把服务端返回的相对路径（/uploads/...）拼成绝对地址。</summary>
+        private string ToAbsoluteUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return url;
+            if (url.StartsWith("http://") || url.StartsWith("https://")) return url;
+            var baseUrl = NetManager.Instance != null ? NetManager.Instance.ServerUrl : string.Empty;
+            return baseUrl.TrimEnd('/') + "/" + url.TrimStart('/');
         }
 
         // ---------- 交互 ----------
@@ -238,6 +261,92 @@ namespace WildCourt.UI.User
                 });
         }
 
+        // ---------- 头像 ----------
+
+        /// <summary>点击 Avatar 按钮：调系统相册选图（Android 用 NativeGallery），选后上传。</summary>
+        private void OnAvatarClicked()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (!NativeGallery.CheckPermission(NativeGallery.PermissionType.Read, NativeGallery.MediaType.Image))
+            {
+                NativeGallery.RequestPermission(NativeGallery.PermissionType.Read, NativeGallery.MediaType.Image);
+            }
+            NativeGallery.GetImageFromGallery((path) =>
+            {
+                if (string.IsNullOrEmpty(path))
+                {
+                    Debug.Log("[UserPanel] 取消选择头像");
+                    return;
+                }
+                // 读文件字节（限制 8MB）
+                if (!NativeGallery.GetImageSize(path, out var _, out var _, out long dataSize) || dataSize > 8 * 1024 * 1024)
+                {
+                    Debug.LogWarning("[UserPanel] 头像图片过大（>8MB）或读取失败");
+                    return;
+                }
+                byte[] bytes = NativeGallery.LoadImageAtPath(path, -1, false, false);
+                if (bytes == null || bytes.Length == 0)
+                {
+                    Debug.LogWarning("[UserPanel] 头像读取失败");
+                    return;
+                }
+                UploadAvatar(bytes, Path.GetExtension(path));
+            }, "选择头像", "image/*");
+#else
+            // 编辑器/PC 兜底：提示需在 Android 真机测试
+            Debug.LogWarning("[UserPanel] 头像选择仅支持 Android 真机（需 NativeGallery 插件）");
+#endif
+        }
+
+        /// <summary>上传头像字节到服务端，成功后刷新显示。</summary>
+        private void UploadAvatar(byte[] bytes, string extension)
+        {
+            var net = NetManager.Instance;
+            if (net == null) return;
+            var ext = (extension ?? ".png").ToLowerInvariant();
+            if (ext is not (".png" or ".jpg" or ".jpeg")) ext = ".png";
+
+            net.PutMultipart<UserProfileResponse>(ApiPaths.UserUpdateAvatar, "avatar",
+                "avatar" + ext, bytes,
+                resp =>
+                {
+                    ApplyProfile(resp.data);
+                },
+                (code, msg) =>
+                {
+                    Debug.LogWarning($"[UserPanel] 头像上传失败: {msg}");
+                });
+        }
+
+        /// <summary>加载头像 URL 并显示到 avatarImage。</summary>
+        private void LoadAvatar(string url)
+        {
+            if (avatarImage == null || string.IsNullOrEmpty(url)) return;
+            StartCoroutine(LoadAvatarCoroutine(url));
+        }
+
+        private IEnumerator LoadAvatarCoroutine(string url)
+        {
+            using (var req = UnityWebRequestTexture.GetTexture(url))
+            {
+                req.certificateHandler = new NetManager.InsecureCertificateHandlerPublic();
+                req.timeout = 10;
+                yield return req.SendWebRequest();
+
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    Debug.LogWarning($"[UserPanel] 头像加载失败: {req.error}");
+                    yield break;
+                }
+
+                var tex = DownloadHandlerTexture.GetContent(req);
+                if (tex != null && avatarImage != null)
+                {
+                    avatarImage.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                }
+            }
+        }
+
         // ---------- 运行时按名字自动查找子节点（字段为空时兜底） ----------
 
         private void ResolveReferences()
@@ -248,6 +357,8 @@ namespace WildCourt.UI.User
             if (idText == null) idText = FindChild<TextMeshProUGUI>("ID");
             if (userNameInput == null) userNameInput = FindChild<TMP_InputField>("UserName");
             if (levelText == null) levelText = FindChild<TextMeshProUGUI>("UserLevel");
+            if (avatarButton == null) avatarButton = FindChild<Button>("Avatar");
+            if (avatarImage == null) avatarImage = FindChild<Image>("Image");
         }
 
         private T FindChild<T>(string name) where T : Component

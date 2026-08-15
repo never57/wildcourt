@@ -9,6 +9,9 @@ public class User
 
     public string Nickname { get; set; } = string.Empty;
 
+    /// <summary>头像 URL（客户端上传后回填；可为空）。</summary>
+    public string? AvatarUrl { get; set; }
+
     public int ProvinceId { get; set; }
 
     public int CityId { get; set; }

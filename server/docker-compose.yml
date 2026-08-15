@@ -51,6 +51,8 @@ x-api-common: &api-common
     Admin__DefaultPassword: ${ADMIN_DEFAULT_PASSWORD:-CHANGE_ME_admin_password}
   volumes:
     - ./config:/app/config:ro   # 生产配置目录（含数值配置 JSON 也可放这里）
+    # 头像等上传资源持久化：容器内 /app/wwwroot 存用户上传图片，挂到宿主 /data/wildcourt-uploads
+    - /data/wildcourt-uploads:/app/wwwroot
     # ---- 管理后台依赖的挂载（见文件头说明，勿随意移除） ----
     - /var/run/docker.sock:/var/run/docker.sock   # docker CLI 与宿主 daemon 通信
     - /:/host:ro                                  # 宿主根目录（磁盘 df 统计）

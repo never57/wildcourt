@@ -67,6 +67,12 @@ builder.Services.AddControllers()
         opt.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         opt.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
+
+// 上传文件大小限制：头像等图片上传（最大 8MB，覆盖 multipart 上传）
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(opt =>
+{
+    opt.MultipartBodyLengthLimit = 8 * 1024 * 1024;
+});
 // 实时连接：原生 WebSocket（替代 SignalR，规避 IL2CPP/AOT 反射兼容性问题）
 builder.Services.AddSingleton<RealtimeConnectionManager>();
 
@@ -122,6 +128,20 @@ app.UseMiddleware<AuthMiddleware>();
 app.UseMiddleware<LogMiddleware>();
 
 app.MapControllers();
+
+// 静态文件托管：头像等上传资源（wwwroot/uploads/...）
+var webRoot = builder.Configuration["Upload:RootDir"];
+if (string.IsNullOrEmpty(webRoot))
+{
+    webRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+}
+Directory.CreateDirectory(webRoot);
+// 以 webRoot 为静态根（不带 RequestPath 前缀），使 URL /uploads/avatar/x.png 映射到 webRoot/uploads/avatar/x.png
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRoot),
+    RequestPath = ""
+});
 
 // 容器健康检查端点（蓝绿部署/healthcheck 用）：
 // 只确认进程可响应，不查 DB，避免迁移降级时误判并拖慢就绪判断

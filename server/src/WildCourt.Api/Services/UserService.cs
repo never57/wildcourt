@@ -131,6 +131,22 @@ public partial class UserService
         return ToModel(entity);
     }
 
+    /// <summary>更新头像 URL（客户端上传图片后回填；≤512 字符）。返回最新玩家信息。</summary>
+    public async Task<User?> UpdateAvatarAsync(long userId, string avatarUrl)
+    {
+        var entity = await _db.Users.FirstOrDefaultAsync(u => u.UserId == userId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "用户不存在");
+
+        var url = avatarUrl?.Trim();
+        if (url != null && url.Length > 512)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "头像地址过长");
+        }
+        entity.AvatarUrl = string.IsNullOrEmpty(url) ? null : url;
+        await _db.SaveChangesAsync();
+        return ToModel(entity);
+    }
+
     /// <summary>背包快照（阶段 C：编辑面板“已拥有”状态，数量 &gt; 0 才返回）。</summary>
     public async Task<InventoryResponse> GetInventoryAsync(long userId)
     {
@@ -146,6 +162,7 @@ public partial class UserService
     {
         UserId = e.UserId,
         Nickname = e.Nickname,
+        AvatarUrl = e.AvatarUrl,
         ProvinceId = e.ProvinceId,
         CityId = e.CityId,
         Level = e.Level,

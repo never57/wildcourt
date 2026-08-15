@@ -32,6 +32,7 @@ namespace WildCourt.Net.Protocol
     {
         public long userId;
         public string nickname;
+        public string avatarUrl;  // 头像 URL（可为 null）
         public int provinceId;
         public int cityId;
         public int level;
