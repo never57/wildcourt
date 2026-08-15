@@ -63,7 +63,7 @@ public class GoodsCard : MonoBehaviour
         if (nameText == null) nameText = FindChild<TMP_Text>("goodsName");
         if (iconImage == null) iconImage = FindChild<Image>("goodsImage");
         if (remainingText == null) remainingText = FindChild<TMP_Text>("remaining");
-        if (ownedText == null) ownedText = FindChild<TMP_Text>("Stock");
+        if (ownedText == null) ownedText = FindChild<TMP_Text>("owned") ?? FindChild<TMP_Text>("Stock");
         if (buyButton == null) buyButton = FindChild<Button>("BUY");
     }
 
@@ -148,7 +148,7 @@ public class GoodsCard : MonoBehaviour
             if (!warnedOwnedNull)
             {
                 warnedOwnedNull = true;
-                Debug.LogWarning("GoodsCard: 找不到「已拥有」文本（名字带 Stock 的 TMP 文本）", this);
+                Debug.LogWarning("GoodsCard: 找不到「已拥有」文本（名字带 owned / Stock 的 TMP 文本）", this);
             }
             return;
         }
