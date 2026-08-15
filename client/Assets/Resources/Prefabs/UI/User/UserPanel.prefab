@@ -813,7 +813,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   closeButton: {fileID: 8588424477393645214}
-  editorButton: {fileID: 3481424733872728799}
+  editorButton: {fileID: 5393779261512650984}
   idText: {fileID: 2337196501520113567}
   userNameInput: {fileID: 439594160215329371}
   levelText: {fileID: 4625694263547827997}
@@ -1616,7 +1616,7 @@ GameObject:
   - component: {fileID: 7500492201691489743}
   - component: {fileID: 5393779261512650984}
   m_Layer: 5
-  m_Name: Button
+  m_Name: EditorName
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

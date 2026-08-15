@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
@@ -24,6 +25,7 @@ namespace WildCourt.UI.User
         [Header("交互（留空则按名字自动查找）")]
         [SerializeField] private Button closeButton;    // Close 按钮：关闭面板
         [SerializeField] private Button editorButton;   // Editor 按钮：激活昵称编辑
+        [SerializeField] private Button editorNameButton; // EditorName 按钮（UserName 内）：激活昵称编辑并聚焦光标
 
         [Header("显示（留空则按名字自动查找）")]
         [SerializeField] private TextMeshProUGUI idText;       // ID：显示玩家 ID
@@ -73,6 +75,7 @@ namespace WildCourt.UI.User
         {
             if (closeButton != null) closeButton.onClick.AddListener(Close);
             if (editorButton != null) editorButton.onClick.AddListener(OnEditClicked);
+            if (editorNameButton != null) editorNameButton.onClick.AddListener(OnEditClicked);
             if (userNameInput != null) userNameInput.onEndEdit.AddListener(OnNicknameEndEdit);
         }
 
@@ -81,6 +84,7 @@ namespace WildCourt.UI.User
             if (Instance == this) Instance = null;
             if (closeButton != null) closeButton.onClick.RemoveAllListeners();
             if (editorButton != null) editorButton.onClick.RemoveAllListeners();
+            if (editorNameButton != null) editorNameButton.onClick.RemoveAllListeners();
             if (userNameInput != null) userNameInput.onEndEdit.RemoveAllListeners();
         }
 
@@ -117,23 +121,72 @@ namespace WildCourt.UI.User
             // UserLevel：庭院等级（= 玩家等级），纯文本显示，带 "LV." 前缀
             if (levelText != null) levelText.text = "LV." + data.level;
 
-            // UserName：昵称（默认只读，点 Editor 后编辑）
+            // UserName：昵称（默认不可交互，点 Editor/EditorName 后可编辑）
             if (userNameInput != null)
             {
-                userNameInput.readOnly = true;
                 userNameInput.text = data.nickname ?? string.Empty;
                 _lastNickname = userNameInput.text;
             }
+            SetEditEnabled(false);
         }
 
         // ---------- 交互 ----------
 
-        /// <summary>点击 Editor：激活 UserName 输入框进入编辑态。</summary>
+        /// <summary>
+        /// 控制输入框是否可交互。始终不切 readOnly（避免其与 ActivateInputField 竞态），
+        /// 只通过 interactable 控制能否编辑，保证每次点击按钮都能稳定聚焦出光标。
+        /// </summary>
+        private void SetEditEnabled(bool enabled)
+        {
+            if (userNameInput == null) return;
+
+            // 关闭交互必须延迟一帧：onEndEdit 触发时输入框正处于失焦/选中状态切换中，
+            // 若此刻同步设 interactable=false 会打断 Selectable 状态机，
+            // 触发 "Attempting to select while already selecting an object"。
+            if (!enabled)
+            {
+                StartCoroutine(DisableInteractableNextFrame());
+                return;
+            }
+
+            userNameInput.interactable = true;
+        }
+
+        private System.Collections.IEnumerator DisableInteractableNextFrame()
+        {
+            yield return null;
+            if (userNameInput == null) yield break;
+            if (EventSystem.current != null &&
+                EventSystem.current.currentSelectedGameObject == userNameInput.gameObject)
+            {
+                EventSystem.current.SetSelectedGameObject(null);
+            }
+            userNameInput.interactable = false;
+        }
+
+        /// <summary>点击 Editor / EditorName：让 UserName 输入框可交互并获得焦点显示光标。</summary>
         private void OnEditClicked()
         {
             if (userNameInput == null) return;
-            userNameInput.readOnly = false;
+            userNameInput.interactable = true;
+            // 等一帧再聚焦，确保 interactable 与 EventSystem 状态就绪，光标稳定出现
+            StartCoroutine(ActivateAndFocusNextFrame());
+        }
+
+        private System.Collections.IEnumerator ActivateAndFocusNextFrame()
+        {
+            yield return null;
+            if (userNameInput == null) yield break;
+
+            // 先清掉按钮的选中状态，避免 "Attempting to select while already selecting"
+            if (EventSystem.current != null)
+            {
+                EventSystem.current.SetSelectedGameObject(null);
+            }
+
             userNameInput.ActivateInputField();
+            userNameInput.caretPosition = userNameInput.text.Length;
+            userNameInput.MoveTextEnd(false);
         }
 
         /// <summary>昵称输入结束（回车/失焦）：有变化则提交保存。</summary>
@@ -144,15 +197,15 @@ namespace WildCourt.UI.User
 
             if (newName == _lastNickname)
             {
-                // 未变化：恢复只读显示态即可
-                userNameInput.readOnly = true;
+                // 未变化：回到不可交互显示态
+                SetEditEnabled(false);
                 return;
             }
             if (string.IsNullOrEmpty(newName))
             {
                 // 清空视为无效，回滚旧昵称
                 userNameInput.text = _lastNickname;
-                userNameInput.readOnly = true;
+                SetEditEnabled(false);
                 return;
             }
             SaveNickname(newName);
@@ -170,7 +223,6 @@ namespace WildCourt.UI.User
                     if (userNameInput != null)
                     {
                         userNameInput.text = nickname;
-                        userNameInput.readOnly = true;
                     }
                     ApplyProfile(resp.data);
                 },
@@ -180,8 +232,8 @@ namespace WildCourt.UI.User
                     if (userNameInput != null)
                     {
                         userNameInput.text = _lastNickname;
-                        userNameInput.readOnly = true;
                     }
+                    SetEditEnabled(false);
                     Debug.LogWarning($"[UserPanel] 昵称修改失败: {msg}");
                 });
         }
@@ -192,6 +244,7 @@ namespace WildCourt.UI.User
         {
             if (closeButton == null) closeButton = FindChild<Button>("Close");
             if (editorButton == null) editorButton = FindChild<Button>("Editor");
+            if (editorNameButton == null) editorNameButton = FindChild<Button>("EditorName");
             if (idText == null) idText = FindChild<TextMeshProUGUI>("ID");
             if (userNameInput == null) userNameInput = FindChild<TMP_InputField>("UserName");
             if (levelText == null) levelText = FindChild<TextMeshProUGUI>("UserLevel");
