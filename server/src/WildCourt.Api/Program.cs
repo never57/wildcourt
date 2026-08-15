@@ -120,16 +120,8 @@ using (var scope = app.Services.CreateScope())
 // WebSocket 需在中间件之前启用（原生 WebSocket 长连接 /ws/chat）
 app.UseWebSockets();
 
-app.UseMiddleware<ExceptionMiddleware>();
-app.UseMiddleware<RealtimeWebSocketMiddleware>();
-app.UseMiddleware<AdminAuthMiddleware>();
-app.UseMiddleware<AdminAuditMiddleware>();
-app.UseMiddleware<AuthMiddleware>();
-app.UseMiddleware<LogMiddleware>();
-
-app.MapControllers();
-
-// 静态文件托管：头像等上传资源（wwwroot/uploads/...）
+// 静态文件托管：头像等上传资源（wwwroot/uploads/...）。
+// 必须放在鉴权中间件之前，否则 /uploads/xxx 会被 AuthMiddleware 拦截返回 401。
 var webRoot = builder.Configuration["Upload:RootDir"];
 if (string.IsNullOrEmpty(webRoot))
 {
@@ -148,6 +140,15 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "",
     ContentTypeProvider = contentTypeProvider
 });
+
+app.UseMiddleware<ExceptionMiddleware>();
+app.UseMiddleware<RealtimeWebSocketMiddleware>();
+app.UseMiddleware<AdminAuthMiddleware>();
+app.UseMiddleware<AdminAuditMiddleware>();
+app.UseMiddleware<AuthMiddleware>();
+app.UseMiddleware<LogMiddleware>();
+
+app.MapControllers();
 
 // 容器健康检查端点（蓝绿部署/healthcheck 用）：
 // 只确认进程可响应，不查 DB，避免迁移降级时误判并拖慢就绪判断
