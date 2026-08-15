@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.SignalR.Client;
+using WebSocketSharp;
 using UnityEngine;
 using WildCourt.Core;
 using WildCourt.Net.Protocol;
@@ -9,8 +8,10 @@ using WildCourt.Net.Protocol;
 namespace WildCourt.Net.WebSocket
 {
     /// <summary>
-    /// SignalR 长连接客户端（文档 02 §2.5 ChatHub / 03 §3.6 / 14 §14.4）。
-    /// 基于 Microsoft.AspNetCore.SignalR.Client（.NET Standard 2.0，dll 在 Assets/Plugins/SignalR/）。
+    /// 实时长连接客户端（原生 WebSocket 实现，替代官方 SignalR 客户端）。
+    /// 服务端端点：/ws/chat?access_token={token}（原生 WebSocket，帧格式 {event, data}）。
+    /// 采用 WebSocketSharp（netstandard2.0，纯 C#，IL2CPP/AOT 完全兼容），
+    /// 规避官方 SignalR 客户端在 IL2CPP 下的反射/依赖注入兼容性问题。
     /// 断线重连：指数退避，重连成功后重置计数。
     /// </summary>
     public class SignalRClient : MonoBehaviour, IRealtimeClient
@@ -24,14 +25,16 @@ namespace WildCourt.Net.WebSocket
 
         [SerializeField] private float reconnectMinDelay = 1f;
         [SerializeField] private float reconnectMaxDelay = 30f;
+        [SerializeField] private float heartbeatInterval = 30f;
 
         private string _wsUrl;
         private string _token;
         private bool _manualClosed;
         private int _reconnectAttempt;
         private Coroutine _reconnectRoutine;
+        private Coroutine _heartbeatRoutine;
 
-        private HubConnection _connection;
+        private WebSocketSharp.WebSocket _ws;
 
         private void Awake()
         {
@@ -57,6 +60,7 @@ namespace WildCourt.Net.WebSocket
         {
             _manualClosed = true;
             StopReconnect();
+            StopHeartbeat();
             CloseConnection();
         }
 
@@ -67,61 +71,132 @@ namespace WildCourt.Net.WebSocket
                 Debug.LogWarning("[SignalR] wsUrl 为空，跳过实时连接（仅 HTTP）");
                 return;
             }
-            Debug.Log($"[SignalR] 连接 {_wsUrl} ...");
 
-            // 释放旧连接（重连时避免泄漏）
+            // 拼接 token 鉴权参数（服务端 /ws/chat 从 ?access_token= 解析 userId）
+            var url = _wsUrl;
+            var sep = url.Contains("?") ? "&" : "?";
+            url = $"{url}{sep}access_token={Uri.EscapeDataString(_token ?? "")}";
+
+            Debug.Log($"[SignalR] 连接 {url} ...");
+
             CloseConnectionCore();
 
-            _connection = new HubConnectionBuilder()
-                .WithUrl(_wsUrl, options =>
-                {
-                    // 服务端 SignalRUserIdProvider 从 ?access_token= 解析用户
-                    options.AccessTokenProvider = () => Task.FromResult(_token);
-                })
-                .Build();
+            _ws = new WebSocketSharp.WebSocket(url);
+            _ws.OnOpen += OnWsOpen;
+            _ws.OnMessage += OnWsMessage;
+            _ws.OnError += OnWsError;
+            _ws.OnClose += OnWsClose;
 
-            // 服务端推送事件注册（payload 为 JSON 字符串，交由 HandlerCenter 反序列化）
-            _connection.On<string>("ReceivePrivateMessage", payload => Dispatch(NetEvent.PrivateMessage, payload));
-            _connection.On<string>("LetterArrived", payload => Dispatch(NetEvent.LetterArrived, payload));
-            _connection.On<string>("FriendApply", payload => Dispatch(NetEvent.FriendApply, payload));
-            _connection.On<string>("Notice", payload => Dispatch(NetEvent.Notice, payload));
-            _connection.On<string>("DailySettlement", payload => Dispatch(NetEvent.DailySettlement, payload));
-            _connection.On<string>("BadgeUnlocked", payload => Dispatch(NetEvent.BadgeUnlocked, payload));
-            _connection.On<string>("CurrencyChanged", payload => Dispatch(NetEvent.CurrencyChanged, payload));
-            _connection.On<string>("ActivityChanged", payload => Dispatch(NetEvent.ActivityChanged, payload));
-
-            // 断线回调（被动断开 → 自动重连）
-            _connection.Closed += OnConnectionClosed;
-
-            StartAsync(_connection);
-        }
-
-        private async void StartAsync(HubConnection connection)
-        {
+            // 连接在后台线程执行，避免阻塞主线程
             try
             {
-                await connection.StartAsync();
-                IsConnected = true;
-                _reconnectAttempt = 0;
-                Debug.Log("[SignalR] 连接成功");
-                EventBus.Publish(new RealtimeConnectedEvent());
+                _ws.ConnectAsync();
             }
             catch (Exception ex)
             {
-                IsConnected = false;
-                Debug.LogWarning($"[SignalR] 连接失败：{ex.Message}");
-                EventBus.Publish(new RealtimeDisconnectedEvent { Reason = ex.Message });
+                Debug.LogWarning($"[SignalR] 连接异常：{ex.Message}");
                 ScheduleReconnect();
             }
         }
 
-        private Task OnConnectionClosed(Exception ex)
+        private void OnWsOpen(object sender, EventArgs e)
+        {
+            IsConnected = true;
+            _reconnectAttempt = 0;
+            Debug.Log("[SignalR] 连接成功");
+            EventBus.Publish(new RealtimeConnectedEvent());
+            StartHeartbeat();
+        }
+
+        private void OnWsMessage(object sender, MessageEventArgs e)
+        {
+            var text = e.Data;
+            if (string.IsNullOrEmpty(text)) return;
+
+            // 心跳应答：忽略
+            if (text == "pong") return;
+
+            // 解析帧：{ "event": "ReceivePrivateMessage", "data": "{...}" }
+            try
+            {
+                var frame = JsonUtility.FromJson<RealtimeFrameDto>(text);
+                if (frame == null || string.IsNullOrEmpty(frame.@event)) return;
+
+                var netEvent = ParseEvent(frame.@event);
+                OnPush?.Invoke(netEvent, frame.data);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[SignalR] 解析推送帧失败：{ex.Message}");
+            }
+        }
+
+        private void OnWsError(object sender, ErrorEventArgs e)
         {
             IsConnected = false;
-            Debug.LogWarning($"[SignalR] 连接断开：{ex?.Message ?? "remote"}");
-            EventBus.Publish(new RealtimeDisconnectedEvent { Reason = ex?.Message ?? "连接断开" });
+            Debug.LogWarning($"[SignalR] 连接错误：{e.Message}");
+            EventBus.Publish(new RealtimeDisconnectedEvent { Reason = e.Message });
             ScheduleReconnect();
-            return Task.CompletedTask;
+        }
+
+        private void OnWsClose(object sender, CloseEventArgs e)
+        {
+            IsConnected = false;
+            Debug.LogWarning($"[SignalR] 连接断开：{e.Reason}");
+            EventBus.Publish(new RealtimeDisconnectedEvent { Reason = e.Reason });
+            StopHeartbeat();
+            ScheduleReconnect();
+        }
+
+        /// <summary>把服务端事件名映射到 NetEvent 枚举。</summary>
+        private static NetEvent ParseEvent(string eventName)
+        {
+            switch (eventName)
+            {
+                case "LetterArrived": return NetEvent.LetterArrived;
+                case "FriendApply": return NetEvent.FriendApply;
+                case "ReceivePrivateMessage": return NetEvent.PrivateMessage;
+                case "Notice": return NetEvent.Notice;
+                case "DailySettlement": return NetEvent.DailySettlement;
+                case "BadgeUnlocked": return NetEvent.BadgeUnlocked;
+                case "CurrencyChanged": return NetEvent.CurrencyChanged;
+                case "ActivityChanged": return NetEvent.ActivityChanged;
+                default: return NetEvent.Notice;
+            }
+        }
+
+        private void StartHeartbeat()
+        {
+            if (_heartbeatRoutine != null) return;
+            _heartbeatRoutine = StartCoroutine(HeartbeatRoutine());
+        }
+
+        private IEnumerator HeartbeatRoutine()
+        {
+            while (IsConnected)
+            {
+                yield return new WaitForSeconds(heartbeatInterval);
+                if (_ws != null && _ws.IsAlive)
+                {
+                    try
+                    {
+                        _ws.Send("ping");
+                    }
+                    catch
+                    {
+                        // 发送失败由 OnError/OnClose 处理
+                    }
+                }
+            }
+        }
+
+        private void StopHeartbeat()
+        {
+            if (_heartbeatRoutine != null)
+            {
+                StopCoroutine(_heartbeatRoutine);
+                _heartbeatRoutine = null;
+            }
         }
 
         private void CloseConnection()
@@ -136,25 +211,22 @@ namespace WildCourt.Net.WebSocket
 
         private void CloseConnectionCore()
         {
-            if (_connection != null)
+            if (_ws != null)
             {
-                _connection.Closed -= OnConnectionClosed;
+                _ws.OnOpen -= OnWsOpen;
+                _ws.OnMessage -= OnWsMessage;
+                _ws.OnError -= OnWsError;
+                _ws.OnClose -= OnWsClose;
                 try
                 {
-                    _ = _connection.DisposeAsync();
+                    _ws.Close();
                 }
                 catch
                 {
-                    // 忽略释放异常
+                    // 忽略关闭异常
                 }
-                _connection = null;
+                _ws = null;
             }
-        }
-
-        /// <summary>收到服务端事件帧 → 路由分发。</summary>
-        private void Dispatch(NetEvent evt, string data)
-        {
-            OnPush?.Invoke(evt, data);
         }
 
         private void ScheduleReconnect()
@@ -185,6 +257,16 @@ namespace WildCourt.Net.WebSocket
         private void OnDestroy()
         {
             StopReconnect();
+            StopHeartbeat();
+            CloseConnectionCore();
+        }
+
+        /// <summary>服务端推送帧结构：{ "event": "...", "data": "{...}" }。data 为已序列化的负载 JSON 字符串。</summary>
+        [Serializable]
+        private class RealtimeFrameDto
+        {
+            public string @event;
+            public string data;
         }
     }
 }

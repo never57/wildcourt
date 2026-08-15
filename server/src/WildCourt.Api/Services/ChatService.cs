@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using WildCourt.Api.Hubs;
 using WildCourt.Api.Models;
 using WildCourt.Data.DbContext;
 using WildCourt.Data.Entities;
@@ -9,10 +10,12 @@ namespace WildCourt.Api.Services;
 public class ChatService
 {
     private readonly WildCourtDbContext _db;
+    private readonly RealtimeConnectionManager _realtime;
 
-    public ChatService(WildCourtDbContext db)
+    public ChatService(WildCourtDbContext db, RealtimeConnectionManager realtime)
     {
         _db = db;
+        _realtime = realtime;
     }
 
     /// <summary>校验好友关系。</summary>
@@ -60,7 +63,12 @@ public class ChatService
         _db.ChatMessages.Add(entity);
         await _db.SaveChangesAsync();
 
-        return ToDto(entity);
+        var dto = ToDto(entity);
+
+        // 实时推送给接收者（在线则立刻收到；离线消息由历史记录接口拉取）
+        await _realtime.SendAsync(toUserId, "ReceivePrivateMessage", dto);
+
+        return dto;
     }
 
     /// <summary>与某好友的历史消息（双向），按时间升序；同时把对方发给我的未读消息标记已读。</summary>

@@ -52,7 +52,7 @@ namespace WildCourt.Gameplay.Crop
                 Object.DontDestroyOnLoad(go);
                 go.AddComponent<NetManager>();
             }
-            NetManager.Instance.Init(ServerUrl, "http://43.138.133.137/hub/chat");
+            NetManager.Instance.Init(ServerUrl, "ws://43.138.133.137/ws/chat");
 
             if (!ConfigMgr.Instance.IsLoaded)
             {

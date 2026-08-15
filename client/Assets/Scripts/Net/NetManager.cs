@@ -30,8 +30,8 @@ namespace WildCourt.Net
         [SerializeField] private string serverUrl = "http://43.138.133.137";
 
         [Header("实时连接")]
-        [Tooltip("SignalR 长连接地址。注意：SignalR 客户端 WithUrl 只接受 http/https，客户端会自动升级为 WebSocket（生产：http://43.138.133.137/hub/chat；本地 http://localhost:5000/hub/chat）")]
-        [SerializeField] private string wsUrl = "http://43.138.133.137/hub/chat";
+        [Tooltip("原生 WebSocket 长连接地址（生产：ws://43.138.133.137/ws/chat；本地 ws://localhost:5000/ws/chat）")]
+        [SerializeField] private string wsUrl = "ws://43.138.133.137/ws/chat";
 
         public string Token { get; private set; }
 
