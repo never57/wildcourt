@@ -228,7 +228,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   chatWindow: {fileID: 5440051568076331610}
-  chatButton: {fileID: 6333875867400049522}
   closeButton: {fileID: 1113548396177941272}
   friendListContent: {fileID: 6327385753068451715}
   friendButtonPrefab: {fileID: 7743979230681775152, guid: 7ff8d9e6b3974864a93d3c2b36902727, type: 3}
@@ -239,7 +238,7 @@ MonoBehaviour:
   sendButton: {fileID: 2662433724035263165}
   timeLabelPrefab: {fileID: 6889980026504207275, guid: 96e60565d4920274394c7057e7cfe683, type: 3}
   myAvatar: {fileID: 21300000, guid: 1e6a292b42e8c8249b8101521b9b47f9, type: 3}
-  friendAvatar: {fileID: 21300000, guid: e2a031f787ad05d4690735974d80dfcf, type: 3}
+  friendAvatar: {fileID: 21300000, guid: 1e6a292b42e8c8249b8101521b9b47f9, type: 3}
 --- !u!1 &1186236261513671918
 GameObject:
   m_ObjectHideFlags: 0
@@ -494,7 +493,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 3511946393882567}
   m_HandleRect: {fileID: 3633596976725781341}
   m_Direction: 2
-  m_Value: 0
+  m_Value: 1
   m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
@@ -1382,8 +1381,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 188382598311011951}
   m_HandleRect: {fileID: 2595000767746325063}
   m_Direction: 2
-  m_Value: 1
-  m_Size: 0.5
+  m_Value: 0
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -1970,7 +1969,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &2509616949217889027
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2599,7 +2598,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -283.3, y: 113.743576}
+  m_AnchoredPosition: {x: -283.3, y: 115.205}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &6008666929164322125

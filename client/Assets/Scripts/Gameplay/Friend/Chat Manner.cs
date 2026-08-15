@@ -22,9 +22,10 @@ public enum MessageSender
 /// </summary>
 public class ChatManner : MonoBehaviour
 {
+    public static ChatManner Instance { get; private set; }
+
     [Header("窗口控制")]
     public GameObject chatWindow;  //聊天窗口
-    public Button chatButton;  //打开
     public Button closeButton;  //关闭
 
     [Header("好友列表")]
@@ -55,6 +56,13 @@ public class ChatManner : MonoBehaviour
 
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+
         // 订阅实时私聊推送
         EventBus.Subscribe<PrivateMessageEvent>(OnPrivateMessage);
     }
@@ -73,8 +81,7 @@ public class ChatManner : MonoBehaviour
             }
         }
 
-        // 绑定按钮事件
-        if (chatButton != null) chatButton.onClick.AddListener(OpenChat);
+        // 绑定按钮事件（打开聊天改由 YardMainUI 的 friends 按钮触发，此处不再绑定 chatButton）
         if (closeButton != null) closeButton.onClick.AddListener(ChatClose);
         if (sendButton != null) sendButton.onClick.AddListener(SendMessage);
 
@@ -84,10 +91,41 @@ public class ChatManner : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         EventBus.Unsubscribe<PrivateMessageEvent>(OnPrivateMessage);
     }
 
     // ============ 窗口控制 ============
+
+    /// <summary>
+    /// 实例化或复用聊天 UI（chat.prefab，路径 Prefabs/UI/Chat/chat）。
+    /// 与 MailPanel.CreateOrInstantiate 同一模式：首次调用 Resources.Load 实例化，之后复用单例。
+    /// </summary>
+    public static ChatManner CreateOrInstantiate()
+    {
+        if (Instance != null)
+        {
+            Instance.OpenChat();
+            return Instance;
+        }
+
+        var prefab = Resources.Load<GameObject>("Prefabs/UI/Chat/chat");
+        if (prefab == null)
+        {
+            Debug.LogWarning("[ChatManner] 未找到 chat.prefab（Prefabs/UI/Chat/chat）");
+            return null;
+        }
+
+        var go = Instantiate(prefab);
+        var manner = go.GetComponent<ChatManner>();
+        if (manner == null)
+        {
+            Destroy(go);
+            Debug.LogWarning("[ChatManner] chat.prefab 缺少 ChatManner 组件");
+            return null;
+        }
+        return manner;
+    }
 
     public void OpenChat()
     {
