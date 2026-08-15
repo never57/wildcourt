@@ -13,6 +13,13 @@ namespace WildCourt.Api.Hubs;
 /// </summary>
 public class RealtimeConnectionManager
 {
+    /// <summary>与 REST API 一致的 camelCase 序列化（对齐客户端小写字段 DTO）。</summary>
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+    };
+
     /// <summary>userId → 该用户的所有活跃 WebSocket 连接。</summary>
     private readonly ConcurrentDictionary<long, ConcurrentBag<WebSocket>> _connections = new();
 
@@ -58,12 +65,12 @@ public class RealtimeConnectionManager
             return;
         }
 
-        var dataJson = payload as string ?? JsonSerializer.Serialize(payload);
+        var dataJson = payload as string ?? JsonSerializer.Serialize(payload, _jsonOptions);
         var frame = JsonSerializer.Serialize(new RealtimeFrame
         {
             Event = eventName,
             Data = dataJson,
-        });
+        }, _jsonOptions);
 
         var bytes = Encoding.UTF8.GetBytes(frame);
         var segment = new ArraySegment<byte>(bytes);
