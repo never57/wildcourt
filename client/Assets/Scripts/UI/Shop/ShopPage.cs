@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using WildCourt.Core;
+using WildCourt.Net;
+using WildCourt.Net.Protocol;
 
 /// <summary>
 /// 全屏商店主页：把 goodsCard 预制体批量生成到 ScrollRect 的 Content 里，
@@ -20,6 +23,9 @@ public class ShopPage : MonoBehaviour
     {
         [Tooltip("商品名")]
         public string goodsName = "商品";
+
+        [Tooltip("服务器商品 ID（服务器模式购买用）")]
+        public string itemId = "";
 
         [Tooltip("商品图标（可为空）")]
         public Sprite icon;
@@ -57,6 +63,19 @@ public class ShopPage : MonoBehaviour
 
     [Header("商品数据")]
     [SerializeField] private List<ShopItem> items = new List<ShopItem>();
+
+    [Header("服务器模式（种子商店等货架）")]
+    [Tooltip("开启后从服务器货架加载商品，购买走服务器接口")]
+    [SerializeField] private bool serverMode;
+
+    [Tooltip("货架类别过滤（seed/material/item/bait；留空不过滤）")]
+    [SerializeField] private string shelfCategory = "seed";
+
+    [Tooltip("购买货币：shell（庭贝）/ coupon（邮券）")]
+    [SerializeField] private string shelfCurrency = "shell";
+
+    /// <summary>服务器模式：货架加载中（防止重复请求）</summary>
+    private bool _shelfLoading;
 
     /// <summary>已生成的卡片，和 items 一一对应（不依赖 Content 子物体序号，更稳）</summary>
     private readonly List<GoodsCard> spawnedCards = new List<GoodsCard>();
@@ -103,8 +122,16 @@ public class ShopPage : MonoBehaviour
     private void Start()
     {
         AutoFindCurrencyText();
-        Rebuild();
-        RefreshCurrencyDisplay();
+        if (serverMode)
+        {
+            // 服务器模式：数据来自货架接口（Open() 时也会刷新）
+            LoadFromServer();
+        }
+        else
+        {
+            Rebuild();
+            RefreshCurrencyDisplay();
+        }
 
         // 防止全屏商店页挡住其它 UI：默认隐藏，需要时用 Open() 打开
         if (startHidden) gameObject.SetActive(false);
@@ -113,6 +140,7 @@ public class ShopPage : MonoBehaviour
     /// <summary>每 0.25 秒检测一次数据是否被改动（Inspector 或代码改了都算），改了自动刷新卡片。</summary>
     private void Update()
     {
+        if (serverMode) return;   // 服务器模式数据不受 Inspector 编辑影响，无需轮询
         if (Time.time < nextAutoRefresh) return;
         nextAutoRefresh = Time.time + AutoRefreshInterval;
 
@@ -253,6 +281,7 @@ public class ShopPage : MonoBehaviour
     public void Open()
     {
         gameObject.SetActive(true);
+        if (serverMode) LoadFromServer();   // 每次打开刷新货架与余额
         RefreshCurrencyDisplay();
         RefreshAllQuantityCaps();
     }
@@ -399,6 +428,13 @@ public class ShopPage : MonoBehaviour
     {
         if (quantity <= 0) return;
 
+        if (serverMode)
+        {
+            // 服务器模式：余额与库存以服务器为准，走 /shop/buy
+            RequestServerBuy(card, item, quantity);
+            return;
+        }
+
         float cost = item.unitPrice * quantity;
         if (item.useRemainingLimit && item.remaining < quantity)
         {
@@ -425,6 +461,139 @@ public class ShopPage : MonoBehaviour
         RefreshCurrencyDisplay();
 
         Debug.Log($"已购买「{item.goodsName}」x{quantity}，花费 {cost}，剩余货币 {currencyAmount}，剩余库存 {item.remaining}（限制开关={item.useRemainingLimit}）", this);
+    }
+
+    // ---------- 服务器模式（种子商店等货架，文档 09） ----------
+
+    /// <summary>服务器模式：拉取货架（按 shelfCategory 过滤）并重建商品列表。</summary>
+    public void LoadFromServer()
+    {
+        var net = NetManager.Instance;
+        if (net == null || _shelfLoading) return;
+
+        _shelfLoading = true;
+        net.Get<ShelfItem[]>(ApiPaths.ShopShelves,
+            resp =>
+            {
+                _shelfLoading = false;
+                ApplyShelves(resp.data);
+            },
+            (code, msg) =>
+            {
+                _shelfLoading = false;
+                Debug.LogWarning($"[ShopPage] 货架加载失败：{msg}", this);
+            });
+    }
+
+    /// <summary>把货架数据写入商品列表并重建卡片（单价大于 0 才上架）。</summary>
+    private void ApplyShelves(ShelfItem[] shelves)
+    {
+        items.Clear();
+        if (shelves != null)
+        {
+            foreach (ShelfItem s in shelves)
+            {
+                if (s == null) continue;
+                if (!string.IsNullOrEmpty(shelfCategory)
+                    && !s.category.Equals(shelfCategory, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (s.buyPrice <= 0) continue;
+
+                items.Add(new ShopItem
+                {
+                    itemId = s.id,
+                    goodsName = s.itemName,
+                    icon = null,   // 种子图标资源暂缺（Resources/Art/Sprite/Crops 后续补充）
+                    unitPrice = s.buyPrice,
+                    remaining = 0,
+                    owned = 0,
+                    useRemainingLimit = false,   // 种子无库存上限，只受庭贝约束
+                });
+            }
+        }
+
+        Rebuild();
+        RefreshCurrencyDisplay();
+
+        // 拉背包刷新「已拥有」，拉余额刷新可购买上限
+        LoadInventory();
+        LoadBalance();
+    }
+
+    /// <summary>服务器模式：拉取玩家余额（庭贝 shell），刷新货币显示与购买上限。</summary>
+    private void LoadBalance()
+    {
+        var net = NetManager.Instance;
+        if (net == null) return;
+        net.Get<UserProfileResponse>(ApiPaths.UserProfile,
+            resp =>
+            {
+                if (resp.data == null) return;
+                currencyAmount = resp.data.shell;
+                RefreshCurrencyDisplay();
+                RefreshAllQuantityCaps();
+            },
+            (code, msg) => Debug.LogWarning($"[ShopPage] 余额加载失败：{msg}", this));
+    }
+
+    /// <summary>服务器模式：拉取背包，刷新每张卡的「已拥有」数量。</summary>
+    private void LoadInventory()
+    {
+        var net = NetManager.Instance;
+        if (net == null) return;
+        net.Get<InventoryResponse>(ApiPaths.UserInventory,
+            resp =>
+            {
+                var ownedMap = new Dictionary<string, int>();
+                if (resp.data != null && resp.data.items != null)
+                {
+                    foreach (InventoryItem it in resp.data.items)
+                    {
+                        if (it != null) ownedMap[it.itemId] = it.count;
+                    }
+                }
+                for (int i = 0; i < items.Count && i < spawnedCards.Count; i++)
+                {
+                    ShopItem item = items[i];
+                    if (item == null || spawnedCards[i] == null) continue;
+                    item.owned = ownedMap.TryGetValue(item.itemId, out int count) ? count : 0;
+                    spawnedCards[i].SetOwned(item.owned);
+                }
+            },
+            (code, msg) => Debug.LogWarning($"[ShopPage] 背包加载失败：{msg}", this));
+    }
+
+    /// <summary>服务器模式购买：POST /shop/buy（货币 = shelfCurrency，庭贝 shell），成功后用服务器余额刷新并广播货币变化。</summary>
+    private void RequestServerBuy(GoodsCard card, ShopItem item, int quantity)
+    {
+        if (quantity <= 0 || string.IsNullOrEmpty(item.itemId)) return;
+
+        var net = NetManager.Instance;
+        if (net == null) return;
+
+        net.Post<BuyResponse>(ApiPaths.ShopBuy,
+            new BuyRequest { itemId = item.itemId, count = quantity, currency = shelfCurrency },
+            resp =>
+            {
+                if (resp.data == null) return;
+                // 以服务器返回的权威余额为准（庭贝）
+                currencyAmount = resp.data.shell;
+                item.owned += quantity;
+                card.ResetQuantity();
+                card.SetOwned(item.owned);
+                RefreshAllQuantityCaps();
+                RefreshCurrencyDisplay();
+
+                // 广播货币变化：YardMainUI 等订阅方会重拉 profile 对齐余额
+                EventBus.Publish(new CurrencyChangedEvent
+                {
+                    Shell = resp.data.shell,
+                    Coupon = resp.data.coupon,
+                });
+
+                Debug.Log($"已购买「{item.goodsName}」x{quantity}，剩余庭贝 {resp.data.shell}", this);
+            },
+            (code, msg) => Debug.LogWarning($"购买「{item.goodsName}」失败：{msg}", this));
     }
 
     /// <summary>刷新屏幕上显示的货币文本</summary>
