@@ -1,4 +1,6 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 using WildCourt.Core;
 using WildCourt.Gameplay.Yard;
@@ -34,6 +36,9 @@ namespace WildCourt.UI.Yard
         [SerializeField] private Button _mailButton;       // mail 按钮，点击打开信箱（MailPanel）
         [SerializeField] private Button _friendsButton;    // friends 按钮，点击打开好友聊天（ChatManner）
         [SerializeField] private Button _editorButton;     // editor 按钮，点击打开玩家信息面板（UserPanel）
+
+        [Header("玩家信息（playerinformation 内绑定）")]
+        [SerializeField] private Image _playerInfoAvatarImage;   // playerinformation/Image：头像显示，与服务器头像同步
 
         private YardManager _yard;
         private YardPanel _panel;
@@ -77,12 +82,23 @@ namespace WildCourt.UI.Yard
 
             // 订阅货币变化：邮箱领取附件等场景会广播，收到后重拉 profile 对齐权威余额
             EventBus.Subscribe<CurrencyChangedEvent>(OnCurrencyChanged);
+            // 订阅资料更新：UserPanel 改头像/昵称后广播，同步 playerinformation 头像
+            EventBus.Subscribe<ProfileUpdatedEvent>(OnProfileUpdated);
         }
 
         /// <summary>货币变化（领取附件/购买等）：重拉玩家资料，保证建筑面板余额显示最新值。</summary>
         private void OnCurrencyChanged(CurrencyChangedEvent evt)
         {
             LoadProfile();
+        }
+
+        /// <summary>资料更新（UserPanel 改头像/昵称后广播）：同步 playerinformation 头像。</summary>
+        private void OnProfileUpdated(ProfileUpdatedEvent evt)
+        {
+            if (!string.IsNullOrEmpty(evt.AvatarUrl))
+            {
+                LoadAvatarToPlayerInfo(ToAbsoluteUrl(evt.AvatarUrl));
+            }
         }
 
         private void BindYard(YardManager yard)
@@ -121,6 +137,7 @@ namespace WildCourt.UI.Yard
             if (_editorButton != null) _editorButton.onClick.RemoveAllListeners();
             YardPanel.BackPressed -= OnBuildPanelClosed;
             EventBus.Unsubscribe<CurrencyChangedEvent>(OnCurrencyChanged);
+            EventBus.Unsubscribe<ProfileUpdatedEvent>(OnProfileUpdated);
         }
 
         /// <summary>建造面板返回：隐藏建造面板，恢复显示主 UI。</summary>
@@ -133,14 +150,61 @@ namespace WildCourt.UI.Yard
             gameObject.SetActive(true);
         }
 
-        /// <summary>拉取玩家资料，缓存后供 YardPanel 打开时注入（余额显示）。</summary>
+        /// <summary>拉取玩家资料，缓存后供 YardPanel 打开时注入（余额显示），并同步 playerinformation 头像。</summary>
         private void LoadProfile()
         {
             var net = NetManager.Instance;
             if (net == null) return;
             net.Get<UserProfileResponse>(ApiPaths.UserProfile,
-                resp => _profile = resp.data,
+                resp =>
+                {
+                    _profile = resp.data;
+                    // 初始化/刷新时同步头像到 playerinformation
+                    if (resp.data != null && !string.IsNullOrEmpty(resp.data.avatarUrl))
+                    {
+                        LoadAvatarToPlayerInfo(ToAbsoluteUrl(resp.data.avatarUrl));
+                    }
+                },
                 (code, msg) => Debug.LogWarning($"[YardMainUI] profile 加载失败: {msg}"));
+        }
+
+        /// <summary>把服务端返回的相对路径（/uploads/...）拼成绝对地址。</summary>
+        private string ToAbsoluteUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return url;
+            if (url.StartsWith("http://") || url.StartsWith("https://")) return url;
+            var baseUrl = NetManager.Instance != null ? NetManager.Instance.ServerUrl : string.Empty;
+            return baseUrl.TrimEnd('/') + "/" + url.TrimStart('/');
+        }
+
+        /// <summary>加载头像 URL 并显示到 playerinformation 的 Image。</summary>
+        private void LoadAvatarToPlayerInfo(string url)
+        {
+            if (_playerInfoAvatarImage == null || string.IsNullOrEmpty(url)) return;
+            StartCoroutine(LoadAvatarToPlayerInfoCoroutine(url));
+        }
+
+        private IEnumerator LoadAvatarToPlayerInfoCoroutine(string url)
+        {
+            using (var req = UnityWebRequestTexture.GetTexture(url))
+            {
+                req.certificateHandler = new NetManager.InsecureCertificateHandlerPublic();
+                req.timeout = 10;
+                yield return req.SendWebRequest();
+
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    Debug.LogWarning($"[YardMainUI] 头像加载失败: {req.error}");
+                    yield break;
+                }
+
+                var tex = DownloadHandlerTexture.GetContent(req);
+                if (tex != null && _playerInfoAvatarImage != null)
+                {
+                    _playerInfoAvatarImage.sprite = Sprite.Create(tex,
+                        new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                }
+            }
         }
 
         /// <summary>点击“信箱”按钮：实例化打开信箱面板（MailPanel）。MailPanel 为独立 Canvas 弹窗，覆盖在庭院 UI 之上。</summary>

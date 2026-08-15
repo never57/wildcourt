@@ -704,10 +704,10 @@ RectTransform:
   - {fileID: 2463728008363756579}
   m_Father: {fileID: 3716068655347585163}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 214.8, y: 60.9}
-  m_SizeDelta: {x: 22, y: 22}
+  m_AnchorMin: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: -55.58, y: -33.053}
+  m_SizeDelta: {x: 40, y: 40}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7790277115943969929
 CanvasRenderer:
@@ -1039,6 +1039,7 @@ MonoBehaviour:
   _mailButton: {fileID: 7324471275013973819}
   _friendsButton: {fileID: 5656986604799875015}
   _editorButton: {fileID: 5871339891211895695}
+  _playerInfoAvatarImage: {fileID: 7600734732820487165}
 --- !u!1 &4223649460554621797
 GameObject:
   m_ObjectHideFlags: 0
@@ -1051,7 +1052,7 @@ GameObject:
   - component: {fileID: 3952368345274991716}
   - component: {fileID: 7600734732820487165}
   m_Layer: 5
-  m_Name: Image
+  m_Name: Avatar
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

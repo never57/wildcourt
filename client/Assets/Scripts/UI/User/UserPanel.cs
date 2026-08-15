@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Networking;
 using UnityEngine.UI;
+using WildCourt.Core;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
 
@@ -248,6 +249,12 @@ namespace WildCourt.UI.User
                         userNameInput.text = nickname;
                     }
                     ApplyProfile(resp.data);
+                    // 广播昵称更新，供 YardMainUI 等同步
+                    EventBus.Publish(new ProfileUpdatedEvent
+                    {
+                        AvatarUrl = resp.data != null ? resp.data.avatarUrl : null,
+                        Nickname = resp.data != null ? resp.data.nickname : nickname
+                    });
                 },
                 (code, msg) =>
                 {
@@ -267,10 +274,7 @@ namespace WildCourt.UI.User
         private void OnAvatarClicked()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            if (!NativeGallery.CheckPermission(NativeGallery.PermissionType.Read, NativeGallery.MediaType.Image))
-            {
-                NativeGallery.RequestPermission(NativeGallery.PermissionType.Read, NativeGallery.MediaType.Image);
-            }
+            // GetImageFromGallery 内部已自动处理相册权限（RequestPermissionAsync），无需手动请求
             NativeGallery.GetImageFromGallery((path) =>
             {
                 if (string.IsNullOrEmpty(path))
@@ -278,19 +282,26 @@ namespace WildCourt.UI.User
                     Debug.Log("[UserPanel] 取消选择头像");
                     return;
                 }
-                // 读文件字节（限制 8MB）
-                if (!NativeGallery.GetImageSize(path, out var _, out var _, out long dataSize) || dataSize > 8 * 1024 * 1024)
-                {
-                    Debug.LogWarning("[UserPanel] 头像图片过大（>8MB）或读取失败");
-                    return;
-                }
-                byte[] bytes = NativeGallery.LoadImageAtPath(path, -1, false, false);
-                if (bytes == null || bytes.Length == 0)
+                // LoadImageAtPath 返回 Texture2D，再编码为 PNG 字节上传
+                var tex = NativeGallery.LoadImageAtPath(path, 512, false, false);
+                if (tex == null)
                 {
                     Debug.LogWarning("[UserPanel] 头像读取失败");
                     return;
                 }
-                UploadAvatar(bytes, Path.GetExtension(path));
+                byte[] bytes = tex.EncodeToPNG();
+                UnityEngine.Object.Destroy(tex);
+                if (bytes == null || bytes.Length == 0)
+                {
+                    Debug.LogWarning("[UserPanel] 头像编码失败");
+                    return;
+                }
+                if (bytes.Length > 8 * 1024 * 1024)
+                {
+                    Debug.LogWarning("[UserPanel] 头像图片过大（>8MB）");
+                    return;
+                }
+                UploadAvatar(bytes, ".png");
             }, "选择头像", "image/*");
 #else
             // 编辑器/PC 兜底：提示需在 Android 真机测试
@@ -311,6 +322,12 @@ namespace WildCourt.UI.User
                 resp =>
                 {
                     ApplyProfile(resp.data);
+                    // 广播头像更新，供 YardMainUI 等同步
+                    EventBus.Publish(new ProfileUpdatedEvent
+                    {
+                        AvatarUrl = resp.data != null ? resp.data.avatarUrl : null,
+                        Nickname = resp.data != null ? resp.data.nickname : null
+                    });
                 },
                 (code, msg) =>
                 {
@@ -358,7 +375,11 @@ namespace WildCourt.UI.User
             if (userNameInput == null) userNameInput = FindChild<TMP_InputField>("UserName");
             if (levelText == null) levelText = FindChild<TextMeshProUGUI>("UserLevel");
             if (avatarButton == null) avatarButton = FindChild<Button>("Avatar");
-            if (avatarImage == null) avatarImage = FindChild<Image>("Image");
+            // Avatar 节点自身就带有 Image 组件（按钮那张图），换的就是它的 sprite
+            if (avatarImage == null && avatarButton != null)
+            {
+                avatarImage = avatarButton.GetComponent<Image>();
+            }
         }
 
         private T FindChild<T>(string name) where T : Component

@@ -85,6 +85,13 @@ namespace WildCourt.Core
         public long Coupon;
     }
 
+    /// <summary>玩家资料更新（昵称/头像等，客户端本地改动后广播，供各处头像/昵称同步）。</summary>
+    public struct ProfileUpdatedEvent
+    {
+        public string AvatarUrl;
+        public string Nickname;
+    }
+
     /// <summary>徽章解锁。</summary>
     public struct BadgeUnlockedEvent
     {
