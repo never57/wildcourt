@@ -31,6 +31,7 @@ namespace WildCourt.UI.Yard
         [Header("YardMainUI.prefab 内绑定")]
         [SerializeField] private Button _buildButton;      // bulidsystem 按钮
         [SerializeField] private Button _mailButton;       // mail 按钮，点击打开信箱（MailPanel）
+        [SerializeField] private Button _friendsButton;    // friends 按钮，点击打开好友聊天（ChatManner）
 
         private YardManager _yard;
         private YardPanel _panel;
@@ -95,6 +96,11 @@ namespace WildCourt.UI.Yard
                 _mailButton.onClick.RemoveAllListeners();
                 _mailButton.onClick.AddListener(OpenMailPanel);
             }
+            if (_friendsButton != null)
+            {
+                _friendsButton.onClick.RemoveAllListeners();
+                _friendsButton.onClick.AddListener(OpenChat);
+            }
             YardPanel.BackPressed -= OnBuildPanelClosed;
             YardPanel.BackPressed += OnBuildPanelClosed;
         }
@@ -104,6 +110,7 @@ namespace WildCourt.UI.Yard
             if (Instance == this) Instance = null;
             if (_buildButton != null) _buildButton.onClick.RemoveAllListeners();
             if (_mailButton != null) _mailButton.onClick.RemoveAllListeners();
+            if (_friendsButton != null) _friendsButton.onClick.RemoveAllListeners();
             YardPanel.BackPressed -= OnBuildPanelClosed;
             EventBus.Unsubscribe<CurrencyChangedEvent>(OnCurrencyChanged);
         }
@@ -133,6 +140,12 @@ namespace WildCourt.UI.Yard
         {
             var panel = MailPanel.CreateOrInstantiate();
             if (panel != null) panel.Open();
+        }
+
+        /// <summary>点击“好友”按钮：打开好友聊天窗口（ChatManner）。首次实例化 chat.prefab，之后复用。</summary>
+        private void OpenChat()
+        {
+            ChatManner.CreateOrInstantiate();
         }
 
         /// <summary>点击“建造”按钮：实例化打开庭院建造面板（YardPanel），注入已缓存资料，并隐藏主 UI。</summary>

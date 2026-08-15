@@ -27,9 +27,17 @@ namespace WildCourt.Net.Protocol
         // FriendController
         public const string FriendApply = Base + "/friend/apply";
         public const string FriendAccept = Base + "/friend/accept";
+        public const string FriendReject = Base + "/friend/reject";
+        public const string FriendList = Base + "/friend/list";
+        public const string FriendRequests = Base + "/friend/requests";
         public const string FriendSteal = Base + "/friend/steal";
         public const string FriendFeed = Base + "/friend/feed";
+        public static string FriendDelete(long userId) => Base + $"/friend/{userId}";
         public static string FriendYard(long userId) => Base + $"/friend/yard/{userId}";
+
+        // ChatController（好友私聊）
+        public const string ChatSend = Base + "/chat/send";
+        public static string ChatHistory(long friendUserId) => Base + $"/chat/history/{friendUserId}";
 
         // ShopController
         public const string ShopShelves = Base + "/shop/shelves";
@@ -88,6 +96,9 @@ namespace WildCourt.Net.Protocol
 
         /// <summary>收到好友申请。</summary>
         FriendApply,
+
+        /// <summary>收到好友私聊消息。</summary>
+        PrivateMessage,
 
         /// <summary>通用通知（访问留下/空盆离开等）。</summary>
         Notice,

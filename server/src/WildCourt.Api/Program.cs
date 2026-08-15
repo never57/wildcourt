@@ -44,6 +44,7 @@ builder.Services.AddScoped<PlayerService>();
 builder.Services.AddScoped<ShopService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<FriendService>();
+builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<SignInService>();
 builder.Services.AddScoped<LetterService>();
 
@@ -66,7 +67,8 @@ builder.Services.AddControllers()
         opt.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         opt.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
-builder.Services.AddSignalR();
+// 实时连接：原生 WebSocket（替代 SignalR，规避 IL2CPP/AOT 反射兼容性问题）
+builder.Services.AddSingleton<RealtimeConnectionManager>();
 
 var app = builder.Build();
 
@@ -109,7 +111,11 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// WebSocket 需在中间件之前启用（原生 WebSocket 长连接 /ws/chat）
+app.UseWebSockets();
+
 app.UseMiddleware<ExceptionMiddleware>();
+app.UseMiddleware<RealtimeWebSocketMiddleware>();
 app.UseMiddleware<AdminAuthMiddleware>();
 app.UseMiddleware<AdminAuditMiddleware>();
 app.UseMiddleware<AuthMiddleware>();
@@ -120,8 +126,6 @@ app.MapControllers();
 // 容器健康检查端点（蓝绿部署/healthcheck 用）：
 // 只确认进程可响应，不查 DB，避免迁移降级时误判并拖慢就绪判断
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-
-app.MapHub<ChatHub>("/hub/chat");
 
 app.Run();
 return;

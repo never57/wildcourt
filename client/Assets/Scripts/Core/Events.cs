@@ -62,6 +62,16 @@ namespace WildCourt.Core
         public long FromUserId;
     }
 
+    /// <summary>收到好友私聊消息（ChatHub ReceivePrivateMessage 推送）。</summary>
+    public struct PrivateMessageEvent
+    {
+        public long Id;
+        public long FromUserId;
+        public long ToUserId;
+        public string Content;
+        public long CreatedAt;
+    }
+
     /// <summary>每日结算播报（04:00 推送，文档 14 §14.5）。</summary>
     public struct DailySettlementEvent
     {

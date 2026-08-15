@@ -40,8 +40,8 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # SignalR WebSocket（/hub/chat），需 Upgrade/Connection 头支持长连接
-    location /hub/ {
+    # 实时长连接 WebSocket（/ws/chat），需 Upgrade/Connection 头支持长连接
+    location /ws/ {
         proxy_pass http://api-blue:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;

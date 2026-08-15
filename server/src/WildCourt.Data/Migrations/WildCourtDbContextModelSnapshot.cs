@@ -202,6 +202,48 @@ namespace WildCourt.Data.Migrations
                     b.ToTable("announcements", (string)null);
                 });
 
+            modelBuilder.Entity("WildCourt.Data.Entities.ChatMessageEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("FromUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_user_id");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("is_read");
+
+                    b.Property<long>("ToUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromUserId", "ToUserId")
+                        .HasDatabaseName("idx_chat_messages_from_to");
+
+                    b.HasIndex("ToUserId", "IsRead")
+                        .HasDatabaseName("idx_chat_messages_to_read");
+
+                    b.ToTable("chat_messages", (string)null);
+                });
+
             modelBuilder.Entity("WildCourt.Data.Entities.FarmPlotEntity", b =>
                 {
                     b.Property<long>("UserId")
@@ -262,6 +304,41 @@ namespace WildCourt.Data.Migrations
                     b.HasKey("UserId", "FriendId");
 
                     b.ToTable("friends", (string)null);
+                });
+
+            modelBuilder.Entity("WildCourt.Data.Entities.FriendRequestEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("FromUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_user_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)")
+                        .HasColumnName("status");
+
+                    b.Property<long>("ToUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ToUserId", "Status")
+                        .HasDatabaseName("idx_friend_requests_to_status");
+
+                    b.ToTable("friend_requests", (string)null);
                 });
 
             modelBuilder.Entity("WildCourt.Data.Entities.InventoryEntity", b =>

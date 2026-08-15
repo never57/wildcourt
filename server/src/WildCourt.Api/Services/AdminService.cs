@@ -694,7 +694,7 @@ public class AdminService
             ToNickname = nicknames.GetValueOrDefault(l.ToUser, "未知"),
             Content = l.Content,
             // 审核队列展示随附道具：从多附件中取第一个 item 类型的 ItemId（玩家写信携带道具功能已剥离，此处为兼容占位）
-            ItemId = l.Attachments.FirstOrDefault(a => a.Type == "item")?.ItemId,
+            ItemId = (l.Attachments ?? new List<LetterAttachment>()).FirstOrDefault(a => a.Type == "item")?.ItemId,
             Status = l.Status,
             CreatedAt = l.CreatedAt,
         }).ToList();

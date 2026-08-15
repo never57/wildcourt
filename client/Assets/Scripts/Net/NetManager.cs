@@ -29,12 +29,21 @@ namespace WildCourt.Net
         [Tooltip("REST 服务地址，需与服务端端口一致（生产：http://43.138.133.137 走 nginx 80；本地 localhost:5000）")]
         [SerializeField] private string serverUrl = "http://43.138.133.137";
 
+        [Header("实时连接")]
+        [Tooltip("原生 WebSocket 长连接地址（生产：ws://43.138.133.137/ws/chat；本地 ws://localhost:5000/ws/chat）")]
+        [SerializeField] private string wsUrl = "ws://43.138.133.137/ws/chat";
+
         public string Token { get; private set; }
 
         [SerializeField] private float timeoutSeconds = 10f;
         [SerializeField] private int maxRetry = 1;
 
         private IRealtimeClient _realtime;
+        private string _wsUrl;
+        private bool _initialized;
+
+        /// <summary>是否已完成初始化（HandlerCenter 已注册、SignalRClient 已创建）。</summary>
+        public bool IsInitialized => _initialized;
 
         private void Awake()
         {
@@ -47,21 +56,28 @@ namespace WildCourt.Net
             DontDestroyOnLoad(gameObject);
             // 默认取序列化配置的 serverUrl（服务端端口默认 5000）
             ServerUrl = serverUrl;
+            // 自举：无论从哪个入口创建 NetManager（Splash/Login/DebugScene），都确保网络层就绪。
+            // SignalR 连接本身延迟到 SetToken（登录拿到 token）后，见 ConnectRealtime。
+            Init(serverUrl, wsUrl);
         }
 
-        /// <summary>初始化（文档 17 §17.4 联调：localhost:5000）。</summary>
+        /// <summary>初始化（文档 17 §17.4 联调：localhost:5000）。幂等，重复调用无副作用。</summary>
         public void Init(string serverUrl, string wsUrl)
         {
+            if (_initialized) return;
             ServerUrl = string.IsNullOrEmpty(serverUrl) ? ServerUrl : serverUrl;
+            _wsUrl = wsUrl;
             DefaultHandlers.RegisterAll();
             _realtime = GetComponent<SignalRClient>() ?? gameObject.AddComponent<SignalRClient>();
-            ConnectRealtime(wsUrl);
+            _realtime.OnPush += HandlerCenter.Instance.Route;
+            _initialized = true;
         }
 
-        /// <summary>登录后注入会话 token。</summary>
+        /// <summary>登录后注入会话 token，并建立实时连接（SignalR 需 token 鉴权，故在登录后连接）。</summary>
         public void SetToken(string token)
         {
             Token = token;
+            ConnectRealtime();
         }
 
         public void Get<T>(string path, Action<ApiResponse<T>> onSuccess, Action<int, string> onError = null)
@@ -235,11 +251,11 @@ namespace WildCourt.Net
             }
         }
 
-        private void ConnectRealtime(string wsUrl)
+        private void ConnectRealtime()
         {
-            if (_realtime == null || string.IsNullOrEmpty(wsUrl)) return;
-            _realtime.OnPush += HandlerCenter.Instance.Route;
-            _realtime.Connect(wsUrl, Token);
+            if (_realtime == null || string.IsNullOrEmpty(_wsUrl)) return;
+            if (_realtime.IsConnected) return;
+            _realtime.Connect(_wsUrl, Token);
         }
 
         /// <summary>信任所有证书的兜底 handler（仅开发/联调使用，规避 HTTP 明文被拒）。</summary>
