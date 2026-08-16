@@ -293,7 +293,11 @@ namespace WildCourt.UI.Letters
             grid.constraintCount = 5;                  // 每行 5 个
         }
 
-        /// <summary>标记信件已读（未读 → 已读），成功后更新本地状态并刷新对应列表项。</summary>
+        /// <summary>
+        /// 标记信件已读（未读 → 已读），成功后更新本地状态并刷新对应列表项。
+        /// 仅在本地仍为「未读」时才改为「已读」：防止 mark-read 回调晚于
+        /// claim 回调到达时，把已设置为「已领取」的状态覆盖回「已读」。
+        /// </summary>
         private void MarkRead(LetterItem letter)
         {
             if (NetManager.Instance != null)
@@ -302,8 +306,11 @@ namespace WildCourt.UI.Letters
                     new ClaimLetterRequest { letterId = letter.letterId },
                     resp =>
                     {
-                        letter.status = "已读";
-                        RefreshItemStatus(letter);
+                        if (letter.status == "未读")
+                        {
+                            letter.status = "已读";
+                            RefreshItemStatus(letter);
+                        }
                     },
                     (code, msg) => { /* 已读标记失败不打断阅读，静默忽略 */ });
             }
@@ -348,6 +355,10 @@ namespace WildCourt.UI.Letters
                         // 仍是旧值（已读），无法命中「已经领取过了」的幂等提示，会重复调领取接口。
                         _selected.status = "已领取";
                         RefreshItemStatus(_selected);
+                        // 刷新附件格子的领取标记（Status 图片）：领取后 ShowList 重建列表时
+                        // _selected 非空不会触发自动选中，详情区不会重绑，若不在此刷新
+                        // 附件格子的 Status 图片将一直保持隐藏。
+                        BindAttachment(_selected);
                         SetHint("领取成功");
 
                         // 领取附件后广播货币变化，通知建筑/农场等依赖庭贝显示的 UI 刷新。
