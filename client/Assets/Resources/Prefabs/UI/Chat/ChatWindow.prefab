@@ -2900,6 +2900,8 @@ MonoBehaviour:
   timeLabelPrefab: {fileID: 6889980026504207275, guid: 96e60565d4920274394c7057e7cfe683, type: 3}
   myAvatar: {fileID: 21300000, guid: 1e6a292b42e8c8249b8101521b9b47f9, type: 3}
   friendAvatar: {fileID: 21300000, guid: e2a031f787ad05d4690735974d80dfcf, type: 3}
+  titleText: {fileID: 0}
+  chatScrollRect: {fileID: 0}
 --- !u!1 &8408784106250059457
 GameObject:
   m_ObjectHideFlags: 0

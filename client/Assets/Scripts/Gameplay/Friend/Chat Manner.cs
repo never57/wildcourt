@@ -49,6 +49,12 @@ public class ChatManner : MonoBehaviour
     public Sprite myAvatar;  // 本人头像
     public Sprite friendAvatar;  // 好友头像
 
+    [Header("标题")]
+    public TMP_Text titleText;  // 标题好友名字喵
+
+    [Header("消息更新到最新")]
+    public ScrollRect chatScrollRect;  // 滚动区域喵
+
     // ---- 会话状态 ----
     private long _myUserId;                 // 当前登录用户 ID
     private long _activeFriendId = -1;     // 当前正在聊天的好友 ID
@@ -69,6 +75,12 @@ public class ChatManner : MonoBehaviour
 
     private void Start()
     {
+        //清空输入框消息
+        inputField.text = "";
+
+        //测试喵
+        
+
         // 将窗口组件全部禁止
         if (chatWindow != null)
         {
@@ -186,6 +198,16 @@ public class ChatManner : MonoBehaviour
                     _friends.AddRange(resp.data.friends);
                 }
                 RebuildFriendList();
+                if(_friends.Count > 0)
+                {
+                    OpenFriendChat(_friends[0].userId);  // 默认打开第一个好友聊天
+                    ScrollToBottom();
+                }
+                else
+                {
+                    UpdateTitle("");
+                    ClearMessages();
+                }
             },
             (code, msg) => Debug.LogWarning($"[Chat] 拉取好友列表失败：{msg}"));
     }
@@ -218,12 +240,37 @@ public class ChatManner : MonoBehaviour
         }
     }
 
+    //更新当前聊天对象喵
     private void OpenFriendChat(long friendId)
     {
         _activeFriendId = friendId;
+        //更新标题
+        string friendName = GetFriendName(friendId);
+        UpdateTitle(friendName);
+
         // 清空消息区
         ClearMessages();
         LoadHistory(friendId);
+    }
+
+    private void UpdateTitle(string name)
+    {
+        if(titleText != null)
+        {
+            titleText.text = name;
+        }
+    }
+
+    private string GetFriendName(long friendId)
+    {
+        foreach(var i in _friends)
+        {
+            if(i.userId == friendId)
+            {
+                return string.IsNullOrEmpty(i.nickname) ? i.userId.ToString() : i.nickname;
+            }
+        }
+        return friendId.ToString();
     }
 
     private void LoadHistory(long friendId)
@@ -236,7 +283,7 @@ public class ChatManner : MonoBehaviour
                 {
                     foreach (var m in resp.data.messages)
                     {
-                        AddMessage(m.content, m.fromUserId == _myUserId ? MessageSender.Me : MessageSender.Friend);
+                        AddMessage(m.content, m.fromUserId == _myUserId ? MessageSender.Me : MessageSender.Friend, m.avatarUrl);
                     }
                 }
             },
@@ -275,11 +322,22 @@ public class ChatManner : MonoBehaviour
                 if (resp != null && resp.data != null)
                 {
                     AddMessage(resp.data.content, MessageSender.Me);
+                    ScrollToBottom();
                 }
             },
             (code, errMsg) => Debug.LogWarning($"[Chat] 发送失败：{errMsg}"));
 
         inputField.text = "";
+    }
+
+    private void ScrollToBottom()
+    {
+        if(chatScrollRect != null)
+        {
+            Canvas.ForceUpdateCanvases();
+            chatScrollRect.verticalNormalizedPosition = 0f;
+            Debug.Log("已到最下方喵");
+        }
     }
 
     private void OnPrivateMessage(PrivateMessageEvent evt)
@@ -297,7 +355,7 @@ public class ChatManner : MonoBehaviour
 
     // ============ UI 渲染（保留原实现） ============
 
-    private void AddMessage(string text, MessageSender sender = MessageSender.Me)
+    private void AddMessage(string text, MessageSender sender = MessageSender.Me,string avatarUrl = null)
     {
         // 检查是否需要显示时间
         string currentTime = System.DateTime.Now.ToString("HH:mm");
@@ -332,8 +390,22 @@ public class ChatManner : MonoBehaviour
         if (avatarNode != null)
         {
             Image avatar = avatarNode.GetComponent<Image>();
-            if (avatar != null) avatar.sprite = (sender == MessageSender.Me) ? myAvatar : friendAvatar;
+            if(avatar != null)
+            {
+                if (!string.IsNullOrEmpty(avatarUrl))
+                {
+                    //从服务器中加载头像喵
+                    string fullUrl = AvatarLoader.ToAbsluteUrl(avatarUrl);
+                    AvatarLoader.LoadInto(avatar, fullUrl,this);
+                }
+                else
+                {
+                    //使用默认头像
+                    avatar.sprite = (sender == MessageSender.Me) ? myAvatar : friendAvatar;
+                }
+            }
         }
+        ScrollToBottom();
     }
 
     private bool ShouldShowTime()
