@@ -29,3 +29,9 @@ public class AddExpRequest
 {
     public int Exp { get; set; }
 }
+
+/// <summary>修改昵称请求（玩家自助，PUT /api/v1/user/nickname）。</summary>
+public class UpdateNicknameRequest
+{
+    public string Nickname { get; set; } = string.Empty;
+}

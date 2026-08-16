@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -108,6 +109,13 @@ namespace WildCourt.Net
         public void Delete<T>(string path, Action<ApiResponse<T>> onSuccess, Action<int, string> onError = null)
         {
             StartCoroutine(SendRequest<T>("DELETE", path, null, onSuccess, onError, maxRetry));
+        }
+
+        /// <summary>multipart/form-data 上传（头像等文件）。fileName 为服务端字段名。</summary>
+        public void PutMultipart<T>(string path, string fieldName, string fileName, byte[] data,
+            Action<ApiResponse<T>> onSuccess, Action<int, string> onError = null)
+        {
+            StartCoroutine(SendMultipart<T>(path, fieldName, fileName, data, onSuccess, onError));
         }
 
         // ---- 原始文本请求（WC.net 桥接用：Lua 侧自行解析信封，无需预知 DTO 类型） ----
@@ -251,6 +259,66 @@ namespace WildCourt.Net
             }
         }
 
+        /// <summary>multipart/form-data 上传请求：token 注入 + 信封解析，与 SendRequest 行为一致。</summary>
+        private IEnumerator SendMultipart<T>(string path, string fieldName, string fileName, byte[] data,
+            Action<ApiResponse<T>> onSuccess, Action<int, string> onError)
+        {
+            var form = new List<IMultipartFormSection>
+            {
+                new MultipartFormFileSection(fieldName, data, fileName, "application/octet-stream")
+            };
+
+            using (UnityWebRequest req = UnityWebRequest.Post(ServerUrl + path, form))
+            {
+                req.method = "PUT";
+                req.certificateHandler = new InsecureCertificateHandler();
+                req.downloadHandler = new DownloadHandlerBuffer();
+                req.timeout = (int)timeoutSeconds;
+                req.SetRequestHeader("Accept", "application/json");
+                if (!string.IsNullOrEmpty(Token))
+                {
+                    req.SetRequestHeader("Authorization", "Bearer " + Token);
+                }
+
+                yield return req.SendWebRequest();
+
+                if (req.result == UnityWebRequest.Result.ConnectionError ||
+                    req.result == UnityWebRequest.Result.ProtocolError && req.responseCode == 0)
+                {
+                    EventBus.Publish(new NetDisconnectedEvent { Reason = req.error });
+                    onError?.Invoke(ApiCodes.NetworkError, req.error);
+                    yield break;
+                }
+
+                string text = req.downloadHandler == null ? null : req.downloadHandler.text;
+
+                if (req.responseCode < 200 || req.responseCode >= 300)
+                {
+                    var env = string.IsNullOrEmpty(text) ? null : JsonUtil.FromJson<ApiEnvelope>(text);
+                    int code = (int)req.responseCode;
+                    onError?.Invoke(code, env != null && !string.IsNullOrEmpty(env.message) ? env.message : req.error);
+                    yield break;
+                }
+
+                var envelope = string.IsNullOrEmpty(text) ? null : JsonUtil.FromJson<ApiResponse<T>>(text);
+                if (envelope == null)
+                {
+                    onError?.Invoke(ApiCodes.ServerError, "响应解析失败");
+                    yield break;
+                }
+
+                if (envelope.IsSuccess)
+                {
+                    EventBus.Publish(new NetConnectedEvent());
+                    onSuccess?.Invoke(envelope);
+                }
+                else
+                {
+                    onError?.Invoke(envelope.code, envelope.message);
+                }
+            }
+        }
+
         private void ConnectRealtime()
         {
             if (_realtime == null || string.IsNullOrEmpty(_wsUrl)) return;
@@ -259,6 +327,12 @@ namespace WildCourt.Net
         }
 
         /// <summary>信任所有证书的兜底 handler（仅开发/联调使用，规避 HTTP 明文被拒）。</summary>
+        public sealed class InsecureCertificateHandlerPublic : CertificateHandler
+        {
+            protected override bool ValidateCertificate(byte[] certificateData) => true;
+        }
+
+        /// <summary>信任所有证书的兜底 handler（内部使用）。</summary>
         private sealed class InsecureCertificateHandler : CertificateHandler
         {
             protected override bool ValidateCertificate(byte[] certificateData) => true;

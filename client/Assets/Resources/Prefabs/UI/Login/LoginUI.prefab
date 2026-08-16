@@ -920,8 +920,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 6787235220671007686}
   m_HandleRect: {fileID: 5531666721951258526}
   m_Direction: 2
-  m_Value: 1.0000001
-  m_Size: 0.65941983
+  m_Value: 1
+  m_Size: 0.6677625
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -1657,6 +1657,7 @@ MonoBehaviour:
   yardPanelPrefab: {fileID: 3786910468004182874, guid: 521f009911fb6404cb1370dbf0574840, type: 3}
   farmPanelPrefab: {fileID: 116178347840688767, guid: de586d737bfb235408e594258d82487e, type: 3}
   mailPanelPrefab: {fileID: 1000000, guid: 6d2e9cb728c0cd34cb5986ae760e0033, type: 3}
+  userPanelPrefab: {fileID: 1500606069936609739, guid: 322be3f3a615ee24497dc7913f107f30, type: 3}
 --- !u!114 &7466341717583054709
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2683,8 +2684,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 6920577863637264606}
   m_TextComponent: {fileID: 1521261568697722843}
   m_Placeholder: {fileID: 4038991450035321771}
-  m_ContentType: 9
-  m_InputType: 0
+  m_ContentType: 7
+  m_InputType: 2
   m_AsteriskChar: 42
   m_KeyboardType: 0
   m_LineType: 0

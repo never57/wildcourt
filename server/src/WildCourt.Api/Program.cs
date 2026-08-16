@@ -67,6 +67,12 @@ builder.Services.AddControllers()
         opt.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         opt.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
+
+// 上传文件大小限制：头像等图片上传（最大 8MB，覆盖 multipart 上传）
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(opt =>
+{
+    opt.MultipartBodyLengthLimit = 8 * 1024 * 1024;
+});
 // 实时连接：原生 WebSocket（替代 SignalR，规避 IL2CPP/AOT 反射兼容性问题）
 builder.Services.AddSingleton<RealtimeConnectionManager>();
 
@@ -113,6 +119,27 @@ using (var scope = app.Services.CreateScope())
 
 // WebSocket 需在中间件之前启用（原生 WebSocket 长连接 /ws/chat）
 app.UseWebSockets();
+
+// 静态文件托管：头像等上传资源（wwwroot/uploads/...）。
+// 必须放在鉴权中间件之前，否则 /uploads/xxx 会被 AuthMiddleware 拦截返回 401。
+var webRoot = builder.Configuration["Upload:RootDir"];
+if (string.IsNullOrEmpty(webRoot))
+{
+    webRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+}
+Directory.CreateDirectory(webRoot);
+// 以 webRoot 为静态根（不带 RequestPath 前缀），使 URL /uploads/avatar/x.png 映射到 webRoot/uploads/avatar/x.png
+var contentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+// 显式补全图片 MIME，避免 .png 被误判为 application/json
+contentTypeProvider.Mappings[".png"] = "image/png";
+contentTypeProvider.Mappings[".jpg"] = "image/jpeg";
+contentTypeProvider.Mappings[".jpeg"] = "image/jpeg";
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRoot),
+    RequestPath = "",
+    ContentTypeProvider = contentTypeProvider
+});
 
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<RealtimeWebSocketMiddleware>();

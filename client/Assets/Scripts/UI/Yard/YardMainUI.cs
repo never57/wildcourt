@@ -5,6 +5,8 @@ using WildCourt.Gameplay.Yard;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
 using WildCourt.UI.Letters;
+using WildCourt.UI.User;
+using WildCourt.Utils;
 
 namespace WildCourt.UI.Yard
 {
@@ -32,6 +34,10 @@ namespace WildCourt.UI.Yard
         [SerializeField] private Button _buildButton;      // bulidsystem 按钮
         [SerializeField] private Button _mailButton;       // mail 按钮，点击打开信箱（MailPanel）
         [SerializeField] private Button _friendsButton;    // friends 按钮，点击打开好友聊天（ChatManner）
+        [SerializeField] private Button _editorButton;     // editor 按钮，点击打开玩家信息面板（UserPanel）
+
+        [Header("玩家信息（playerinformation 内绑定）")]
+        [SerializeField] private Image _playerInfoAvatarImage;   // playerinformation/Image：头像显示，与服务器头像同步
 
         private YardManager _yard;
         private YardPanel _panel;
@@ -75,12 +81,23 @@ namespace WildCourt.UI.Yard
 
             // 订阅货币变化：邮箱领取附件等场景会广播，收到后重拉 profile 对齐权威余额
             EventBus.Subscribe<CurrencyChangedEvent>(OnCurrencyChanged);
+            // 订阅资料更新：UserPanel 改头像/昵称后广播，同步 playerinformation 头像
+            EventBus.Subscribe<ProfileUpdatedEvent>(OnProfileUpdated);
         }
 
         /// <summary>货币变化（领取附件/购买等）：重拉玩家资料，保证建筑面板余额显示最新值。</summary>
         private void OnCurrencyChanged(CurrencyChangedEvent evt)
         {
             LoadProfile();
+        }
+
+        /// <summary>资料更新（UserPanel 改头像/昵称后广播）：同步 playerinformation 头像。</summary>
+        private void OnProfileUpdated(ProfileUpdatedEvent evt)
+        {
+            if (!string.IsNullOrEmpty(evt.AvatarUrl))
+            {
+                AvatarLoader.LoadInto(_playerInfoAvatarImage, AvatarLoader.ToAbsoluteUrl(evt.AvatarUrl), this);
+            }
         }
 
         private void BindYard(YardManager yard)
@@ -101,6 +118,11 @@ namespace WildCourt.UI.Yard
                 _friendsButton.onClick.RemoveAllListeners();
                 _friendsButton.onClick.AddListener(OpenChat);
             }
+            if (_editorButton != null)
+            {
+                _editorButton.onClick.RemoveAllListeners();
+                _editorButton.onClick.AddListener(OpenUserPanel);
+            }
             YardPanel.BackPressed -= OnBuildPanelClosed;
             YardPanel.BackPressed += OnBuildPanelClosed;
         }
@@ -111,8 +133,10 @@ namespace WildCourt.UI.Yard
             if (_buildButton != null) _buildButton.onClick.RemoveAllListeners();
             if (_mailButton != null) _mailButton.onClick.RemoveAllListeners();
             if (_friendsButton != null) _friendsButton.onClick.RemoveAllListeners();
+            if (_editorButton != null) _editorButton.onClick.RemoveAllListeners();
             YardPanel.BackPressed -= OnBuildPanelClosed;
             EventBus.Unsubscribe<CurrencyChangedEvent>(OnCurrencyChanged);
+            EventBus.Unsubscribe<ProfileUpdatedEvent>(OnProfileUpdated);
         }
 
         /// <summary>建造面板返回：隐藏建造面板，恢复显示主 UI。</summary>
@@ -125,13 +149,21 @@ namespace WildCourt.UI.Yard
             gameObject.SetActive(true);
         }
 
-        /// <summary>拉取玩家资料，缓存后供 YardPanel 打开时注入（余额显示）。</summary>
+        /// <summary>拉取玩家资料，缓存后供 YardPanel 打开时注入（余额显示），并同步 playerinformation 头像。</summary>
         private void LoadProfile()
         {
             var net = NetManager.Instance;
             if (net == null) return;
             net.Get<UserProfileResponse>(ApiPaths.UserProfile,
-                resp => _profile = resp.data,
+                resp =>
+                {
+                    _profile = resp.data;
+                    // 初始化/刷新时同步头像到 playerinformation
+                    if (resp.data != null && !string.IsNullOrEmpty(resp.data.avatarUrl))
+                    {
+                        AvatarLoader.LoadInto(_playerInfoAvatarImage, AvatarLoader.ToAbsoluteUrl(resp.data.avatarUrl), this);
+                    }
+                },
                 (code, msg) => Debug.LogWarning($"[YardMainUI] profile 加载失败: {msg}"));
         }
 
@@ -146,6 +178,13 @@ namespace WildCourt.UI.Yard
         private void OpenChat()
         {
             ChatManner.CreateOrInstantiate();
+        }
+
+        /// <summary>点击“editor”按钮：实例化打开玩家信息面板（UserPanel）。</summary>
+        private void OpenUserPanel()
+        {
+            var panel = UserPanel.CreateOrInstantiate();
+            if (panel != null) panel.Open();
         }
 
         /// <summary>点击“建造”按钮：实例化打开庭院建造面板（YardPanel），注入已缓存资料，并隐藏主 UI。</summary>

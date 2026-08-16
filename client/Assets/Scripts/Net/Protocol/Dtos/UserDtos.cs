@@ -32,6 +32,7 @@ namespace WildCourt.Net.Protocol
     {
         public long userId;
         public string nickname;
+        public string avatarUrl;  // 头像 URL（可为 null）
         public int provinceId;
         public int cityId;
         public int level;
@@ -46,6 +47,13 @@ namespace WildCourt.Net.Protocol
     {
         public int level;
         public int exp;
+    }
+
+    /// <summary>修改昵称请求（PUT /api/v1/user/nickname）。</summary>
+    [Serializable]
+    public class UpdateNicknameRequest
+    {
+        public string nickname;
     }
 
     /// <summary>增加经验请求（联调测试接口 POST /api/v1/user/exp，alpha 阶段）。</summary>
