@@ -2,11 +2,11 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.Networking;
 using UnityEngine.UI;
 using WildCourt.Core;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
+using WildCourt.Utils;
 
 namespace WildCourt.UI.User
 {
@@ -141,17 +141,8 @@ namespace WildCourt.UI.User
             // 头像：有 URL 则加载显示
             if (!string.IsNullOrEmpty(data.avatarUrl))
             {
-                LoadAvatar(ToAbsoluteUrl(data.avatarUrl));
+                AvatarLoader.LoadInto(avatarImage, AvatarLoader.ToAbsoluteUrl(data.avatarUrl), this);
             }
-        }
-
-        /// <summary>把服务端返回的相对路径（/uploads/...）拼成绝对地址。</summary>
-        private string ToAbsoluteUrl(string url)
-        {
-            if (string.IsNullOrEmpty(url)) return url;
-            if (url.StartsWith("http://") || url.StartsWith("https://")) return url;
-            var baseUrl = NetManager.Instance != null ? NetManager.Instance.ServerUrl : string.Empty;
-            return baseUrl.TrimEnd('/') + "/" + url.TrimStart('/');
         }
 
         // ---------- 交互 ----------
@@ -333,35 +324,6 @@ namespace WildCourt.UI.User
                 {
                     Debug.LogWarning($"[UserPanel] 头像上传失败: {msg}");
                 });
-        }
-
-        /// <summary>加载头像 URL 并显示到 avatarImage。</summary>
-        private void LoadAvatar(string url)
-        {
-            if (avatarImage == null || string.IsNullOrEmpty(url)) return;
-            StartCoroutine(LoadAvatarCoroutine(url));
-        }
-
-        private IEnumerator LoadAvatarCoroutine(string url)
-        {
-            using (var req = UnityWebRequestTexture.GetTexture(url))
-            {
-                req.certificateHandler = new NetManager.InsecureCertificateHandlerPublic();
-                req.timeout = 10;
-                yield return req.SendWebRequest();
-
-                if (req.result != UnityWebRequest.Result.Success)
-                {
-                    Debug.LogWarning($"[UserPanel] 头像加载失败: {req.error}");
-                    yield break;
-                }
-
-                var tex = DownloadHandlerTexture.GetContent(req);
-                if (tex != null && avatarImage != null)
-                {
-                    avatarImage.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
-                }
-            }
         }
 
         // ---------- 运行时按名字自动查找子节点（字段为空时兜底） ----------

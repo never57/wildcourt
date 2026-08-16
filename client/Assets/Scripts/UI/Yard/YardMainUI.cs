@@ -1,6 +1,4 @@
-using System.Collections;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.UI;
 using WildCourt.Core;
 using WildCourt.Gameplay.Yard;
@@ -8,6 +6,7 @@ using WildCourt.Net;
 using WildCourt.Net.Protocol;
 using WildCourt.UI.Letters;
 using WildCourt.UI.User;
+using WildCourt.Utils;
 
 namespace WildCourt.UI.Yard
 {
@@ -97,7 +96,7 @@ namespace WildCourt.UI.Yard
         {
             if (!string.IsNullOrEmpty(evt.AvatarUrl))
             {
-                LoadAvatarToPlayerInfo(ToAbsoluteUrl(evt.AvatarUrl));
+                AvatarLoader.LoadInto(_playerInfoAvatarImage, AvatarLoader.ToAbsoluteUrl(evt.AvatarUrl), this);
             }
         }
 
@@ -162,49 +161,10 @@ namespace WildCourt.UI.Yard
                     // 初始化/刷新时同步头像到 playerinformation
                     if (resp.data != null && !string.IsNullOrEmpty(resp.data.avatarUrl))
                     {
-                        LoadAvatarToPlayerInfo(ToAbsoluteUrl(resp.data.avatarUrl));
+                        AvatarLoader.LoadInto(_playerInfoAvatarImage, AvatarLoader.ToAbsoluteUrl(resp.data.avatarUrl), this);
                     }
                 },
                 (code, msg) => Debug.LogWarning($"[YardMainUI] profile 加载失败: {msg}"));
-        }
-
-        /// <summary>把服务端返回的相对路径（/uploads/...）拼成绝对地址。</summary>
-        private string ToAbsoluteUrl(string url)
-        {
-            if (string.IsNullOrEmpty(url)) return url;
-            if (url.StartsWith("http://") || url.StartsWith("https://")) return url;
-            var baseUrl = NetManager.Instance != null ? NetManager.Instance.ServerUrl : string.Empty;
-            return baseUrl.TrimEnd('/') + "/" + url.TrimStart('/');
-        }
-
-        /// <summary>加载头像 URL 并显示到 playerinformation 的 Image。</summary>
-        private void LoadAvatarToPlayerInfo(string url)
-        {
-            if (_playerInfoAvatarImage == null || string.IsNullOrEmpty(url)) return;
-            StartCoroutine(LoadAvatarToPlayerInfoCoroutine(url));
-        }
-
-        private IEnumerator LoadAvatarToPlayerInfoCoroutine(string url)
-        {
-            using (var req = UnityWebRequestTexture.GetTexture(url))
-            {
-                req.certificateHandler = new NetManager.InsecureCertificateHandlerPublic();
-                req.timeout = 10;
-                yield return req.SendWebRequest();
-
-                if (req.result != UnityWebRequest.Result.Success)
-                {
-                    Debug.LogWarning($"[YardMainUI] 头像加载失败: {req.error}");
-                    yield break;
-                }
-
-                var tex = DownloadHandlerTexture.GetContent(req);
-                if (tex != null && _playerInfoAvatarImage != null)
-                {
-                    _playerInfoAvatarImage.sprite = Sprite.Create(tex,
-                        new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
-                }
-            }
         }
 
         /// <summary>点击“信箱”按钮：实例化打开信箱面板（MailPanel）。MailPanel 为独立 Canvas 弹窗，覆盖在庭院 UI 之上。</summary>
