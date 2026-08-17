@@ -63,7 +63,7 @@ public class ChatService
         _db.ChatMessages.Add(entity);
         await _db.SaveChangesAsync();
 
-        var dto = ToDto(entity);
+        var dto = await ToDtoAsync(entity);
 
         // 实时推送给接收者（在线则立刻收到；离线消息由历史记录接口拉取）
         await _realtime.SendAsync(toUserId, "ReceivePrivateMessage", dto);
@@ -102,14 +102,22 @@ public class ChatService
             await _db.SaveChangesAsync();
         }
 
+        // 批量查询发送者头像，避免逐条消息 N+1 查询
+        var fromIds = messages.Select(m => m.FromUserId).Distinct().ToList();
+        var avatarMap = await _db.Users
+            .Where(u => fromIds.Contains(u.UserId))
+            .ToDictionaryAsync(u => u.UserId, u => u.AvatarUrl ?? string.Empty);
+
         return new ChatHistoryResponse
         {
-            Messages = messages.Select(ToDto).ToList(),
+            Messages = messages.Select(m => ToDto(m, avatarMap)).ToList(),
         };
     }
 
-    private static ChatMessageDto ToDto(ChatMessageEntity e)
+    /// <summary>构造消息 DTO，并从头像字典回填发送者头像。</summary>
+    private static ChatMessageDto ToDto(ChatMessageEntity e, IReadOnlyDictionary<long, string> avatarMap)
     {
+        avatarMap.TryGetValue(e.FromUserId, out var avatarUrl);
         return new ChatMessageDto
         {
             Id = e.Id,
@@ -118,6 +126,27 @@ public class ChatService
             Content = e.Content,
             IsRead = e.IsRead,
             CreatedAt = new DateTimeOffset(e.CreatedAt).ToUnixTimeMilliseconds(),
+            AvatarUrl = avatarUrl ?? string.Empty,
+        };
+    }
+
+    /// <summary>构造单条消息 DTO（发送场景，按 FromUserId 单独查询发送者头像）。</summary>
+    private async Task<ChatMessageDto> ToDtoAsync(ChatMessageEntity e)
+    {
+        var avatarUrl = await _db.Users
+            .Where(u => u.UserId == e.FromUserId)
+            .Select(u => u.AvatarUrl)
+            .FirstOrDefaultAsync();
+
+        return new ChatMessageDto
+        {
+            Id = e.Id,
+            FromUserId = e.FromUserId,
+            ToUserId = e.ToUserId,
+            Content = e.Content,
+            IsRead = e.IsRead,
+            CreatedAt = new DateTimeOffset(e.CreatedAt).ToUnixTimeMilliseconds(),
+            AvatarUrl = avatarUrl ?? string.Empty,
         };
     }
 }

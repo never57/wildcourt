@@ -94,6 +94,9 @@ public class ChatMessageDto
     public bool IsRead { get; set; }
 
     public long CreatedAt { get; set; }
+
+    /// <summary>发送者头像 URL（服务端按 FromUserId 关联 users 表回填；可为空）。</summary>
+    public string AvatarUrl { get; set; } = string.Empty;
 }
 
 /// <summary>历史消息响应。</summary>

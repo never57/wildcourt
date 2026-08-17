@@ -70,6 +70,7 @@ namespace WildCourt.Core
         public long ToUserId;
         public string Content;
         public long CreatedAt;
+        public string AvatarUrl;
     }
 
     /// <summary>每日结算播报（04:00 推送，文档 14 §14.5）。</summary>

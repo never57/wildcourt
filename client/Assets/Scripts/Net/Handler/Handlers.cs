@@ -54,7 +54,7 @@ namespace WildCourt.Net.Handler
             switch (evt)
             {
                 case NetEvent.PrivateMessage:
-                    // data 为 ChatMessageDto JSON（id/fromUserId/toUserId/content/isRead/createdAt）
+                    // data 为 ChatMessageDto JSON（id/fromUserId/toUserId/content/isRead/createdAt/avatarUrl）
                     long id = 0, fromUserId = 0, toUserId = 0, createdAt = 0;
                     var rId = JsonUtil.GetField(data, "id");
                     var rFrom = JsonUtil.GetField(data, "fromUserId");
@@ -72,6 +72,7 @@ namespace WildCourt.Net.Handler
                         ToUserId = toUserId,
                         Content = JsonUtil.GetField(data, "content") ?? string.Empty,
                         CreatedAt = createdAt,
+                        AvatarUrl = JsonUtil.GetField(data, "avatarUrl") ?? string.Empty,
                     });
                     break;
             }

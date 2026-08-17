@@ -346,7 +346,7 @@ public class ChatManner : MonoBehaviour
         // 实时收到好友消息：仅当正在与该好友聊天时显示，否则忽略（好友列表可加未读角标，暂略）
         if (_activeFriendId > 0 && evt.FromUserId == _activeFriendId)
         {
-            AddMessage(evt.Content, MessageSender.Friend);
+            AddMessage(evt.Content, MessageSender.Friend, evt.AvatarUrl);
         }
         else
         {
