@@ -15,8 +15,8 @@
 
 | 表 | 文件名 | 状态 |
 | --- | --- | --- |
-| Sheet1 Provinces | `Config_Provinces.json` | ⬜ 待导出 |
-| Sheet2 Cities | `Config_Cities.json` | ⬜ 待导出 |
+| Sheet1 Provinces | `Config_Regions.json`（省/市合并） | ✅ 已落地（34 省级行政区，国标代码） |
+| Sheet2 Cities | `Config_Regions.json`（省/市合并） | ✅ 已落地（主要地级市，国标代码 + provinceId 关联） |
 | Sheet3 Crops | `Config_Crops.json` | ✅ 已按文档 04 落地 14 种作物 |
 | Sheet4 Fish | `Config_Fish.json` | ⬜ 待导出 |
 | Sheet4.1 Bait | `Config_Bait.json` | ⬜ 待导出 |

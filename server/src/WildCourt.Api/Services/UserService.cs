@@ -147,6 +147,48 @@ public partial class UserService
         return ToModel(entity);
     }
 
+    /// <summary>
+    /// 获取玩家省份城市（不存在返回 null，由 Controller 转 404）。
+    /// </summary>
+    public async Task<LocationResponse?> GetLocationAsync(long userId)
+    {
+        var entity = await _db.Users.FirstOrDefaultAsync(u => u.UserId == userId);
+        if (entity == null) return null;
+        return new LocationResponse
+        {
+            ProvinceId = entity.ProvinceId,
+            CityId = entity.CityId,
+        };
+    }
+
+    /// <summary>
+    /// 更新玩家省份城市（校验非 0、城市归属省份）。修改成功后返回最新玩家信息。
+    /// </summary>
+    public async Task<User?> UpdateLocationAsync(long userId, int provinceId, int cityId)
+    {
+        var entity = await _db.Users.FirstOrDefaultAsync(u => u.UserId == userId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "用户不存在");
+
+        if (provinceId <= 0)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "请选择省份");
+        }
+        if (cityId <= 0)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "请选择城市");
+        }
+        // 城市归属校验：国标代码前 2 位为省代码（直辖市/港澳台例外，仅做宽松校验）
+        if (cityId / 10000 != provinceId / 10000)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "所选城市不属于该省份");
+        }
+
+        entity.ProvinceId = provinceId;
+        entity.CityId = cityId;
+        await _db.SaveChangesAsync();
+        return ToModel(entity);
+    }
+
     /// <summary>背包快照（阶段 C：编辑面板“已拥有”状态，数量 &gt; 0 才返回）。</summary>
     public async Task<InventoryResponse> GetInventoryAsync(long userId)
     {
