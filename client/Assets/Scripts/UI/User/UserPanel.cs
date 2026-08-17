@@ -312,6 +312,12 @@ namespace WildCourt.UI.User
                 "avatar" + ext, bytes,
                 resp =>
                 {
+                    // 头像内容已变但 URL 不变（/uploads/avatar/{userId}.png），
+                    // 先失效该 URL 的图片缓存，强制重新下载新头像
+                    if (resp.data != null && !string.IsNullOrEmpty(resp.data.avatarUrl))
+                    {
+                        AvatarLoader.Invalidate(resp.data.avatarUrl);
+                    }
                     ApplyProfile(resp.data);
                     // 广播头像更新，供 YardMainUI 等同步
                     EventBus.Publish(new ProfileUpdatedEvent

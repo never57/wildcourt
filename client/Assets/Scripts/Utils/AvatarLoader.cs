@@ -98,6 +98,19 @@ namespace WildCourt.Utils
             _failedCache.Clear();
         }
 
+        /// <summary>
+        /// 失效指定 URL 的缓存，强制下次 LoadInto 重新下载。
+        /// 用于头像内容更新但 URL 不变（如 /uploads/avatar/{userId}.png）的场景。
+        /// </summary>
+        public static void Invalidate(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return;
+            string fullUrl = ToAbsoluteUrl(url);
+            _spriteCache.Remove(fullUrl);
+            _failedCache.Remove(fullUrl);
+            _pendingImages.Remove(fullUrl);
+        }
+
         private static IEnumerator LoadCoroutine(string fullUrl)
         {
             using (var req = UnityWebRequestTexture.GetTexture(fullUrl))
