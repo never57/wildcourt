@@ -34,11 +34,16 @@ namespace WildCourt.Utils
             {
                 req.certificateHandler = new NetManager.InsecureCertificateHandlerPublic();
                 req.timeout = 10;
+                // 携带会话 token：即使静态资源被鉴权中间件拦截也能通过校验
+                if (NetManager.Instance != null && !string.IsNullOrEmpty(NetManager.Instance.Token))
+                {
+                    req.SetRequestHeader("Authorization", "Bearer " + NetManager.Instance.Token);
+                }
                 yield return req.SendWebRequest();
 
                 if (req.result != UnityWebRequest.Result.Success)
                 {
-                    Debug.LogWarning($"[AvatarLoader] 头像加载失败: {req.error}");
+                    Debug.LogWarning($"[AvatarLoader] 头像加载失败: url={url}, error={req.error}, code={req.responseCode}");
                     yield break;
                 }
 

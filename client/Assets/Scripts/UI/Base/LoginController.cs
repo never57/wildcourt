@@ -119,6 +119,8 @@ namespace WildCourt.UI
                 onSuccess: token =>
                 {
                     ShowStatus("登录成功，正在进入游戏...", new Color(0.4f, 0.8f, 0.4f));
+                    // 初始化全局头像缓存（拉取自己的 profile，缓存头像 URL；后续修改头像经 ProfileUpdatedEvent 同步）
+                    AvatarManager.EnsureCreated();
                     PreloadYardPanel();
                     LoadGameScene();
                 },

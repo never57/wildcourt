@@ -37,6 +37,7 @@ public class AuthMiddleware
             path.Equals("/favicon.ico", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/hub/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/v1/admin", StringComparison.OrdinalIgnoreCase))
         {
             await _next(context);

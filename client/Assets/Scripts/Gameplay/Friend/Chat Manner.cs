@@ -6,6 +6,7 @@ using TMPro;
 using WildCourt.Core;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
+using WildCourt.UI.User;
 using WildCourt.Utils;
 
 public enum MessageSender
@@ -175,16 +176,12 @@ public class ChatManner : MonoBehaviour
 
     private void LoadMyProfile()
     {
-        if (NetManager.Instance == null) return;
-        NetManager.Instance.Get<UserProfileResponse>(ApiPaths.UserProfile,
-            resp =>
-            {
-                if (resp != null && resp.data != null)
-                {
-                    _myUserId = resp.data.userId;
-                }
-            },
-            (code, msg) => Debug.LogWarning($"[Chat] 拉取用户信息失败：{msg}"));
+        // 当前用户 ID 统一从全局 AvatarManager 缓存读取（登录后已拉取 profile）
+        _myUserId = AvatarManager.Instance != null ? AvatarManager.Instance.GetMyUserId() : -1;
+        if (_myUserId <= 0)
+        {
+            Debug.LogWarning("[Chat] 尚未拿到当前用户 ID，请确认登录后 AvatarManager 已初始化");
+        }
     }
 
     private void LoadFriendList()
@@ -197,6 +194,14 @@ public class ChatManner : MonoBehaviour
                 if (resp != null && resp.data != null && resp.data.friends != null)
                 {
                     _friends.AddRange(resp.data.friends);
+                    // 把好友头像喂入全局缓存，供消息头像与其它模块复用
+                    if (AvatarManager.Instance != null)
+                    {
+                        foreach (var f in resp.data.friends)
+                        {
+                            AvatarManager.Instance.SetFriendAvatar(f.userId, f.avatarUrl);
+                        }
+                    }
                 }
                 RebuildFriendList();
                 if(_friends.Count > 0)
@@ -284,7 +289,7 @@ public class ChatManner : MonoBehaviour
                 {
                     foreach (var m in resp.data.messages)
                     {
-                        AddMessage(m.content, m.fromUserId == _myUserId ? MessageSender.Me : MessageSender.Friend, m.avatarUrl);
+                        AddMessage(m.content, m.fromUserId == _myUserId ? MessageSender.Me : MessageSender.Friend, m.avatarUrl, m.fromUserId);
                     }
                 }
             },
@@ -346,7 +351,7 @@ public class ChatManner : MonoBehaviour
         // 实时收到好友消息：仅当正在与该好友聊天时显示，否则忽略（好友列表可加未读角标，暂略）
         if (_activeFriendId > 0 && evt.FromUserId == _activeFriendId)
         {
-            AddMessage(evt.Content, MessageSender.Friend, evt.AvatarUrl);
+            AddMessage(evt.Content, MessageSender.Friend, evt.AvatarUrl, evt.FromUserId);
         }
         else
         {
@@ -356,7 +361,7 @@ public class ChatManner : MonoBehaviour
 
     // ============ UI 渲染（保留原实现） ============
 
-    private void AddMessage(string text, MessageSender sender = MessageSender.Me,string avatarUrl = null)
+    private void AddMessage(string text, MessageSender sender = MessageSender.Me, string avatarUrl = null, long fromUserId = 0)
     {
         // 检查是否需要显示时间
         string currentTime = System.DateTime.Now.ToString("HH:mm");
@@ -386,22 +391,30 @@ public class ChatManner : MonoBehaviour
             bgRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, textHeight + padding);
         }
 
-        // 设置头像
+        // 设置头像：优先用消息携带的 avatarUrl，其次从全局缓存查，最后回退默认头像
         var avatarNode = msgObj.transform.Find("Avatar");
         if (avatarNode != null)
         {
             Image avatar = avatarNode.GetComponent<Image>();
-            if(avatar != null)
+            if (avatar != null)
             {
-                if (!string.IsNullOrEmpty(avatarUrl))
+                string resolvedUrl = avatarUrl;
+                if (string.IsNullOrEmpty(resolvedUrl) && AvatarManager.Instance != null)
                 {
-                    //从服务器中加载头像喵
-                    string fullUrl = AvatarLoader.ToAbsoluteUrl(avatarUrl);
-                    AvatarLoader.LoadInto(avatar, fullUrl,this);
+                    resolvedUrl = (sender == MessageSender.Me)
+                        ? AvatarManager.Instance.GetMyAvatarUrl()
+                        : AvatarManager.Instance.GetFriendAvatarUrl(fromUserId);
+                }
+
+                if (!string.IsNullOrEmpty(resolvedUrl))
+                {
+                    // 从服务器加载头像
+                    string fullUrl = AvatarLoader.ToAbsoluteUrl(resolvedUrl);
+                    AvatarLoader.LoadInto(avatar, fullUrl, this);
                 }
                 else
                 {
-                    //使用默认头像
+                    // 使用默认头像
                     avatar.sprite = (sender == MessageSender.Me) ? myAvatar : friendAvatar;
                 }
             }
