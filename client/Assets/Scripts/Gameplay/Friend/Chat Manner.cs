@@ -6,6 +6,7 @@ using TMPro;
 using WildCourt.Core;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
+using WildCourt.Utils;
 
 public enum MessageSender
 {
@@ -395,7 +396,7 @@ public class ChatManner : MonoBehaviour
                 if (!string.IsNullOrEmpty(avatarUrl))
                 {
                     //从服务器中加载头像喵
-                    string fullUrl = AvatarLoader.ToAbsluteUrl(avatarUrl);
+                    string fullUrl = AvatarLoader.ToAbsoluteUrl(avatarUrl);
                     AvatarLoader.LoadInto(avatar, fullUrl,this);
                 }
                 else

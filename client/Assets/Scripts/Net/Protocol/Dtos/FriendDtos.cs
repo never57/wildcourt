@@ -56,6 +56,7 @@ namespace WildCourt.Net.Protocol
         public string content;
         public bool isRead;
         public long createdAt;
+        public string avatarUrl;
     }
 
     /// <summary>历史消息响应。</summary>
