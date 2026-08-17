@@ -45,7 +45,7 @@ public class ChatManner : MonoBehaviour
 
     [Header("时间标签")]
     public GameObject timeLabelPrefab;  //时间标签预制体
-    private string lastMessageTime = "";  //上条消息时间
+    private System.DateTime _lastMessageTime = System.DateTime.MinValue;  //上条消息时间（含日期，避免跨天判断错误）
 
     [Header("头像")]
     public Sprite myAvatar;  // 本人头像
@@ -318,7 +318,7 @@ public class ChatManner : MonoBehaviour
                 {
                     foreach (var m in resp.data.messages)
                     {
-                        AddMessage(m.content, m.fromUserId == _myUserId ? MessageSender.Me : MessageSender.Friend, m.avatarUrl, m.fromUserId);
+                        AddMessage(m.content, m.fromUserId == _myUserId ? MessageSender.Me : MessageSender.Friend, m.avatarUrl, m.fromUserId, m.createdAt);
                     }
                 }
             },
@@ -332,7 +332,7 @@ public class ChatManner : MonoBehaviour
         {
             Destroy(messContent.GetChild(i).gameObject);
         }
-        lastMessageTime = "";
+        _lastMessageTime = System.DateTime.MinValue;
     }
 
     // ============ 发送 / 接收 ============
@@ -356,7 +356,7 @@ public class ChatManner : MonoBehaviour
                 // 发送成功：本地显示自己的消息
                 if (resp != null && resp.data != null)
                 {
-                    AddMessage(resp.data.content, MessageSender.Me);
+                    AddMessage(resp.data.content, MessageSender.Me, null, 0, resp.data.createdAt);
                     ScrollToBottom();
                 }
             },
@@ -379,7 +379,7 @@ public class ChatManner : MonoBehaviour
         // 实时收到好友消息：仅当正在与该好友聊天时显示，否则忽略（好友列表可加未读角标，暂略）
         if (_activeFriendId > 0 && evt.FromUserId == _activeFriendId)
         {
-            AddMessage(evt.Content, MessageSender.Friend, evt.AvatarUrl, evt.FromUserId);
+            AddMessage(evt.Content, MessageSender.Friend, evt.AvatarUrl, evt.FromUserId, evt.CreatedAt);
         }
         else
         {
@@ -389,16 +389,20 @@ public class ChatManner : MonoBehaviour
 
     // ============ UI 渲染（保留原实现） ============
 
-    private void AddMessage(string text, MessageSender sender = MessageSender.Me, string avatarUrl = null, long fromUserId = 0)
+    private void AddMessage(string text, MessageSender sender = MessageSender.Me, string avatarUrl = null, long fromUserId = 0, long createdAt = 0)
     {
-        // 检查是否需要显示时间
-        string currentTime = System.DateTime.Now.ToString("HH:mm");
-        if (ShouldShowTime())
+        // 消息真实时间：优先用服务端返回的 createdAt（UTC 毫秒时间戳），统一转 UTC+8 北京时间
+        System.DateTime msgTime = createdAt > 0
+            ? System.DateTimeOffset.FromUnixTimeMilliseconds(createdAt).ToOffset(System.TimeSpan.FromHours(8)).DateTime
+            : System.DateTime.Now;
+
+        // 检查是否需要显示时间：距上一条消息超过 3 分钟则插入时间标签
+        if (ShouldShowTime(msgTime))
         {
             GameObject timeObj = Instantiate(timeLabelPrefab, messContent);
             TMP_Text timeText = timeObj.GetComponentInChildren<TMP_Text>();
-            if (timeText != null) timeText.text = currentTime;
-            lastMessageTime = currentTime;
+            if (timeText != null) timeText.text = FormatTime(msgTime);
+            _lastMessageTime = msgTime;
         }
 
         GameObject PrefabToUse = (sender == MessageSender.Me) ? myMessagePrefab : friendMessagePrefab;
@@ -450,15 +454,37 @@ public class ChatManner : MonoBehaviour
         ScrollToBottom();
     }
 
-    private bool ShouldShowTime()
+    private bool ShouldShowTime(System.DateTime now)
     {
-        string currentTime = System.DateTime.Now.ToString("HH:mm");
-        if (string.IsNullOrEmpty(lastMessageTime)) return true;
+        // 上一条消息时间为空（尚未发送过消息）时，第一条消息也显示时间
+        if (_lastMessageTime == System.DateTime.MinValue) return true;
 
-        System.DateTime last = System.DateTime.ParseExact(lastMessageTime, "HH:mm", null);
-        System.DateTime now = System.DateTime.Now;
-        System.TimeSpan diff = now - last;
-
+        System.TimeSpan diff = now - _lastMessageTime;
         return diff.TotalMinutes >= 3;
+    }
+
+    /// <summary>
+    /// 格式化时间标签：今天显示 HH:mm；昨天显示「昨天 HH:mm」；更早显示具体日期 + HH:mm。
+    /// </summary>
+    private string FormatTime(System.DateTime time)
+    {
+        System.DateTime today = System.DateTime.Today;
+        System.DateTime yesterday = today.AddDays(-1);
+
+        string hm = time.ToString("HH:mm");
+        if (time.Date == today)
+        {
+            return hm;
+        }
+        if (time.Date == yesterday)
+        {
+            return "昨天 " + hm;
+        }
+        // 同年显示 MM-dd，跨年显示 yyyy-MM-dd
+        if (time.Year == today.Year)
+        {
+            return time.ToString("MM-dd") + " " + hm;
+        }
+        return time.ToString("yyyy-MM-dd") + " " + hm;
     }
 }

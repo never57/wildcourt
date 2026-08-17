@@ -186,7 +186,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u597D\u53CB"
+  m_text: "\u597D\u53CB\u6635\u79F0"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: c3b42c5eb57e0a24a8977a4a3b302160, type: 2}
   m_sharedMaterial: {fileID: -1803072672789456202, guid: c3b42c5eb57e0a24a8977a4a3b302160, type: 2}
@@ -213,12 +213,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 14
+  m_fontSize: 18
   m_fontSizeBase: 14
   m_fontWeight: 400
-  m_enableAutoSizing: 0
-  m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_enableAutoSizing: 1
+  m_fontSizeMin: 1
+  m_fontSizeMax: 18
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
