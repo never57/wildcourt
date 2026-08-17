@@ -371,7 +371,6 @@ public class ChatManner : MonoBehaviour
         {
             Canvas.ForceUpdateCanvases();
             chatScrollRect.verticalNormalizedPosition = 0f;
-            Debug.Log("已到最下方喵");
         }
     }
 
