@@ -38,12 +38,20 @@ namespace WildCourt.Utils
 
         /// <summary>
         /// 加载头像并显示到 image。命中缓存直接赋值；否则发起下载并去重。
+        /// <param name="force">强制刷新：忽略缓存并给 URL 追加时间戳绕过 HTTP 缓存（用于头像内容更新但 URL 不变的场景）。</param>
         /// </summary>
-        public static void LoadInto(Image image, string url, MonoBehaviour runner)
+        public static void LoadInto(Image image, string url, MonoBehaviour runner, bool force = false)
         {
             if (image == null || string.IsNullOrEmpty(url) || runner == null) return;
 
             string fullUrl = ToAbsoluteUrl(url);
+
+            // 强制刷新：追加时间戳绕过 HTTP 缓存（内存缓存与下载中集合也一并视为失效）
+            if (force)
+            {
+                Invalidate(url);
+                fullUrl = AppendCacheBust(fullUrl);
+            }
 
             // 1) 命中缓存：直接赋值
             if (_spriteCache.TryGetValue(fullUrl, out var cached))
@@ -109,6 +117,14 @@ namespace WildCourt.Utils
             _spriteCache.Remove(fullUrl);
             _failedCache.Remove(fullUrl);
             _pendingImages.Remove(fullUrl);
+        }
+
+        /// <summary>给 URL 追加时间戳参数，绕过 Unity / nginx 的 HTTP 缓存。</summary>
+        private static string AppendCacheBust(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return url;
+            string sep = url.Contains("?") ? "&" : "?";
+            return url + sep + "_t=" + System.DateTime.Now.Ticks;
         }
 
         private static IEnumerator LoadCoroutine(string fullUrl)
