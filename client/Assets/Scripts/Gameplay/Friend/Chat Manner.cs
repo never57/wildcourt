@@ -204,6 +204,9 @@ public class ChatManner : MonoBehaviour
                     }
                 }
                 RebuildFriendList();
+                // 提前预加载所有好友头像 + 自己的头像到图片缓存，
+                // 避免进入对话面板时当屏重新下载/替换头像。
+                PrefetchAvatars();
                 if(_friends.Count > 0)
                 {
                     OpenFriendChat(_friends[0].userId);  // 默认打开第一个好友聊天
@@ -277,6 +280,32 @@ public class ChatManner : MonoBehaviour
             }
         }
         return friendId.ToString();
+    }
+
+    /// <summary>
+    /// 预加载所有好友头像 + 自己的头像到 AvatarLoader 图片缓存。
+    /// 好友列表拉到后即触发下载，进入对话面板时头像已就绪，不再当屏替换。
+    /// </summary>
+    private void PrefetchAvatars()
+    {
+        // 自己的头像
+        if (AvatarManager.Instance != null)
+        {
+            var myUrl = AvatarManager.Instance.GetMyAvatarUrl();
+            if (!string.IsNullOrEmpty(myUrl))
+            {
+                AvatarLoader.Prefetch(myUrl, this);
+            }
+        }
+
+        // 所有好友头像
+        foreach (var f in _friends)
+        {
+            if (!string.IsNullOrEmpty(f.avatarUrl))
+            {
+                AvatarLoader.Prefetch(f.avatarUrl, this);
+            }
+        }
     }
 
     private void LoadHistory(long friendId)
