@@ -4,3 +4,4 @@ YardUnlock
 Crops
 Shop
 StealMechanics
+Regions

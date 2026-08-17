@@ -60,6 +60,26 @@ public class UserController : ControllerBase
         return ApiResponse<User>.Ok(user);
     }
 
+    /// <summary>获取玩家省份城市（token 鉴权）。</summary>
+    [HttpGet("location")]
+    public async Task<ApiResponse<LocationResponse>> GetLocation()
+    {
+        var location = await _userService.GetLocationAsync(GetUserId());
+        if (location == null)
+        {
+            throw new BusinessException(ApiCodes.NotFound, "用户不存在");
+        }
+        return ApiResponse<LocationResponse>.Ok(location);
+    }
+
+    /// <summary>更新玩家省份城市（玩家自助，token 鉴权）。</summary>
+    [HttpPut("location")]
+    public async Task<ApiResponse<User>> UpdateLocation([FromBody] UpdateLocationRequest request)
+    {
+        var user = await _userService.UpdateLocationAsync(GetUserId(), request.ProvinceId, request.CityId);
+        return ApiResponse<User>.Ok(user);
+    }
+
     /// <summary>
     /// 上传头像（multipart/form-data，字段名 avatar；jpg/png，≤8MB，token 鉴权）。
     /// 保存到 wwwroot/uploads/avatar/{userId}.png，并回填 User.AvatarUrl。

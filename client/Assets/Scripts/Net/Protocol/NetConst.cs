@@ -11,6 +11,7 @@ namespace WildCourt.Net.Protocol
         public const string UserProfile = Base + "/user/profile";
         public const string UserUpdateNickname = Base + "/user/nickname";   // PUT，修改昵称
         public const string UserUpdateAvatar = Base + "/user/avatar";       // PUT，上传头像（multipart）
+        public const string UserLocation = Base + "/user/location";         // GET 获取 / PUT 更新省份城市
         public const string UserLevel = Base + "/user/level";
         public const string UserExp = Base + "/user/exp";
         public const string UserInventory = Base + "/user/inventory";

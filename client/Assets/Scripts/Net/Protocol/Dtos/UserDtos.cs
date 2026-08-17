@@ -56,6 +56,22 @@ namespace WildCourt.Net.Protocol
         public string nickname;
     }
 
+    /// <summary>更新省份城市请求（PUT /api/v1/user/location）。</summary>
+    [Serializable]
+    public class UpdateLocationRequest
+    {
+        public int provinceId;
+        public int cityId;
+    }
+
+    /// <summary>玩家省份城市信息（GET /api/v1/user/location，响应 data）。</summary>
+    [Serializable]
+    public class LocationResponse
+    {
+        public int provinceId;
+        public int cityId;
+    }
+
     /// <summary>增加经验请求（联调测试接口 POST /api/v1/user/exp，alpha 阶段）。</summary>
     [Serializable]
     public class AddExpRequest

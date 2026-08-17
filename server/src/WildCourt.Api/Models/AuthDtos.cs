@@ -35,3 +35,21 @@ public class UpdateNicknameRequest
 {
     public string Nickname { get; set; } = string.Empty;
 }
+
+/// <summary>更新省份城市请求（玩家自助，PUT /api/v1/user/location）。</summary>
+public class UpdateLocationRequest
+{
+    /// <summary>省份 ID（国标行政区划代码，如 440000 广东）。</summary>
+    public int ProvinceId { get; set; }
+
+    /// <summary>城市 ID（国标行政区划代码，如 440100 广州）。</summary>
+    public int CityId { get; set; }
+}
+
+/// <summary>玩家省份城市信息（GET /api/v1/user/location）。</summary>
+public class LocationResponse
+{
+    public int ProvinceId { get; set; }
+
+    public int CityId { get; set; }
+}
