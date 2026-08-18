@@ -93,6 +93,8 @@ public class ChatManner : MonoBehaviour
 
         // 订阅实时私聊推送
         EventBus.Subscribe<PrivateMessageEvent>(OnPrivateMessage);
+        // 订阅玩家资料更新（改头像/昵称后广播），实时同步 Label 的头像 + 昵称
+        EventBus.Subscribe<ProfileUpdatedEvent>(OnProfileUpdated);
     }
 
     private void Start()
@@ -118,6 +120,7 @@ public class ChatManner : MonoBehaviour
     {
         if (Instance == this) Instance = null;
         EventBus.Unsubscribe<PrivateMessageEvent>(OnPrivateMessage);
+        EventBus.Unsubscribe<ProfileUpdatedEvent>(OnProfileUpdated);
     }
 
     // ============ 窗口控制 ============
@@ -172,7 +175,7 @@ public class ChatManner : MonoBehaviour
             }
         }
 
-        // 默认显示聊天区
+        // 默认显示聊天区（ShowChatArea 内部会清空搜索栏）
         ShowChatArea();
 
         // 打开时刷新好友列表
@@ -200,11 +203,21 @@ public class ChatManner : MonoBehaviour
 
     // ============ 聊天区 / 搜索区切换 ============
 
-    /// <summary>显示聊天区（显示 Chat Window，隐藏搜索区）。</summary>
+    /// <summary>显示聊天区（显示 Chat Window，隐藏搜索区），并清空搜索栏。</summary>
     public void ShowChatArea()
     {
         if (chatWindow != null) chatWindow.SetActive(true);
         if (searchWindow != null) searchWindow.SetActive(false);
+        // 从搜索切回聊天时清空搜索栏（输入框 + 结果列表 + 提示），不保留上次搜索内容
+        ClearSearchArea();
+    }
+
+    /// <summary>清空搜索栏：输入框文字、搜索结果列表、搜索提示。</summary>
+    private void ClearSearchArea()
+    {
+        if (searchInput != null) searchInput.text = "";
+        ClearSearchResults();
+        HideSearchTip();
     }
 
     /// <summary>显示搜索/申请区（显示搜索区，隐藏聊天区），并刷新好友申请列表。</summary>
@@ -505,23 +518,38 @@ public class ChatManner : MonoBehaviour
         }
 
         // 同步 Label 子节点的玩家信息（头像 + 昵称）
+        // 头像：若 AvatarManager 缓存已有则立即设置（加速显示，未命中靠 profile 补）
         if (labelAvatarImage != null)
         {
-            // 优先用 AvatarManager 缓存的头像；尚未缓存则拉取 profile
             string myAvatar = AvatarManager.Instance != null ? AvatarManager.Instance.MyAvatarUrl : null;
             if (!string.IsNullOrEmpty(myAvatar))
             {
                 AvatarLoader.LoadInto(labelAvatarImage, myAvatar, this);
             }
-            else
-            {
-                RefreshLabelPlayerInfo();
-            }
+        }
+        // 昵称无本地缓存，无论头像缓存状态都必须拉取 profile 才能同步到 Label/Name。
+        // 原实现只在头像缓存为空时才拉 profile，导致头像有缓存时昵称一直不同步。
+        RefreshLabelPlayerInfo();
+    }
+
+    /// <summary>
+    /// 玩家资料更新（改头像/昵称后广播）：实时同步 Label 子节点的头像 + 昵称，
+    /// 避免必须重启游戏才能看到最新资料。头像/昵称直接用事件携带的值，无需再拉 profile。
+    /// </summary>
+    private void OnProfileUpdated(ProfileUpdatedEvent evt)
+    {
+        if (labelAvatarImage != null && !string.IsNullOrEmpty(evt.AvatarUrl))
+        {
+            AvatarLoader.LoadInto(labelAvatarImage, evt.AvatarUrl, this);
+        }
+        if (labelNameText != null && !string.IsNullOrEmpty(evt.Nickname))
+        {
+            labelNameText.text = evt.Nickname;
         }
     }
 
     /// <summary>
-    /// 拉取自己 profile，把头像 + 昵称更新到 Label 子节点（Label/Avatar、Label/Text (TMP)）。
+    /// 拉取自己 profile，把头像 + 昵称更新到 Label 子节点（Label/Avatar、Label/Name）。
     /// </summary>
     private void RefreshLabelPlayerInfo()
     {
@@ -590,7 +618,9 @@ public class ChatManner : MonoBehaviour
             var text = go.GetComponentInChildren<TMP_Text>();
             if (text != null) text.text = string.IsNullOrEmpty(f.nickname) ? f.userId.ToString() : f.nickname;
 
-            // 好友头像：按玩家 ID 从 AvatarManager 缓存取（LoadFriendList 已喂入缓存），再加载显示
+            // 好友头像：按玩家 ID 从 AvatarManager 缓存取（LoadFriendList 已喂入缓存），再加载显示。
+            // 头像 URL 现已带版本号（/uploads/avatar/{userId}-{ts}.png），好友换头像 URL 会变化，
+            // LoadInto 按 URL 判缓存自然重下，无需 force，也避免每次打开都重新下载。
             BindFriendAvatar(go, f.userId, f.avatarUrl);
 
             // 点击好友 → 拉历史消息
@@ -607,8 +637,10 @@ public class ChatManner : MonoBehaviour
 
     /// <summary>
     /// 给好友按钮实例加载头像：优先用 FriendItem.avatarUrl，其次从 AvatarManager 缓存按 userId 查。
+    /// <param name="force">强制刷新：头像 URL 固定但内容可能更新（好友换头像），
+    /// 传 true 会失效缓存并重新下载，确保显示最新头像。</param>
     /// </summary>
-    private void BindFriendAvatar(GameObject go, long userId, string avatarUrl)
+    private void BindFriendAvatar(GameObject go, long userId, string avatarUrl, bool force = false)
     {
         if (go == null) return;
         // Avatar 节点（Friend Button Prefab 根节点下）
@@ -624,7 +656,7 @@ public class ChatManner : MonoBehaviour
         }
         if (!string.IsNullOrEmpty(url))
         {
-            AvatarLoader.LoadInto(avatarImage, url, this);
+            AvatarLoader.LoadInto(avatarImage, url, this, force);
         }
     }
 
