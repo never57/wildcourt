@@ -155,6 +155,14 @@ public partial class UserService
         var result = new List<PlayerSearchDto>();
         if (string.IsNullOrWhiteSpace(keyword)) return result;
 
+        // 查询当前用户的好友 ID 集合，用于标记搜索结果中的好友关系
+        HashSet<long> friendIds = new HashSet<long>();
+        var myFriendRows = await _db.Friends
+            .Where(f => f.UserId == excludeUserId)
+            .Select(f => f.FriendId)
+            .ToListAsync();
+        foreach (var fid in myFriendRows) friendIds.Add(fid);
+
         var kw = keyword.Trim();
 
         // 1) 纯数字：优先按 userId 精确匹配
@@ -167,6 +175,7 @@ public partial class UserService
                     UserId = u.UserId,
                     Nickname = u.Nickname,
                     AvatarUrl = u.AvatarUrl,
+                    Signature = u.Signature,
                     Level = u.Level,
                 })
                 .FirstOrDefaultAsync();
@@ -181,6 +190,7 @@ public partial class UserService
                 UserId = u.UserId,
                 Nickname = u.Nickname,
                 AvatarUrl = u.AvatarUrl,
+                Signature = u.Signature,
                 Level = u.Level,
             })
             .OrderBy(u => u.UserId)
@@ -194,6 +204,12 @@ public partial class UserService
                 result.Add(item);
             }
             if (result.Count >= 20) break;
+        }
+
+        // 标记好友关系
+        foreach (var r in result)
+        {
+            r.IsFriend = friendIds.Contains(r.UserId);
         }
 
         return result;

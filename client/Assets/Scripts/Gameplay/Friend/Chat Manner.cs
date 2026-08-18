@@ -27,6 +27,7 @@ public class ChatManner : MonoBehaviour
     public static ChatManner Instance { get; private set; }
 
     [Header("窗口控制")]
+    public GameObject friendSystemRoot;  //整个 FriendSystem 根节点（close 控制其显示/隐藏）
     public GameObject chatWindow;  //聊天窗口（Chat Window）
     public Button closeButton;  //关闭
 
@@ -37,6 +38,17 @@ public class ChatManner : MonoBehaviour
     public Transform searchScrollContent; //Search Scroll View 的 Content
     public GameObject applicationPrefab;  //好友申请条目预制体（application.prefab）
     public TMP_Text tipText;              //Tip：无申请时显示提示
+
+    [Header("搜索玩家")]
+    public TMP_InputField searchInput;    //搜索输入框（InputField (TMP)）
+    public Button searchConfirmButton;    //执行搜索的按钮（searchWindow 里的 search 按钮）
+    public GameObject playerInfoPrefab;   //搜索结果条目预制体（playerinfromation.prefab）
+    public Transform searchResultContent; //搜索结果容器（FriendsWindow/search/Search Content）
+    public TMP_Text searchTipText;        //搜索结果的 Tip：无搜索结果时显示提示（与好友申请的 tipText 独立）
+
+    [Header("玩家信息")]
+    public UnityEngine.UI.Image labelAvatarImage; //Label 子节点下的 Avatar（显示自己头像）
+    public TMP_Text labelNameText;                //Label 子节点下的 Text (TMP)（显示自己昵称）
 
     [Header("好友列表")]
     public Transform friendListContent;  //好友按钮
@@ -88,26 +100,15 @@ public class ChatManner : MonoBehaviour
         //清空输入框消息
         inputField.text = "";
 
-        //测试喵
-        
-
-        // 将窗口组件全部禁止
-        if (chatWindow != null)
-        {
-            var cg = chatWindow.GetComponent<CanvasGroup>();
-            if (cg != null)
-            {
-                cg.blocksRaycasts = false;
-                cg.alpha = 0;
-                cg.interactable = false;
-            }
-        }
+        // 窗口显示/隐藏统一由 friendSystemRoot.SetActive 控制（OpenChat / ChatClose），
+        // 不再用 CanvasGroup 隐藏，避免 Start 在首次 OpenChat 之后又把窗口变透明。
 
         // 绑定按钮事件
         if (closeButton != null) closeButton.onClick.AddListener(ChatClose);
         if (sendButton != null) sendButton.onClick.AddListener(SendMessage);
         if (chatButton != null) chatButton.onClick.AddListener(ShowChatArea);
         if (searchButton != null) searchButton.onClick.AddListener(ShowSearchArea);
+        if (searchConfirmButton != null) searchConfirmButton.onClick.AddListener(OnSearchClick);
 
         // 拉取当前用户信息（拿到 userId 用于判断消息左右侧）
         LoadMyProfile();
@@ -148,12 +149,19 @@ public class ChatManner : MonoBehaviour
             Debug.LogWarning("[ChatManner] FriendSystem.prefab 缺少 ChatManner 组件");
             return null;
         }
+        // 首次实例化后主动打开（显示窗口 + 加载好友列表），与复用分支行为一致
+        manner.OpenChat();
         return manner;
     }
 
     public void OpenChat()
     {
-        if (chatWindow != null)
+        // 打开整个 FriendSystem
+        if (friendSystemRoot != null)
+        {
+            friendSystemRoot.SetActive(true);
+        }
+        else if (chatWindow != null)
         {
             var cg = chatWindow.GetComponent<CanvasGroup>();
             if (cg != null)
@@ -164,13 +172,21 @@ public class ChatManner : MonoBehaviour
             }
         }
 
+        // 默认显示聊天区
+        ShowChatArea();
+
         // 打开时刷新好友列表
         LoadFriendList();
     }
 
     public void ChatClose()
     {
-        if (chatWindow != null)
+        // 关闭整个 FriendSystem
+        if (friendSystemRoot != null)
+        {
+            friendSystemRoot.SetActive(false);
+        }
+        else if (chatWindow != null)
         {
             var cg = chatWindow.GetComponent<CanvasGroup>();
             if (cg != null)
@@ -184,25 +200,19 @@ public class ChatManner : MonoBehaviour
 
     // ============ 聊天区 / 搜索区切换 ============
 
-    /// <summary>显示聊天区（隐藏搜索区）。</summary>
+    /// <summary>显示聊天区（显示 Chat Window，隐藏搜索区）。</summary>
     public void ShowChatArea()
     {
-        SetSearchWindowVisible(false);
+        if (chatWindow != null) chatWindow.SetActive(true);
+        if (searchWindow != null) searchWindow.SetActive(false);
     }
 
-    /// <summary>显示搜索/申请区（隐藏聊天区），并刷新好友申请列表。</summary>
+    /// <summary>显示搜索/申请区（显示搜索区，隐藏聊天区），并刷新好友申请列表。</summary>
     public void ShowSearchArea()
     {
-        SetSearchWindowVisible(true);
+        if (searchWindow != null) searchWindow.SetActive(true);
+        if (chatWindow != null) chatWindow.SetActive(false);
         LoadFriendRequests();
-    }
-
-    private void SetSearchWindowVisible(bool visible)
-    {
-        if (searchWindow != null)
-        {
-            searchWindow.SetActive(visible);
-        }
     }
 
     // ============ 好友申请 ============
@@ -265,6 +275,147 @@ public class ChatManner : MonoBehaviour
         }
     }
 
+    // ============ 搜索玩家 ============
+
+    /// <summary>点击搜索按钮：读取输入框，搜索玩家并渲染结果。</summary>
+    public void OnSearchClick()
+    {
+        if (searchInput == null)
+        {
+            Debug.LogWarning("[Chat] 未绑定 searchInput（InputField (TMP)）");
+            return;
+        }
+        SearchPlayer(searchInput.text);
+    }
+
+    /// <summary>按昵称/UserId 搜索玩家，结果用 playerinfromation 渲染到 searchScrollContent。</summary>
+    private void SearchPlayer(string keyword)
+    {
+        if (string.IsNullOrWhiteSpace(keyword))
+        {
+            ClearSearchResults();
+            if (searchTipText != null) { searchTipText.text = "请输入昵称或玩家 ID"; searchTipText.gameObject.SetActive(true); }
+            return;
+        }
+
+        if (NetManager.Instance == null) return;
+
+        string kw = keyword.Trim();
+
+        // 搜索自己：明确提示不能添加自己为好友
+        // 用 ChatManner 自己的 _myUserId 作为主要判断（LoadMyProfile 已赋值），AvatarManager 作兜底
+        long myId = _myUserId;
+        if (myId <= 0 && AvatarManager.Instance != null) myId = AvatarManager.Instance.MyUserId;
+        if (myId > 0 && long.TryParse(kw, out var selfUid) && selfUid == myId)
+        {
+            ClearSearchResults();
+            if (searchTipText != null) { searchTipText.text = "不能添加自己为好友"; searchTipText.gameObject.SetActive(true); }
+            return;
+        }
+
+        string path = ApiPaths.UserSearch + "?keyword=" + UnityEngine.Networking.UnityWebRequest.EscapeURL(kw);
+        NetManager.Instance.Get<System.Collections.Generic.List<PlayerSearchDto>>(path,
+            resp =>
+            {
+                RebuildSearchResults(resp != null ? resp.data : null);
+            },
+            (code, msg) => Debug.LogWarning($"[Chat] 搜索玩家失败：{msg}"));
+    }
+
+    private void ClearSearchResults()
+    {
+        if (searchResultContent == null) return;
+        for (int i = searchResultContent.childCount - 1; i >= 0; i--)
+        {
+            Destroy(searchResultContent.GetChild(i).gameObject);
+        }
+    }
+
+    private void RebuildSearchResults(System.Collections.Generic.List<PlayerSearchDto> results)
+    {
+        ClearSearchResults();
+
+        bool hasResults = results != null && results.Count > 0;
+        if (searchTipText != null)
+        {
+            searchTipText.text = hasResults ? "" : "没有找到符合条件的玩家";
+            searchTipText.gameObject.SetActive(!hasResults);
+        }
+        if (!hasResults) return;
+
+        if (playerInfoPrefab == null)
+        {
+            Debug.LogWarning("[Chat] 未绑定 playerInfoPrefab（playerinfromation.prefab）");
+            return;
+        }
+
+        foreach (var p in results)
+        {
+            var go = Instantiate(playerInfoPrefab, searchResultContent);
+            BindPlayerInfo(go, p);
+        }
+    }
+
+    /// <summary>绑定 playerinfromation 预制体：Avatar 头像、Name 名字、describe 个性签名。</summary>
+    private void BindPlayerInfo(GameObject go, PlayerSearchDto p)
+    {
+        if (go == null || p == null) return;
+
+        // Name 名字
+        var nameText = go.transform.Find("Name")?.GetComponent<TMP_Text>();
+        if (nameText != null)
+        {
+            nameText.text = string.IsNullOrEmpty(p.nickname) ? p.userId.ToString() : p.nickname;
+        }
+
+        // describe 个性签名（未设置时显示默认文案）
+        var describeText = go.transform.Find("describe")?.GetComponent<TMP_Text>();
+        if (describeText != null)
+        {
+            describeText.text = string.IsNullOrEmpty(p.signature) ? "该玩家很神秘，什么也没有留下~" : p.signature;
+        }
+
+        // Avatar 头像
+        var avatarNode = go.transform.Find("Avatar");
+        if (avatarNode != null)
+        {
+            var avatarImage = avatarNode.GetComponent<UnityEngine.UI.Image>();
+            if (avatarImage != null && !string.IsNullOrEmpty(p.avatarUrl))
+            {
+                AvatarLoader.LoadInto(avatarImage, p.avatarUrl, this);
+            }
+        }
+
+        // application 按钮：若已是好友则禁用（变灰）并修改文案
+        var appNode = go.transform.Find("application");
+        if (appNode != null)
+        {
+            var appButton = appNode.GetComponent<Button>();
+            var appText = appNode.GetComponentInChildren<TMP_Text>();
+            // 优先用服务端返回的 isFriend 标记，客户端 _friends 列表作兜底
+            bool isFriend = p.isFriend || IsFriend(p.userId);
+            if (appButton != null)
+            {
+                appButton.interactable = !isFriend;
+            }
+            if (appText != null)
+            {
+                appText.text = isFriend ? "对方已经是你好友" : "申请";
+            }
+        }
+    }
+
+    /// <summary>判断指定 userId 是否已是好友（基于客户端 _friends 好友列表）。</summary>
+    private bool IsFriend(long userId)
+    {
+        if (userId <= 0) return false;
+        foreach (var f in _friends)
+        {
+            if (f.userId == userId) return true;
+        }
+        return false;
+    }
+
     // ============ 服务端数据加载 ============
 
     private void LoadMyProfile()
@@ -275,6 +426,48 @@ public class ChatManner : MonoBehaviour
         {
             Debug.LogWarning("[Chat] 尚未拿到当前用户 ID，请确认登录后 AvatarManager 已初始化");
         }
+
+        // 同步 Label 子节点的玩家信息（头像 + 昵称）
+        if (labelAvatarImage != null)
+        {
+            // 优先用 AvatarManager 缓存的头像；尚未缓存则拉取 profile
+            string myAvatar = AvatarManager.Instance != null ? AvatarManager.Instance.MyAvatarUrl : null;
+            if (!string.IsNullOrEmpty(myAvatar))
+            {
+                AvatarLoader.LoadInto(labelAvatarImage, myAvatar, this);
+            }
+            else
+            {
+                RefreshLabelPlayerInfo();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 拉取自己 profile，把头像 + 昵称更新到 Label 子节点（Label/Avatar、Label/Text (TMP)）。
+    /// </summary>
+    private void RefreshLabelPlayerInfo()
+    {
+        if (NetManager.Instance == null) return;
+        NetManager.Instance.Get<UserProfileResponse>(ApiPaths.UserProfile,
+            resp =>
+            {
+                if (resp == null || resp.data == null) return;
+                var data = resp.data;
+
+                if (_myUserId <= 0) _myUserId = data.userId;
+
+                if (labelNameText != null)
+                {
+                    labelNameText.text = string.IsNullOrEmpty(data.nickname) ? data.userId.ToString() : data.nickname;
+                }
+
+                if (labelAvatarImage != null && !string.IsNullOrEmpty(data.avatarUrl))
+                {
+                    AvatarLoader.LoadInto(labelAvatarImage, data.avatarUrl, this);
+                }
+            },
+            (code, msg) => Debug.LogWarning($"[Chat] 拉取玩家资料失败：{msg}"));
     }
 
     private void LoadFriendList()
@@ -330,6 +523,9 @@ public class ChatManner : MonoBehaviour
             var text = go.GetComponentInChildren<TMP_Text>();
             if (text != null) text.text = string.IsNullOrEmpty(f.nickname) ? f.userId.ToString() : f.nickname;
 
+            // 好友头像：按玩家 ID 从 AvatarManager 缓存取（LoadFriendList 已喂入缓存），再加载显示
+            BindFriendAvatar(go, f.userId, f.avatarUrl);
+
             // 点击好友 → 拉历史消息
             long friendId = f.userId;
             var btn = go.GetComponent<Button>();
@@ -339,6 +535,29 @@ public class ChatManner : MonoBehaviour
                 btn.onClick.RemoveAllListeners();
                 btn.onClick.AddListener(() => OpenFriendChat(friendId));
             }
+        }
+    }
+
+    /// <summary>
+    /// 给好友按钮实例加载头像：优先用 FriendItem.avatarUrl，其次从 AvatarManager 缓存按 userId 查。
+    /// </summary>
+    private void BindFriendAvatar(GameObject go, long userId, string avatarUrl)
+    {
+        if (go == null) return;
+        // Avatar 节点（Friend Button Prefab 根节点下）
+        var avatarNode = go.transform.Find("Avatar");
+        if (avatarNode == null) return;
+        var avatarImage = avatarNode.GetComponent<UnityEngine.UI.Image>();
+        if (avatarImage == null) return;
+
+        string url = avatarUrl;
+        if (string.IsNullOrEmpty(url) && AvatarManager.Instance != null)
+        {
+            url = AvatarManager.Instance.GetFriendAvatarUrl(userId);
+        }
+        if (!string.IsNullOrEmpty(url))
+        {
+            AvatarLoader.LoadInto(avatarImage, url, this);
         }
     }
 

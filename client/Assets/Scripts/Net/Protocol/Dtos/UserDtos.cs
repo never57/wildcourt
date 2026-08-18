@@ -79,7 +79,9 @@ namespace WildCourt.Net.Protocol
         public long userId;
         public string nickname;
         public string avatarUrl;
+        public string signature;
         public int level;
+        public bool isFriend;
     }
 
     /// <summary>增加经验请求（联调测试接口 POST /api/v1/user/exp，alpha 阶段）。</summary>

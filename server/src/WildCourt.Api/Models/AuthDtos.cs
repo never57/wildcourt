@@ -63,5 +63,11 @@ public class PlayerSearchDto
 
     public string? AvatarUrl { get; set; }
 
+    /// <summary>个性签名（未设置时为空）。</summary>
+    public string? Signature { get; set; }
+
     public int Level { get; set; }
+
+    /// <summary>当前用户是否已与对方成为好友。</summary>
+    public bool IsFriend { get; set; }
 }
