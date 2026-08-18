@@ -540,7 +540,9 @@ public class ChatManner : MonoBehaviour
     {
         if (labelAvatarImage != null && !string.IsNullOrEmpty(evt.AvatarUrl))
         {
-            AvatarLoader.LoadInto(labelAvatarImage, evt.AvatarUrl, this);
+            // force：换头像后即使 URL 不变（旧服务端固定 URL），也强制重新下载最新头像，
+            // 避免「换头像后 Label 头像不同步，重启才生效」。
+            AvatarLoader.LoadInto(labelAvatarImage, evt.AvatarUrl, this, force: true);
         }
         if (labelNameText != null && !string.IsNullOrEmpty(evt.Nickname))
         {
@@ -569,7 +571,8 @@ public class ChatManner : MonoBehaviour
 
                 if (labelAvatarImage != null && !string.IsNullOrEmpty(data.avatarUrl))
                 {
-                    AvatarLoader.LoadInto(labelAvatarImage, data.avatarUrl, this);
+                    // force：自己的头像可能换了内容但 URL 未变（旧服务端），强制重下保证显示最新
+                    AvatarLoader.LoadInto(labelAvatarImage, data.avatarUrl, this, force: true);
                 }
             },
             (code, msg) => Debug.LogWarning($"[Chat] 拉取玩家资料失败：{msg}"));
