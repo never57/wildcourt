@@ -161,6 +161,8 @@ namespace WildCourt.UI.Yard
                     // 初始化/刷新时同步头像到 playerinformation
                     if (resp.data != null && !string.IsNullOrEmpty(resp.data.avatarUrl))
                     {
+                        // 先同步把磁盘缓存头像载入内存，确保 LoadInto 命中缓存秒回，避免「默认图→真实图」闪烁
+                        AvatarLoader.PreloadIntoMemory(AvatarLoader.ToAbsoluteUrl(resp.data.avatarUrl));
                         AvatarLoader.LoadInto(_playerInfoAvatarImage, AvatarLoader.ToAbsoluteUrl(resp.data.avatarUrl), this);
                     }
                 },

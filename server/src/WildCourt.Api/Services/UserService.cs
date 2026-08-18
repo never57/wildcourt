@@ -148,7 +148,8 @@ public partial class UserService
     }
 
     /// <summary>
-    /// 按昵称模糊 / userId 精确搜索玩家，返回加好友所需的精简卡片列表（最多 20 条）。
+    /// 只允许按 userId 精确搜索玩家（不再支持昵称模糊），返回加好友所需的精简卡片。
+    /// 非纯数字 keyword 一律返回空列表。
     /// </summary>
     public async Task<List<PlayerSearchDto>> SearchAsync(string? keyword, long excludeUserId)
     {
@@ -165,26 +166,11 @@ public partial class UserService
 
         var kw = keyword.Trim();
 
-        // 1) 纯数字：优先按 userId 精确匹配
-        if (long.TryParse(kw, out var uid))
-        {
-            var byId = await _db.Users
-                .Where(u => u.UserId == uid && u.UserId != excludeUserId)
-                .Select(u => new PlayerSearchDto
-                {
-                    UserId = u.UserId,
-                    Nickname = u.Nickname,
-                    AvatarUrl = u.AvatarUrl,
-                    Signature = u.Signature,
-                    Level = u.Level,
-                })
-                .FirstOrDefaultAsync();
-            if (byId != null) result.Add(byId);
-        }
+        // 只按 userId 精确匹配；非纯数字直接返回空
+        if (!long.TryParse(kw, out var uid)) return result;
 
-        // 2) 昵称模糊匹配（含纯数字情况下的补充匹配）
-        var byNick = await _db.Users
-            .Where(u => u.Nickname.Contains(kw) && u.UserId != excludeUserId)
+        var byId = await _db.Users
+            .Where(u => u.UserId == uid && u.UserId != excludeUserId)
             .Select(u => new PlayerSearchDto
             {
                 UserId = u.UserId,
@@ -193,18 +179,8 @@ public partial class UserService
                 Signature = u.Signature,
                 Level = u.Level,
             })
-            .OrderBy(u => u.UserId)
-            .Take(20)
-            .ToListAsync();
-
-        foreach (var item in byNick)
-        {
-            if (!result.Any(r => r.UserId == item.UserId))
-            {
-                result.Add(item);
-            }
-            if (result.Count >= 20) break;
-        }
+            .FirstOrDefaultAsync();
+        if (byId != null) result.Add(byId);
 
         // 标记好友关系
         foreach (var r in result)

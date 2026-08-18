@@ -289,18 +289,41 @@ public class ChatManner : MonoBehaviour
     }
 
     /// <summary>按昵称/UserId 搜索玩家，结果用 playerinfromation 渲染到 searchScrollContent。</summary>
+    /// <summary>显示搜索 Tip（需同时启用组件 + 激活 GameObject，因为 Tip 的 TMP_Text 组件默认 m_Enabled: 0）。</summary>
+    private void ShowSearchTip(string text)
+    {
+        if (searchTipText == null) return;
+        searchTipText.text = text;
+        searchTipText.enabled = true;                 // 启用 TMP_Text 组件（可能默认禁用）
+        searchTipText.gameObject.SetActive(true);     // 激活 GameObject
+    }
+
+    private void HideSearchTip()
+    {
+        if (searchTipText == null) return;
+        searchTipText.gameObject.SetActive(false);
+    }
+
     private void SearchPlayer(string keyword)
     {
         if (string.IsNullOrWhiteSpace(keyword))
         {
             ClearSearchResults();
-            if (searchTipText != null) { searchTipText.text = "请输入昵称或玩家 ID"; searchTipText.gameObject.SetActive(true); }
+            ShowSearchTip("请输入玩家 ID");
             return;
         }
 
         if (NetManager.Instance == null) return;
 
         string kw = keyword.Trim();
+
+        // 只允许按玩家 ID 精确搜索（纯数字），不再支持昵称模糊搜索
+        if (!long.TryParse(kw, out _))
+        {
+            ClearSearchResults();
+            ShowSearchTip("请输入玩家 ID（纯数字）");
+            return;
+        }
 
         // 搜索自己：明确提示不能添加自己为好友
         // 用 ChatManner 自己的 _myUserId 作为主要判断（LoadMyProfile 已赋值），AvatarManager 作兜底
@@ -309,7 +332,7 @@ public class ChatManner : MonoBehaviour
         if (myId > 0 && long.TryParse(kw, out var selfUid) && selfUid == myId)
         {
             ClearSearchResults();
-            if (searchTipText != null) { searchTipText.text = "不能添加自己为好友"; searchTipText.gameObject.SetActive(true); }
+            ShowSearchTip("不能添加自己为好友");
             return;
         }
 
@@ -336,10 +359,13 @@ public class ChatManner : MonoBehaviour
         ClearSearchResults();
 
         bool hasResults = results != null && results.Count > 0;
-        if (searchTipText != null)
+        if (hasResults)
         {
-            searchTipText.text = hasResults ? "" : "没有找到符合条件的玩家";
-            searchTipText.gameObject.SetActive(!hasResults);
+            HideSearchTip();
+        }
+        else
+        {
+            ShowSearchTip("没有找到符合条件的玩家");
         }
         if (!hasResults) return;
 
@@ -352,7 +378,10 @@ public class ChatManner : MonoBehaviour
         foreach (var p in results)
         {
             var go = Instantiate(playerInfoPrefab, searchResultContent);
+            // 先隐藏再绑定，避免「默认黄色按钮 → 变灰」/「默认头像 → 真实头像」的可见闪烁
+            go.SetActive(false);
             BindPlayerInfo(go, p);
+            go.SetActive(true);
         }
     }
 
@@ -361,33 +390,29 @@ public class ChatManner : MonoBehaviour
     {
         if (go == null || p == null) return;
 
-        // Name 名字
-        var nameText = go.transform.Find("Name")?.GetComponent<TMP_Text>();
+        // Name 名字（在 Avatar_background 子节点下）
+        var nameText = FindText(go, "Name");
         if (nameText != null)
         {
             nameText.text = string.IsNullOrEmpty(p.nickname) ? p.userId.ToString() : p.nickname;
         }
 
         // describe 个性签名（未设置时显示默认文案）
-        var describeText = go.transform.Find("describe")?.GetComponent<TMP_Text>();
+        var describeText = FindText(go, "describe");
         if (describeText != null)
         {
             describeText.text = string.IsNullOrEmpty(p.signature) ? "该玩家很神秘，什么也没有留下~" : p.signature;
         }
 
         // Avatar 头像
-        var avatarNode = go.transform.Find("Avatar");
-        if (avatarNode != null)
+        var avatarImage = FindImage(go, "Avatar");
+        if (avatarImage != null && !string.IsNullOrEmpty(p.avatarUrl))
         {
-            var avatarImage = avatarNode.GetComponent<UnityEngine.UI.Image>();
-            if (avatarImage != null && !string.IsNullOrEmpty(p.avatarUrl))
-            {
-                AvatarLoader.LoadInto(avatarImage, p.avatarUrl, this);
-            }
+            AvatarLoader.LoadInto(avatarImage, p.avatarUrl, this);
         }
 
-        // application 按钮：若已是好友则禁用（变灰）并修改文案
-        var appNode = go.transform.Find("application");
+        // application 按钮：若已是好友则禁用（变灰）并修改文案；否则绑定点击发起好友申请
+        var appNode = FindNode(go, "application");
         if (appNode != null)
         {
             var appButton = appNode.GetComponent<Button>();
@@ -397,12 +422,30 @@ public class ChatManner : MonoBehaviour
             if (appButton != null)
             {
                 appButton.interactable = !isFriend;
+                // 绑定点击：发起好友申请
+                appButton.onClick.RemoveAllListeners();
+                long targetId = p.userId;
+                appButton.onClick.AddListener(() => SendFriendApply(targetId, appButton, appText));
             }
             if (appText != null)
             {
                 appText.text = isFriend ? "对方已经是你好友" : "申请";
             }
         }
+    }
+
+    /// <summary>发起好友申请；成功后禁用按钮并修改文案为「已发送申请」。</summary>
+    private void SendFriendApply(long targetUserId, Button button, TMP_Text text)
+    {
+        if (NetManager.Instance == null) return;
+        NetManager.Instance.Post<object>(ApiPaths.FriendApply,
+            new FriendApplyRequest { userId = targetUserId },
+            resp =>
+            {
+                if (button != null) button.interactable = false;   // 变灰
+                if (text != null) text.text = "已发送申请";
+            },
+            (code, msg) => Debug.LogWarning($"[Chat] 发送好友申请失败：{msg}"));
     }
 
     /// <summary>判断指定 userId 是否已是好友（基于客户端 _friends 好友列表）。</summary>
@@ -414,6 +457,40 @@ public class ChatManner : MonoBehaviour
             if (f.userId == userId) return true;
         }
         return false;
+    }
+
+    // ============ 递归查找工具（节点可能嵌套在 Avatar_background 等中间层下） ============
+
+    /// <summary>递归查找指定名字的节点。</summary>
+    private Transform FindNode(GameObject go, string nodeName)
+    {
+        if (go == null) return null;
+        return FindInChildren(go.transform, nodeName);
+    }
+
+    private Transform FindInChildren(Transform t, string nodeName)
+    {
+        foreach (Transform child in t)
+        {
+            if (child.name == nodeName) return child;
+            var found = FindInChildren(child, nodeName);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /// <summary>递归查找指定名字节点下的 TMP_Text。</summary>
+    private TMP_Text FindText(GameObject go, string nodeName)
+    {
+        var node = FindNode(go, nodeName);
+        return node != null ? node.GetComponent<TMP_Text>() : null;
+    }
+
+    /// <summary>递归查找指定名字节点下的 Image。</summary>
+    private UnityEngine.UI.Image FindImage(GameObject go, string nodeName)
+    {
+        var node = FindNode(go, nodeName);
+        return node != null ? node.GetComponent<UnityEngine.UI.Image>() : null;
     }
 
     // ============ 服务端数据加载 ============
@@ -489,20 +566,10 @@ public class ChatManner : MonoBehaviour
                         }
                     }
                 }
-                RebuildFriendList();
-                // 提前预加载所有好友头像 + 自己的头像到图片缓存，
-                // 避免进入对话面板时当屏重新下载/替换头像。
+                // 预热头像（命中缓存立即返回，不阻塞），列表立即渲染保持秒开；
+                // 头像由 AvatarLoader 异步下载后平滑淡入，既快又无「默认图→真实图」硬跳变。
                 PrefetchAvatars();
-                if(_friends.Count > 0)
-                {
-                    OpenFriendChat(_friends[0].userId);  // 默认打开第一个好友聊天
-                    ScrollToBottom();
-                }
-                else
-                {
-                    UpdateTitle("");
-                    ClearMessages();
-                }
+                OnAvatarsReady();
             },
             (code, msg) => Debug.LogWarning($"[Chat] 拉取好友列表失败：{msg}"));
     }
@@ -595,8 +662,8 @@ public class ChatManner : MonoBehaviour
     }
 
     /// <summary>
-    /// 预加载所有好友头像 + 自己的头像到 AvatarLoader 图片缓存。
-    /// 好友列表拉到后即触发下载，进入对话面板时头像已就绪，不再当屏替换。
+    /// 预热所有头像（自己的 + 好友的）到 AvatarLoader 缓存。
+    /// 命中缓存/下载中会直接跳过，不阻塞列表渲染；未命中的异步下载，完成后由 AvatarLoader 平滑淡入。
     /// </summary>
     private void PrefetchAvatars()
     {
@@ -620,12 +687,31 @@ public class ChatManner : MonoBehaviour
         }
     }
 
+    /// <summary>渲染好友列表并默认打开第一个好友的聊天。</summary>
+    private void OnAvatarsReady()
+    {
+        RebuildFriendList();
+        if (_friends.Count > 0)
+        {
+            OpenFriendChat(_friends[0].userId);  // 默认打开第一个好友聊天
+            ScrollToBottom();
+        }
+        else
+        {
+            UpdateTitle("");
+            ClearMessages();
+        }
+    }
+
     private void LoadHistory(long friendId)
     {
         if (NetManager.Instance == null) return;
         NetManager.Instance.Get<ChatHistoryResponse>(ApiPaths.ChatHistory(friendId),
             resp =>
             {
+                // 渲染消息前先把「自己 + 好友」头像同步载入内存缓存，
+                // 这样 AddMessage 渲染时命中缓存秒回，避免「默认图→真实图」闪烁。
+                PreloadChatAvatars(friendId);
                 if (resp != null && resp.data != null && resp.data.messages != null)
                 {
                     foreach (var m in resp.data.messages)
@@ -635,6 +721,27 @@ public class ChatManner : MonoBehaviour
                 }
             },
             (code, msg) => Debug.LogWarning($"[Chat] 拉取历史消息失败：{msg}"));
+    }
+
+    /// <summary>
+    /// 渲染聊天消息前，同步把「自己 + 好友」头像载入内存缓存（磁盘有则秒回）。
+    /// 这样 AddMessage 渲染消息头像时能同步命中，避免「默认图→真实图」的异步闪烁。
+    /// </summary>
+    private void PreloadChatAvatars(long friendId)
+    {
+        // 自己的头像
+        if (AvatarManager.Instance != null)
+        {
+            var myUrl = AvatarManager.Instance.GetMyAvatarUrl();
+            if (!string.IsNullOrEmpty(myUrl)) AvatarLoader.PreloadIntoMemory(myUrl);
+        }
+
+        // 好友头像
+        if (AvatarManager.Instance != null)
+        {
+            var friendUrl = AvatarManager.Instance.GetFriendAvatarUrl(friendId);
+            if (!string.IsNullOrEmpty(friendUrl)) AvatarLoader.PreloadIntoMemory(friendUrl);
+        }
     }
 
     private void ClearMessages()

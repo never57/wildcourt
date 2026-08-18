@@ -60,7 +60,7 @@ public class UserController : ControllerBase
         return ApiResponse<User>.Ok(user);
     }
 
-    /// <summary>搜索玩家（昵称模糊 / userId 精确，token 鉴权；排除自己）。</summary>
+    /// <summary>搜索玩家（只支持按 userId 精确搜索，token 鉴权；排除自己）。</summary>
     [HttpGet("search")]
     public async Task<ApiResponse<List<PlayerSearchDto>>> Search([FromQuery] string keyword)
     {
