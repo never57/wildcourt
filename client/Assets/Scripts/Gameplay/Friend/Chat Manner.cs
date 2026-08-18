@@ -27,8 +27,16 @@ public class ChatManner : MonoBehaviour
     public static ChatManner Instance { get; private set; }
 
     [Header("窗口控制")]
-    public GameObject chatWindow;  //聊天窗口
+    public GameObject chatWindow;  //聊天窗口（Chat Window）
     public Button closeButton;  //关闭
+
+    [Header("搜索/申请窗口")]
+    public GameObject searchWindow;      //搜索窗口（SearchArea）
+    public Button chatButton;            //chat 按钮：显示聊天区
+    public Button searchButton;          //search 按钮：显示搜索/申请区
+    public Transform searchScrollContent; //Search Scroll View 的 Content
+    public GameObject applicationPrefab;  //好友申请条目预制体（application.prefab）
+    public TMP_Text tipText;              //Tip：无申请时显示提示
 
     [Header("好友列表")]
     public Transform friendListContent;  //好友按钮
@@ -95,9 +103,11 @@ public class ChatManner : MonoBehaviour
             }
         }
 
-        // 绑定按钮事件（打开聊天改由 YardMainUI 的 friends 按钮触发，此处不再绑定 chatButton）
+        // 绑定按钮事件
         if (closeButton != null) closeButton.onClick.AddListener(ChatClose);
         if (sendButton != null) sendButton.onClick.AddListener(SendMessage);
+        if (chatButton != null) chatButton.onClick.AddListener(ShowChatArea);
+        if (searchButton != null) searchButton.onClick.AddListener(ShowSearchArea);
 
         // 拉取当前用户信息（拿到 userId 用于判断消息左右侧）
         LoadMyProfile();
@@ -112,7 +122,7 @@ public class ChatManner : MonoBehaviour
     // ============ 窗口控制 ============
 
     /// <summary>
-    /// 实例化或复用聊天 UI（chat.prefab，路径 Prefabs/UI/Chat/chat）。
+    /// 实例化或复用聊天 UI（FriendSystem.prefab，路径 Prefabs/UI/Friends/FriendSystem）。
     /// 与 MailPanel.CreateOrInstantiate 同一模式：首次调用 Resources.Load 实例化，之后复用单例。
     /// </summary>
     public static ChatManner CreateOrInstantiate()
@@ -123,10 +133,10 @@ public class ChatManner : MonoBehaviour
             return Instance;
         }
 
-        var prefab = Resources.Load<GameObject>("Prefabs/UI/Chat/chat");
+        var prefab = Resources.Load<GameObject>("Prefabs/UI/Friends/FriendSystem");
         if (prefab == null)
         {
-            Debug.LogWarning("[ChatManner] 未找到 chat.prefab（Prefabs/UI/Chat/chat）");
+            Debug.LogWarning("[ChatManner] 未找到 FriendSystem.prefab（Prefabs/UI/Friends/FriendSystem）");
             return null;
         }
 
@@ -135,7 +145,7 @@ public class ChatManner : MonoBehaviour
         if (manner == null)
         {
             Destroy(go);
-            Debug.LogWarning("[ChatManner] chat.prefab 缺少 ChatManner 组件");
+            Debug.LogWarning("[ChatManner] FriendSystem.prefab 缺少 ChatManner 组件");
             return null;
         }
         return manner;
@@ -169,6 +179,89 @@ public class ChatManner : MonoBehaviour
                 cg.alpha = 0;
                 cg.interactable = false;
             }
+        }
+    }
+
+    // ============ 聊天区 / 搜索区切换 ============
+
+    /// <summary>显示聊天区（隐藏搜索区）。</summary>
+    public void ShowChatArea()
+    {
+        SetSearchWindowVisible(false);
+    }
+
+    /// <summary>显示搜索/申请区（隐藏聊天区），并刷新好友申请列表。</summary>
+    public void ShowSearchArea()
+    {
+        SetSearchWindowVisible(true);
+        LoadFriendRequests();
+    }
+
+    private void SetSearchWindowVisible(bool visible)
+    {
+        if (searchWindow != null)
+        {
+            searchWindow.SetActive(visible);
+        }
+    }
+
+    // ============ 好友申请 ============
+
+    /// <summary>拉取待处理的好友申请列表并渲染到 Search Scroll View。</summary>
+    private void LoadFriendRequests()
+    {
+        if (NetManager.Instance == null) return;
+        NetManager.Instance.Get<FriendRequestListResponse>(ApiPaths.FriendRequests,
+            resp =>
+            {
+                var list = (resp != null && resp.data != null && resp.data.requests != null)
+                    ? resp.data.requests
+                    : new FriendRequestItem[0];
+
+                RebuildRequestList(list);
+            },
+            (code, msg) => Debug.LogWarning($"[Chat] 拉取好友申请列表失败：{msg}"));
+    }
+
+    private void RebuildRequestList(FriendRequestItem[] requests)
+    {
+        if (searchScrollContent == null) return;
+
+        // 清空旧条目
+        for (int i = searchScrollContent.childCount - 1; i >= 0; i--)
+        {
+            Destroy(searchScrollContent.GetChild(i).gameObject);
+        }
+
+        // 无申请：显示 Tip，隐藏列表
+        bool hasRequests = requests != null && requests.Length > 0;
+        if (tipText != null)
+        {
+            tipText.gameObject.SetActive(!hasRequests);
+        }
+
+        if (!hasRequests) return;
+
+        if (applicationPrefab == null)
+        {
+            Debug.LogWarning("[Chat] 未绑定 applicationPrefab（application.prefab）");
+            return;
+        }
+
+        foreach (var req in requests)
+        {
+            var go = Instantiate(applicationPrefab, searchScrollContent);
+            var item = go.GetComponent<WildCourt.UI.Friends.ApplicationItem>();
+            if (item == null)
+            {
+                item = go.AddComponent<WildCourt.UI.Friends.ApplicationItem>();
+            }
+            item.Bind(req, () =>
+            {
+                // 同意/拒绝后刷新列表 + 好友列表
+                LoadFriendRequests();
+                LoadFriendList();
+            });
         }
     }
 

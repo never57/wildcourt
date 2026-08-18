@@ -53,6 +53,9 @@ public class FriendRequestDto
 
     public string AvatarUrl { get; set; } = string.Empty;
 
+    /// <summary>申请人个性标签（未设置时为空，客户端显示默认文案）。</summary>
+    public string? Signature { get; set; }
+
     public string Status { get; set; } = string.Empty;
 
     public long CreatedAt { get; set; }

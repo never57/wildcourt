@@ -148,6 +148,58 @@ public partial class UserService
     }
 
     /// <summary>
+    /// 按昵称模糊 / userId 精确搜索玩家，返回加好友所需的精简卡片列表（最多 20 条）。
+    /// </summary>
+    public async Task<List<PlayerSearchDto>> SearchAsync(string? keyword, long excludeUserId)
+    {
+        var result = new List<PlayerSearchDto>();
+        if (string.IsNullOrWhiteSpace(keyword)) return result;
+
+        var kw = keyword.Trim();
+
+        // 1) 纯数字：优先按 userId 精确匹配
+        if (long.TryParse(kw, out var uid))
+        {
+            var byId = await _db.Users
+                .Where(u => u.UserId == uid && u.UserId != excludeUserId)
+                .Select(u => new PlayerSearchDto
+                {
+                    UserId = u.UserId,
+                    Nickname = u.Nickname,
+                    AvatarUrl = u.AvatarUrl,
+                    Level = u.Level,
+                })
+                .FirstOrDefaultAsync();
+            if (byId != null) result.Add(byId);
+        }
+
+        // 2) 昵称模糊匹配（含纯数字情况下的补充匹配）
+        var byNick = await _db.Users
+            .Where(u => u.Nickname.Contains(kw) && u.UserId != excludeUserId)
+            .Select(u => new PlayerSearchDto
+            {
+                UserId = u.UserId,
+                Nickname = u.Nickname,
+                AvatarUrl = u.AvatarUrl,
+                Level = u.Level,
+            })
+            .OrderBy(u => u.UserId)
+            .Take(20)
+            .ToListAsync();
+
+        foreach (var item in byNick)
+        {
+            if (!result.Any(r => r.UserId == item.UserId))
+            {
+                result.Add(item);
+            }
+            if (result.Count >= 20) break;
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// 获取玩家省份城市（不存在返回 null，由 Controller 转 404）。
     /// </summary>
     public async Task<LocationResponse?> GetLocationAsync(long userId)

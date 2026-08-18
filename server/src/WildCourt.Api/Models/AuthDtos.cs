@@ -53,3 +53,15 @@ public class LocationResponse
 
     public int CityId { get; set; }
 }
+
+/// <summary>搜索到的玩家卡片（GET /api/v1/user/search，仅含加好友所需字段，不含敏感数据）。</summary>
+public class PlayerSearchDto
+{
+    public long UserId { get; set; }
+
+    public string Nickname { get; set; } = string.Empty;
+
+    public string? AvatarUrl { get; set; }
+
+    public int Level { get; set; }
+}

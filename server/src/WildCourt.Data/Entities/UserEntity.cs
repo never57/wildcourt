@@ -20,6 +20,9 @@ public class UserEntity
     /// <summary>头像 URL（运营后台可修改；客户端上传后回填）。</summary>
     public string? AvatarUrl { get; set; }
 
+    /// <summary>个性标签（玩家自定义签名；为空表示未设置）。</summary>
+    public string? Signature { get; set; }
+
     public int ProvinceId { get; set; }
 
     public int CityId { get; set; }

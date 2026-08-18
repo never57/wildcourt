@@ -72,6 +72,16 @@ namespace WildCourt.Net.Protocol
         public int cityId;
     }
 
+    /// <summary>搜索到的玩家卡片（GET /api/v1/user/search，响应 data 数组元素）。</summary>
+    [Serializable]
+    public class PlayerSearchDto
+    {
+        public long userId;
+        public string nickname;
+        public string avatarUrl;
+        public int level;
+    }
+
     /// <summary>增加经验请求（联调测试接口 POST /api/v1/user/exp，alpha 阶段）。</summary>
     [Serializable]
     public class AddExpRequest
@@ -92,42 +102,5 @@ namespace WildCourt.Net.Protocol
     public class InventoryResponse
     {
         public InventoryItem[] items;
-    }
-
-    // ---------- Pet（PetController） ----------
-
-    /// <summary>宠物信息（响应 data）。status: 在家 / 派遣中 / 休息中。</summary>
-    [Serializable]
-    public class PetInfoResponse
-    {
-        public long petId;
-        public string type;
-        public int level;
-        public int exp;
-        public string status;
-    }
-
-    /// <summary>派遣请求（文档 07 §7.6 十步校验；cityId 为 0 表示不限城市）。</summary>
-    [Serializable]
-    public class DispatchRequest
-    {
-        public int provinceId;
-        public int cityId;        // 0 = 不限
-        public string nonfictionId; // 随行非遗
-        public string letterContent; // ≤50 字
-    }
-
-    [Serializable]
-    public class DispatchResultResponse
-    {
-        public bool success;
-        public string message;
-        public long targetUserId; // 匹配到的目标庭院
-    }
-
-    [Serializable]
-    public class RecallRequest
-    {
-        public long petId;
     }
 }
