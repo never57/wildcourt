@@ -129,6 +129,8 @@ namespace WildCourt.UI
                     // token 有效：进入已登录菜单，并同步昵称
                     ShowLoginMenu(true);
                     ClearStatus();
+                    // 自动登录同样需要注入庭院/农场等预制体，否则进主场景后 YardMainUI/FarmPanel 未注入无法创建
+                    PreloadYardPanel();
                     AvatarManager.EnsureCreated();
                     AvatarManager.Instance.OnProfileReady(() =>
                     {
