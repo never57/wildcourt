@@ -32,14 +32,15 @@
 
 ## 配置
 
-MCP Server 用管理后台账号登录（密码客户端 SHA256 后传输，与服务端约定一致）。
+MCP Server 用「服务间登录」连接管理后台：携带共享密钥（`Security:ServiceLoginKey`）调用
+`/api/v1/admin/auth/service-login`，绕过图形验证码签发 JWT（MCP 是可信服务端调用，无法人工识别验证码）。
 
 三种配置方式（优先级从高到低）：
 
 1. **环境变量**（推荐，适合 CodeBuddy 配置 MCP 时填写）
    - `WILDCOURT_ADMIN_URL` — 管理 API 地址，如 `http://your-server.example/api/v1/admin`
    - `WILDCOURT_ADMIN_USERNAME` — 管理员账号（默认 `admin`）
-   - `WILDCOURT_ADMIN_PASSWORD` — 管理员明文密码（程序自动 SHA256）
+   - `WILDCOURT_SERVICE_LOGIN_KEY` — 服务间共享密钥（**必须与服务端 `Security:ServiceLoginKey` / `WILDCOURT_SERVICE_LOGIN_KEY` 一致**）
 2. **`appsettings.local.json`**（构建目录下，已 gitignore）
    ```json
    {
@@ -69,7 +70,7 @@ dotnet publish src/WildCourt.Mcp -c Release -o publish/WildCourt.Mcp
    - env（可选，推荐）：
      - `WILDCOURT_ADMIN_URL=http://your-server.example/api/v1/admin`
      - `WILDCOURT_ADMIN_USERNAME=admin`
-     - `WILDCOURT_ADMIN_PASSWORD=你的密码`
+     - `WILDCOURT_SERVICE_LOGIN_KEY=你的共享密钥（需与服务端一致）`
 3. 保存后 CodeBuddy 即可发现 `deploy_*` / `db_*` 工具。
 
 ## 安全说明
