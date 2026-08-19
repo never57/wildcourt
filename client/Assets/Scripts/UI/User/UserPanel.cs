@@ -85,10 +85,13 @@ namespace WildCourt.UI.User
             if (editorNameButton != null) editorNameButton.onClick.AddListener(OnEditClicked);
             if (userNameInput != null) userNameInput.onEndEdit.AddListener(OnNicknameEndEdit);
             if (avatarButton != null) avatarButton.onClick.AddListener(OnAvatarClicked);
+            // 订阅资料更新：改头像/昵称后实时刷新（与 YardMainUI 一致，避免改完不刷新）
+            EventBus.Subscribe<ProfileUpdatedEvent>(OnProfileUpdated);
         }
 
         private void OnDestroy()
         {
+            EventBus.Unsubscribe<ProfileUpdatedEvent>(OnProfileUpdated);
             if (Instance == this) Instance = null;
             if (closeButton != null) closeButton.onClick.RemoveAllListeners();
             if (editorButton != null) editorButton.onClick.RemoveAllListeners();
@@ -117,6 +120,12 @@ namespace WildCourt.UI.User
             net.Get<UserProfileResponse>(ApiPaths.UserProfile,
                 resp => ApplyProfile(resp.data),
                 (code, msg) => Debug.LogWarning($"[UserPanel] profile 加载失败: {msg}"));
+        }
+
+        /// <summary>资料更新（改头像/昵称后广播）：重新拉取 profile 刷新头像+昵称，确保实时同步。</summary>
+        private void OnProfileUpdated(ProfileUpdatedEvent evt)
+        {
+            LoadProfile();
         }
 
         private void ApplyProfile(UserProfileResponse data, bool forceAvatar = false)
@@ -312,8 +321,7 @@ namespace WildCourt.UI.User
                 "avatar" + ext, bytes,
                 resp =>
                 {
-                    // 头像 URL 已带版本号（{userId}-{时间戳}.png），换头像后 URL 变化，
-                    // LoadInto 自动检测差异下载新头像，无需 force
+                    // 头像 URL 带版本，换头像后 URL 变化，LoadInto 自动下载新头像
                     ApplyProfile(resp.data);
                     // 广播头像更新，供 YardMainUI / ChatManner 等同步
                     EventBus.Publish(new ProfileUpdatedEvent

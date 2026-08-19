@@ -78,7 +78,28 @@ namespace WildCourt.Net
         public void SetToken(string token)
         {
             Token = token;
+            // 记住登录：持久化 token 到本地，下次启动免输入（服务端会话默认 7 天，过期需重新登录）
+            if (!string.IsNullOrEmpty(token))
+            {
+                PlayerPrefs.SetString("session_token", token);
+                PlayerPrefs.Save();
+            }
             ConnectRealtime();
+        }
+
+        /// <summary>读取本地记住的会话 token（启动自动登录用）。</summary>
+        public string RestoreToken()
+        {
+            return PlayerPrefs.GetString("session_token", null);
+        }
+
+        /// <summary>退出登录：清空会话 token（含本地持久化），并断开实时连接（登录界面 exit 按钮调用）。</summary>
+        public void ClearSession()
+        {
+            Token = null;
+            PlayerPrefs.DeleteKey("session_token");
+            PlayerPrefs.Save();
+            _realtime?.Disconnect();
         }
 
         public void Get<T>(string path, Action<ApiResponse<T>> onSuccess, Action<int, string> onError = null)

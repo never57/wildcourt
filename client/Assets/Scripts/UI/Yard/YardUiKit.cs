@@ -40,7 +40,10 @@ namespace WildCourt.UI.Yard
 
         public static Image AddImage(GameObject go, Color color)
         {
-            var img = go.AddComponent<Image>();
+            // 幂等：若节点已有 Image（如预制体已带）则复用，避免 AddComponent 因 Graphic 冲突返回 null 导致 NRE
+            var img = go.GetComponent<Image>();
+            if (img == null) img = go.AddComponent<Image>();
+            if (img == null) return null;
             img.color = color;
             return img;
         }

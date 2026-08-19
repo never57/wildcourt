@@ -1,8 +1,11 @@
 using System.Text.RegularExpressions;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using WildCourt.Core;
+using WildCourt.Net;
+using WildCourt.Net.Protocol;
 using WildCourt.UI.Yard;
 using WildCourt.UI.Farm;
 using WildCourt.UI.Letters;
@@ -38,6 +41,18 @@ namespace WildCourt.UI
 
         [Header("状态提示")]
         public Text statusText;
+
+        [Header("登录成功菜单（LoginUI 实例内节点）")]
+        [Tooltip("登录表单容器，登录成功后隐藏")]
+        public GameObject loginInformation;
+        [Tooltip("开始游戏按钮（Start 节点），登录成功后显示，点击进入主场景")]
+        public Button startButton;
+        [Tooltip("退出登录容器节点（exit），登录成功后整体显示，内含 exitButton 与 UserName")]
+        public GameObject exitNode;
+        [Tooltip("退出登录按钮（exit/exitButton），点击退出登录")]
+        public Button exitButton;
+        [Tooltip("显示玩家昵称的文本框（exit/UserName，TMP）")]
+        public TMP_Text userNameText;
 
         [Header("跳转场景名")]
         [Tooltip("登录成功后跳转到的场景")]
@@ -76,6 +91,91 @@ namespace WildCourt.UI
 
             // 进入登录界面即弹出公告（公开接口免登录；无已发布公告或失败时静默不弹）
             AnnouncementPopup.Open(transform);
+
+            // 绑定登录成功菜单按钮事件（节点在 LoginUI prefab 内通过 Inspector 拖拽绑定）
+            if (startButton != null) startButton.onClick.AddListener(OnStartClick);
+            if (exitButton != null) exitButton.onClick.AddListener(OnExitClick);
+
+            // 初始状态：仅显示登录表单，隐藏 start / exit
+            ShowLoginMenu(false);
+
+            // 自动登录：本机若记住过登录（token 有效期内）则免输入直接进入已登录菜单
+            TryAutoLogin();
+        }
+
+        /// <summary>
+        /// 自动登录：读取本地持久化的会话 token，带 token 调 GET /user/profile 校验。
+        /// 有效则直接进入「已登录菜单」（显示 start/exit + 昵称），免输入账号密码；失效则清除并走正常登录。
+        /// </summary>
+        private void TryAutoLogin()
+        {
+            var net = NetManager.Instance;
+            if (net == null) return;
+
+            var savedToken = net.RestoreToken();
+            if (string.IsNullOrEmpty(savedToken)) return;
+
+            net.SetToken(savedToken);   // 注入 token，后续请求自动带 Bearer
+
+            // 用 token 调 profile 校验会话是否有效
+            net.Get<UserProfileResponse>(ApiPaths.UserProfile,
+                resp =>
+                {
+                    if (resp == null || resp.data == null)
+                    {
+                        OnAutoLoginFail();
+                        return;
+                    }
+                    // token 有效：进入已登录菜单，并同步昵称
+                    ShowLoginMenu(true);
+                    ClearStatus();
+                    AvatarManager.EnsureCreated();
+                    AvatarManager.Instance.OnProfileReady(() =>
+                    {
+                        if (userNameText != null && AvatarManager.Instance != null)
+                        {
+                            userNameText.text = AvatarManager.Instance.MyNickname ?? resp.data.nickname;
+                        }
+                    });
+                },
+                (code, msg) => OnAutoLoginFail());
+        }
+
+        private void OnAutoLoginFail()
+        {
+            // 会话失效（过期/退出过）：清除本地 token，走正常登录界面
+            if (NetManager.Instance != null) NetManager.Instance.ClearSession();
+            if (AvatarManager.Instance != null) AvatarManager.Instance.ClearProfile();
+            if (userNameText != null) userNameText.text = "";
+            ShowLoginMenu(false);
+        }
+
+        private void OnStartClick()
+        {
+            // 点击开始游戏才进入主场景
+            LoadGameScene();
+        }
+
+        private void OnExitClick()
+        {
+            // 退出登录：清空会话 + 缓存 + 昵称文本，恢复登录界面（下次登录成功会重新拉取 profile）
+            if (NetManager.Instance != null) NetManager.Instance.ClearSession();
+            if (AvatarManager.Instance != null) AvatarManager.Instance.ClearProfile();
+            if (userNameText != null) userNameText.text = "";
+            ClearInputs();
+            ClearStatus();
+            ShowLoginMenu(false);
+            SetButtonsInteractable(true);
+        }
+
+        /// <summary>
+        /// 切换登录成功菜单显隐。true=显示 start/exit、隐藏登录表单；false=隐藏 start/exit、显示登录表单。
+        /// </summary>
+        private void ShowLoginMenu(bool loggedIn)
+        {
+            if (loginInformation) loginInformation.SetActive(!loggedIn);
+            if (startButton) startButton.gameObject.SetActive(loggedIn);
+            if (exitNode) exitNode.SetActive(loggedIn);
         }
 
         private void OnDestroy()
@@ -118,11 +218,21 @@ namespace WildCourt.UI
             _auth.Login(username, password,
                 onSuccess: token =>
                 {
-                    ShowStatus("登录成功，正在进入游戏...", new Color(0.4f, 0.8f, 0.4f));
-                    // 初始化全局头像缓存（拉取自己的 profile，缓存头像 URL；后续修改头像经 ProfileUpdatedEvent 同步）
+                    ShowStatus("登录成功", new Color(0.4f, 0.8f, 0.4f));
+                    // 初始化全局头像缓存（拉取自己的 profile，缓存头像 URL 与昵称）
                     AvatarManager.EnsureCreated();
                     PreloadYardPanel();
-                    LoadGameScene();
+                    // 隐藏登录表单，显示 start / exit，并等待 profile 拉取后把昵称显示到 UserName
+                    ShowLoginMenu(true);
+                    // 登录成功后清除状态提示（菜单已表示登录成功，不再常驻「登录成功」文字）
+                    ClearStatus();
+                    AvatarManager.Instance.OnProfileReady(() =>
+                    {
+                        if (userNameText != null && AvatarManager.Instance != null)
+                        {
+                            userNameText.text = AvatarManager.Instance.MyNickname ?? username;
+                        }
+                    });
                 },
                 onError: err =>
                 {
