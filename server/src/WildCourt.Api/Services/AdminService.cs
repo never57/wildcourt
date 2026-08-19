@@ -136,8 +136,13 @@ public class AdminService
     /// </summary>
     public async Task<AdminLoginResponse> ServiceLoginAsync(string? username, string? serviceKey)
     {
-        // 校验共享密钥（密钥未配置则一律拒绝，防误开放）；用固定时间比较防时序侧信道
+        // 校验共享密钥（密钥未配置则一律拒绝，防误开放）；用固定时间比较防时序侧信道。
+        // 优先级：Security:ServiceLoginKey（配置/docker 传 Security__ServiceLoginKey）→ WILDCOURT_SERVICE_LOGIN_KEY 环境变量
         var expected = _config["Security:ServiceLoginKey"];
+        if (string.IsNullOrEmpty(expected))
+        {
+            expected = Environment.GetEnvironmentVariable("WILDCOURT_SERVICE_LOGIN_KEY");
+        }
         var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected ?? string.Empty);
         var providedBytes = System.Text.Encoding.UTF8.GetBytes(serviceKey ?? string.Empty);
         if (string.IsNullOrEmpty(expected) || string.IsNullOrEmpty(serviceKey)

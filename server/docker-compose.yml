@@ -49,6 +49,8 @@ x-api-common: &api-common
     Admin__JwtSecret: ${ADMIN_JWT_SECRET:-CHANGE_ME_please_set_a_long_random_secret_in_production}
     Admin__DefaultUsername: ${ADMIN_DEFAULT_USERNAME:-admin}
     Admin__DefaultPassword: ${ADMIN_DEFAULT_PASSWORD:-CHANGE_ME_admin_password}
+    # 服务间登录共享密钥（MCP 用；在 .env 设 WILDCOURT_SERVICE_LOGIN_KEY）
+    Security__ServiceLoginKey: ${WILDCOURT_SERVICE_LOGIN_KEY:-}
   volumes:
     - ./config:/app/config:ro   # 生产配置目录（含数值配置 JSON 也可放这里）
     # 头像等上传资源持久化：容器内 /app/wwwroot 存用户上传图片，挂到宿主 /data/wildcourt-uploads
