@@ -24,6 +24,15 @@ public class AdminLoginRequest
     public string? TotpTicket { get; set; }
 }
 
+/// <summary>服务间登录请求（MCP / 部署脚本等内部服务，校验共享密钥绕过验证码）。</summary>
+public class ServiceLoginRequest
+{
+    public string Username { get; set; } = string.Empty;
+
+    /// <summary>服务间共享密钥（Security:ServiceLoginKey）。</summary>
+    public string ServiceKey { get; set; } = string.Empty;
+}
+
 public class AdminLoginResponse
 {
     public string Token { get; set; } = string.Empty;
@@ -241,6 +250,9 @@ public class PlayerAdminDto
     public int Coupon { get; set; }
 
     public int Exp { get; set; }
+
+    /// <summary>角色创建/资料初始化是否完成。</summary>
+    public bool ProfileInitialized { get; set; }
 
     public bool IsBanned { get; set; }
 

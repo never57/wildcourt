@@ -38,6 +38,14 @@ public class AdminAuthController : AdminControllerBase
         return ApiResponse<AdminLoginResponse>.Ok(result);
     }
 
+    /// <summary>服务间登录（MCP / 部署脚本等受信任内部服务，校验共享密钥绕过验证码）。</summary>
+    [HttpPost("auth/service-login")]
+    public async Task<ApiResponse<AdminLoginResponse>> ServiceLogin([FromBody] ServiceLoginRequest request)
+    {
+        var result = await _adminService.ServiceLoginAsync(request.Username, request.ServiceKey);
+        return ApiResponse<AdminLoginResponse>.Ok(result);
+    }
+
     /// <summary>当前管理员信息（含角色与权限集合）。</summary>
     [HttpGet("auth/profile")]
     public async Task<ApiResponse<AdminProfileResponse>> Profile()

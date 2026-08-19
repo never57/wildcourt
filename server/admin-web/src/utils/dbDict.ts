@@ -7,8 +7,10 @@
 export const TABLE_ZH: Record<string, string> = {
   admins: '运营后台管理员',
   announcements: '游戏内公告',
+  chat_messages: '好友聊天消息',
   farm_plots: '农田格种植记录',
   friends: '好友关系',
+  friend_requests: '好友申请',
   inventories: '玩家背包',
   letters: '玩家信件',
   operation_logs: '管理员操作审计日志',
@@ -25,6 +27,7 @@ export const TABLE_ZH: Record<string, string> = {
 // 字段名 → 中文注释（通用，跨表同名字段语义一致）
 export const COLUMN_ZH: Record<string, string> = {
   // 通用
+  id: '记录ID',
   user_id: '用户ID',
   created_at: '创建时间',
   updated_at: '更新时间',
@@ -54,6 +57,8 @@ export const COLUMN_ZH: Record<string, string> = {
   city_id: '城市ID',
   shell: '庭贝',
   coupon: '邮券',
+  signature: '个性签名',
+  profile_initialized: '是否完成角色创建',
   is_banned: '是否封禁',
   last_login: '最后登录时间',
 
@@ -92,6 +97,14 @@ export const COLUMN_ZH: Record<string, string> = {
 
   // friends / 好友
   friend_id: '好友ID',
+
+  // chat_messages / 好友聊天
+  from_user_id: '发送者用户ID',
+  to_user_id: '接收者用户ID',
+  is_read: '是否已读',
+
+  // friend_requests / 好友申请
+  // (from_user_id / to_user_id / status 已在上方)
 
   // inventories / 背包
   // (item_id / count 已在上方通用)

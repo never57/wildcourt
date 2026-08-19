@@ -610,8 +610,10 @@ public class DeployService
             var argLine = noCache ? "--no-cache" : "";
             // 不重定向 stdout：deploy.sh 内部已有 tee 写日志（logs/deploy-*.log），
             // 重定向会与 docker build/up 的海量输出叠加形成管道缓冲死锁，导致启动容器阶段卡死。
-            await RunProcessAsync("bash", $"\"{script}\" {argLine}".TrimEnd(), captureOutput: false);
-            // 部署完成后，把 deploy.sh 写的最新日志文件尾部补进内存队列供前端轮询
+            // 改为「进程运行期间实时 tail 日志文件」：既避免管道死锁，又能让前端轮询实时看到构建过程。
+            AppendLog("==> 启动蓝绿部署脚本（实时跟踪日志）");
+            await RunDeployScriptWithTailAsync(script, argLine);
+            // 部署完成后，再把日志文件尾部补进内存队列一次，确保完整收尾
             AppendDeployLogFileTail();
 
             if (string.IsNullOrEmpty(svc))
@@ -728,6 +730,105 @@ public class DeployService
         while (_log.Count > MaxLogLines)
         {
             _log.TryDequeue(out _);
+        }
+    }
+
+    /// <summary>
+    /// 运行蓝绿部署脚本，并在进程运行期间实时 tail deploy.sh 写的日志文件到内存队列。
+    /// 进程不重定向 stdout（避免与 docker 输出形成管道缓冲死锁），日志改由后台任务实时读文件增量追加，
+    /// 这样前端轮询能实时看到构建过程，而不是只有结束后的尾部。
+    /// </summary>
+    private async Task RunDeployScriptWithTailAsync(string script, string argLine)
+    {
+        var psi = new ProcessStartInfo("bash", $"\"{script}\" {argLine}".TrimEnd())
+        {
+            RedirectStandardOutput = false,
+            RedirectStandardError = false,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        using var process = Process.Start(psi)
+            ?? throw new BusinessException(ApiCodes.ServerError, "启动部署脚本失败");
+
+        // 后台任务实时 tail 最新的 deploy-*.log 文件到 _log 队列
+        using var tailCts = new CancellationTokenSource();
+        var tailTask = Task.Run(() => TailDeployLogFile(process, tailCts.Token));
+
+        await process.WaitForExitAsync();
+        tailCts.Cancel();
+        try { await tailTask; } catch { /* 日志跟踪失败不影响部署 */ }
+
+        if (process.ExitCode != 0)
+        {
+            throw new BusinessException(ApiCodes.ServerError, $"部署脚本执行失败（退出码 {process.ExitCode}），详见部署日志");
+        }
+    }
+
+    /// <summary>
+    /// 后台轮询：持续把最新 deploy-*.log 文件的新增行追加到内存日志队列，直到进程结束。
+    /// 用「文件路径 + 字节偏移」做增量读取，避免重复追加。
+    /// </summary>
+    private void TailDeployLogFile(Process process, CancellationToken ct)
+    {
+        try
+        {
+            var logsDir = Path.Combine(_hostCodeRoot, "logs");
+            if (!Directory.Exists(logsDir)) Directory.CreateDirectory(logsDir);
+
+            string? currentFile = null;
+            long offset = 0;
+
+            while (!ct.IsCancellationRequested && !process.HasExited)
+            {
+                var latest = Directory.GetFiles(logsDir, "deploy-*.log")
+                    .OrderByDescending(File.GetLastWriteTimeUtc)
+                    .FirstOrDefault();
+
+                if (latest != null)
+                {
+                    if (currentFile != latest)
+                    {
+                        currentFile = latest;
+                        offset = 0;
+                    }
+                    offset = AppendLogFileIncremental(latest, offset);
+                }
+
+                ct.WaitHandle.WaitOne(TimeSpan.FromMilliseconds(500));
+            }
+
+            // 进程结束时把当前文件剩余行读完，保证完整
+            if (currentFile != null)
+            {
+                AppendLogFileIncremental(currentFile, offset);
+            }
+        }
+        catch
+        {
+            // 日志跟踪失败不影响部署
+        }
+    }
+
+    /// <summary>增量读取日志文件自 offset 起的新行并追加到内存队列，返回新的文件偏移。</summary>
+    private long AppendLogFileIncremental(string path, long offset)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (offset > fs.Length) offset = fs.Length;   // 文件被截断时回退
+            fs.Seek(offset, SeekOrigin.Begin);
+            using var reader = new StreamReader(fs);
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                AppendLog(line);
+            }
+            return fs.Position;
+        }
+        catch
+        {
+            return offset;
         }
     }
 

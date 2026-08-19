@@ -27,6 +27,9 @@ public class User
     /// <summary>玩家经验（等级由经验驱动，文档 03 §3.5）。</summary>
     public int Exp { get; set; }
 
+    /// <summary>角色创建/资料初始化是否完成。false=未初始化（登录后需展示角色创建界面）。</summary>
+    public bool ProfileInitialized { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime? LastLogin { get; set; }

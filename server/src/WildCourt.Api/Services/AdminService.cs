@@ -17,6 +17,7 @@ public class AdminService
     private readonly AdminTokenService _tokens;
     private readonly CaptchaService _captcha;
     private readonly TotpService _totp;
+    private readonly IConfiguration _config;
 
     // 登录失败锁定配置：5 次失败锁定 15 分钟
     private const int MaxLoginFails = 5;
@@ -26,13 +27,14 @@ public class AdminService
     private const string CaptchaKeyPrefix = "admin_captcha:";
 
     public AdminService(WildCourtDbContext db, RedisUtil redis, AdminTokenService tokens,
-        CaptchaService captcha, TotpService totp)
+        CaptchaService captcha, TotpService totp, IConfiguration config)
     {
         _db = db;
         _redis = redis;
         _tokens = tokens;
         _captcha = captcha;
         _totp = totp;
+        _config = config;
     }
 
     // ============ 验证码 ============
@@ -121,6 +123,39 @@ public class AdminService
                 TotpTicket = _tokens.Issue(admin.AdminId, TimeSpan.FromMinutes(5)),
                 ExpireAt = DateTime.UtcNow.AddMinutes(5),
             };
+        }
+
+        return await IssueLoginAsync(admin);
+    }
+
+    /// <summary>
+    /// 服务间登录（MCP / 部署脚本等受信任内部服务调用）。
+    /// 校验共享密钥（Security:ServiceLoginKey，生产用环境变量 WILDCOURT_SERVICE_LOGIN_KEY 覆盖），
+    /// 通过后按管理员账号直接签发令牌，跳过图形验证码 / 失败锁定 / 双因素。
+    /// 该接口不暴露登录失败次数，避免被用作账号探测。
+    /// </summary>
+    public async Task<AdminLoginResponse> ServiceLoginAsync(string? username, string? serviceKey)
+    {
+        // 校验共享密钥（密钥未配置则一律拒绝，防误开放）；用固定时间比较防时序侧信道
+        var expected = _config["Security:ServiceLoginKey"];
+        var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected ?? string.Empty);
+        var providedBytes = System.Text.Encoding.UTF8.GetBytes(serviceKey ?? string.Empty);
+        if (string.IsNullOrEmpty(expected) || string.IsNullOrEmpty(serviceKey)
+            || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expectedBytes, providedBytes))
+        {
+            throw new BusinessException(ApiCodes.Unauthorized, "服务间登录密钥无效");
+        }
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "缺少用户名");
+        }
+
+        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.Username == username.Trim());
+        if (admin == null || !admin.IsActive)
+        {
+            // 不区分“不存在/停用”，防止账号探测
+            throw new BusinessException(ApiCodes.Unauthorized, "账号不存在或已被停用");
         }
 
         return await IssueLoginAsync(admin);
@@ -457,6 +492,7 @@ public class AdminService
                 Shell = u.Shell,
                 Coupon = u.Coupon,
                 Exp = u.Exp,
+                ProfileInitialized = u.ProfileInitialized,
                 IsBanned = u.IsBanned,
                 CreatedAt = u.CreatedAt,
                 LastLogin = u.LastLogin,
@@ -480,6 +516,7 @@ public class AdminService
                 Shell = u.Shell,
                 Coupon = u.Coupon,
                 Exp = u.Exp,
+                ProfileInitialized = u.ProfileInitialized,
                 IsBanned = u.IsBanned,
                 CreatedAt = u.CreatedAt,
                 LastLogin = u.LastLogin,

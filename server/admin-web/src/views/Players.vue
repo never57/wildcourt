@@ -47,6 +47,13 @@
       <el-table-column prop="shell" label="贝壳" width="90" />
       <el-table-column prop="coupon" label="邮券" width="90" />
       <el-table-column prop="exp" label="经验" width="90" />
+      <el-table-column label="初始化" width="90">
+        <template #default="{ row }">
+          <el-tag :type="row.profileInitialized ? 'success' : 'warning'" size="small">
+            {{ row.profileInitialized ? '已完成' : '未初始化' }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag v-if="row.isBanned" type="danger" size="small">已封禁</el-tag>
@@ -99,6 +106,11 @@
           <el-descriptions-item label="邮券">{{ detail.player.coupon }}</el-descriptions-item>
           <el-descriptions-item label="经验">{{ detail.player.exp }}</el-descriptions-item>
           <el-descriptions-item label="好友数">{{ detail.friendCount }}</el-descriptions-item>
+          <el-descriptions-item label="初始化">
+            <el-tag :type="detail.player.profileInitialized ? 'success' : 'warning'" size="small">
+              {{ detail.player.profileInitialized ? '已完成' : '未初始化' }}
+            </el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag :type="detail.player.isBanned ? 'danger' : 'success'" size="small">
               {{ detail.player.isBanned ? '已封禁' : '正常' }}

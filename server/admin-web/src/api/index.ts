@@ -99,6 +99,7 @@ export interface PlayerItem {
   shell: number
   coupon: number
   exp: number
+  profileInitialized: boolean
   isBanned: boolean
   createdAt: string
   lastLogin?: string

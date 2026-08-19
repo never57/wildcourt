@@ -312,10 +312,10 @@ namespace WildCourt.UI.User
                 "avatar" + ext, bytes,
                 resp =>
                 {
-                    // 头像内容已变但 URL 不变（/uploads/avatar/{userId}.png），
-                    // 用 force 强制刷新：失效缓存 + 追加时间戳绕过 HTTP 缓存，重新下载新头像
-                    ApplyProfile(resp.data, forceAvatar: true);
-                    // 广播头像更新，供 YardMainUI 等同步
+                    // 头像 URL 已带版本号（{userId}-{时间戳}.png），换头像后 URL 变化，
+                    // LoadInto 自动检测差异下载新头像，无需 force
+                    ApplyProfile(resp.data);
+                    // 广播头像更新，供 YardMainUI / ChatManner 等同步
                     EventBus.Publish(new ProfileUpdatedEvent
                     {
                         AvatarUrl = resp.data != null ? resp.data.avatarUrl : null,

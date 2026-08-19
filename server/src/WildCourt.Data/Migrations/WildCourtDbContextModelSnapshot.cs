@@ -583,6 +583,12 @@ namespace WildCourt.Data.Migrations
                         .HasColumnType("int")
                         .HasColumnName("exp");
 
+                    b.Property<bool>("ProfileInitialized")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("profile_initialized");
+
                     b.Property<bool>("IsBanned")
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_banned");
@@ -614,6 +620,9 @@ namespace WildCourt.Data.Migrations
                     b.Property<int>("Shell")
                         .HasColumnType("int")
                         .HasColumnName("shell");
+
+                    b.Property<string>("Signature")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("Username")
                         .IsRequired()

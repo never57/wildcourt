@@ -233,6 +233,22 @@ public partial class UserService
         return ToModel(entity);
     }
 
+    /// <summary>
+    /// 标记角色创建/资料初始化完成（昵称 + 地区保存成功后由创建界面调用）。
+    /// 设置 profile_initialized=true，下次登录不再展示角色创建界面。
+    /// </summary>
+    public async Task<User?> MarkProfileInitializedAsync(long userId)
+    {
+        var entity = await _db.Users.FirstOrDefaultAsync(u => u.UserId == userId)
+            ?? throw new BusinessException(ApiCodes.NotFound, "用户不存在");
+
+        if (entity.ProfileInitialized) return ToModel(entity); // 已初始化则幂等返回
+
+        entity.ProfileInitialized = true;
+        await _db.SaveChangesAsync();
+        return ToModel(entity);
+    }
+
     /// <summary>背包快照（阶段 C：编辑面板“已拥有”状态，数量 &gt; 0 才返回）。</summary>
     public async Task<InventoryResponse> GetInventoryAsync(long userId)
     {
@@ -255,6 +271,7 @@ public partial class UserService
         Shell = e.Shell,
         Coupon = e.Coupon,
         Exp = e.Exp,
+        ProfileInitialized = e.ProfileInitialized,
         CreatedAt = e.CreatedAt,
         LastLogin = e.LastLogin,
     };

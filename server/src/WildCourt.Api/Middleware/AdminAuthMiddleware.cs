@@ -21,6 +21,7 @@ public class AdminAuthMiddleware
         "/auth/login",
         "/auth/captcha",
         "/auth/verify-totp",
+        "/auth/service-login",
     };
 
     private readonly RequestDelegate _next;

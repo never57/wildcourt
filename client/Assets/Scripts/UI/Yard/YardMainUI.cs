@@ -91,13 +91,13 @@ namespace WildCourt.UI.Yard
             LoadProfile();
         }
 
-        /// <summary>资料更新（UserPanel 改头像/昵称后广播）：同步 playerinformation 头像。</summary>
+        /// <summary>
+        /// 资料更新（UserPanel 改头像/昵称后广播）：重新拉取 profile，用权威数据 force 刷新 playerinformation 头像。
+        /// 主动拉 profile 而非仅用事件携带的 URL，确保拿到服务端最新头像（事件 URL 可能为空/旧值）。
+        /// </summary>
         private void OnProfileUpdated(ProfileUpdatedEvent evt)
         {
-            if (!string.IsNullOrEmpty(evt.AvatarUrl))
-            {
-                AvatarLoader.LoadInto(_playerInfoAvatarImage, AvatarLoader.ToAbsoluteUrl(evt.AvatarUrl), this);
-            }
+            LoadProfile();
         }
 
         private void BindYard(YardManager yard)
@@ -159,10 +159,10 @@ namespace WildCourt.UI.Yard
                 {
                     _profile = resp.data;
                     // 初始化/刷新时同步头像到 playerinformation
-                    if (resp.data != null && !string.IsNullOrEmpty(resp.data.avatarUrl))
+                    if (resp.data != null && _playerInfoAvatarImage != null && !string.IsNullOrEmpty(resp.data.avatarUrl))
                     {
-                        // 先同步把磁盘缓存头像载入内存，确保 LoadInto 命中缓存秒回，避免「默认图→真实图」闪烁
-                        AvatarLoader.PreloadIntoMemory(AvatarLoader.ToAbsoluteUrl(resp.data.avatarUrl));
+                        // 服务端头像 URL 带版本，换头像后 URL 变化，LoadInto 自动下载新头像；
+                        // URL 未变则命中本地缓存秒回（优先本地）
                         AvatarLoader.LoadInto(_playerInfoAvatarImage, AvatarLoader.ToAbsoluteUrl(resp.data.avatarUrl), this);
                     }
                 },

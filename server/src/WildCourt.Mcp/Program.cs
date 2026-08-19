@@ -14,17 +14,17 @@ var username = Environment.GetEnvironmentVariable("WILDCOURT_ADMIN_USERNAME")
     ?? Config.Get("Admin:Username")
     ?? "admin";
 
-var password = Environment.GetEnvironmentVariable("WILDCOURT_ADMIN_PASSWORD")
-    ?? Config.Get("Admin:Password")
+var serviceKey = Environment.GetEnvironmentVariable("WILDCOURT_SERVICE_LOGIN_KEY")
+    ?? Config.Get("Security:ServiceLoginKey")
     ?? string.Empty;
 
-if (string.IsNullOrEmpty(password))
+if (string.IsNullOrEmpty(serviceKey))
 {
-    Console.Error.WriteLine("[WildCourt.Mcp] 未配置管理员密码，请设置环境变量 WILDCOURT_ADMIN_PASSWORD 或 appsettings.local.json 的 Admin:Password。");
+    Console.Error.WriteLine("[WildCourt.Mcp] 未配置服务间共享密钥，请设置环境变量 WILDCOURT_SERVICE_LOGIN_KEY（需与服务端 Security:ServiceLoginKey 一致）。");
 }
 
-// ===== 管理 API 客户端（登录/JWT/HTTP 封装）=====
-var api = new AdminApiClient(url, username, password);
+// ===== 管理 API 客户端（服务间登录/JWT/HTTP 封装）=====
+var api = new AdminApiClient(url, username, serviceKey);
 await DeployTools.InitializeAsync(api);
 await DatabaseTools.InitializeAsync(api);
 

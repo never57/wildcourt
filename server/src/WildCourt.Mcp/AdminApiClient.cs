@@ -1,13 +1,12 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
 namespace WildCourt.Mcp;
 
 /// <summary>
-/// 管理后台 API 客户端：负责登录（密码 SHA256 hex）→ 缓存 JWT → 自动续期 → 带令牌调用。
+/// 管理后台 API 客户端：负责服务间登录（共享密钥绕过验证码）→ 缓存 JWT → 自动续期 → 带令牌调用。
 /// 响应信封约定：{ Code, Data, Message }，Code==0 表示成功。
 /// </summary>
 public class AdminApiClient
@@ -15,17 +14,17 @@ public class AdminApiClient
     private readonly HttpClient _http = new();
     private readonly string _baseUrl;
     private readonly string _username;
-    private readonly string _passwordSha256;
+    private readonly string _serviceKey;
     private readonly SemaphoreSlim _loginLock = new(1, 1);
 
     private string? _token;
     private DateTime _tokenExpireAtUtc = DateTime.MinValue;
 
-    public AdminApiClient(string baseUrl, string username, string password)
+    public AdminApiClient(string baseUrl, string username, string serviceKey)
     {
         _baseUrl = baseUrl.TrimEnd('/');
         _username = username;
-        _passwordSha256 = Sha256Hex(password);
+        _serviceKey = serviceKey;
     }
 
     public string BaseUrl => _baseUrl;
@@ -46,10 +45,11 @@ public class AdminApiClient
                 return _token;
             }
 
-            var response = await _http.PostAsJsonAsync($"{_baseUrl}/auth/login", new
+            // 服务间登录：校验共享密钥绕过验证码（MCP 是可信服务端调用，无法人工识别图形验证码）
+            var response = await _http.PostAsJsonAsync($"{_baseUrl}/auth/service-login", new
             {
                 Username = _username,
-                Password = _passwordSha256,
+                ServiceKey = _serviceKey,
             });
 
             var envelope = await ReadEnvelopeAsync(response);
@@ -236,12 +236,6 @@ public class AdminApiClient
             }
         }
         return sb.ToString();
-    }
-
-    private static string Sha256Hex(string input)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private static string Truncate(string s, int max = 500)

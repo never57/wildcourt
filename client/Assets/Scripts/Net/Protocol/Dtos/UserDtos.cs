@@ -39,6 +39,7 @@ namespace WildCourt.Net.Protocol
         public int exp;           // 玩家经验（详情展示用，服务端已返回）
         public long shell;        // 庭贝
         public long coupon;       // 邮券（仅活动产出，文档 09 §9.1.1）
+        public bool profileInitialized; // 角色创建/资料初始化是否完成（登录后据此判断是否展示创建界面）
         public string token;      // 会话 token，登录后注入 NetManager
     }
 

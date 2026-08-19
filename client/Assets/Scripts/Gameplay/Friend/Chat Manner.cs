@@ -538,16 +538,9 @@ public class ChatManner : MonoBehaviour
     /// </summary>
     private void OnProfileUpdated(ProfileUpdatedEvent evt)
     {
-        if (labelAvatarImage != null && !string.IsNullOrEmpty(evt.AvatarUrl))
-        {
-            // force：换头像后即使 URL 不变（旧服务端固定 URL），也强制重新下载最新头像，
-            // 避免「换头像后 Label 头像不同步，重启才生效」。
-            AvatarLoader.LoadInto(labelAvatarImage, evt.AvatarUrl, this, force: true);
-        }
-        if (labelNameText != null && !string.IsNullOrEmpty(evt.Nickname))
-        {
-            labelNameText.text = evt.Nickname;
-        }
+        // 主动拉取 profile 并 force 刷新头像 + 昵称，确保拿到服务端最新数据，
+        // 而非仅依赖事件携带的 URL（可能为空/旧值）。force 保证换头像后即使 URL 不变也强制重下。
+        RefreshLabelPlayerInfo();
     }
 
     /// <summary>
@@ -571,8 +564,9 @@ public class ChatManner : MonoBehaviour
 
                 if (labelAvatarImage != null && !string.IsNullOrEmpty(data.avatarUrl))
                 {
-                    // force：自己的头像可能换了内容但 URL 未变（旧服务端），强制重下保证显示最新
-                    AvatarLoader.LoadInto(labelAvatarImage, data.avatarUrl, this, force: true);
+                    // 服务端头像 URL 已带版本号（{userId}-{时间戳}.png），换头像后 URL 变化，
+                    // LoadInto 自动检测差异并下载新头像；URL 未变则命中本地缓存秒回，无需 force
+                    AvatarLoader.LoadInto(labelAvatarImage, data.avatarUrl, this);
                 }
             },
             (code, msg) => Debug.LogWarning($"[Chat] 拉取玩家资料失败：{msg}"));

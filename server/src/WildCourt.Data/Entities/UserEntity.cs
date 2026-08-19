@@ -38,6 +38,9 @@ public class UserEntity
     /// <summary>玩家经验（等级由经验驱动，文档 03 §3.5；经验不设上限存储，等级封顶 4）。</summary>
     public int Exp { get; set; } = 0;
 
+    /// <summary>角色创建/资料初始化是否完成。false=未初始化（登录后需展示角色创建界面）。</summary>
+    public bool ProfileInitialized { get; set; } = false;
+
     /// <summary>是否被封禁（管理后台封禁后禁止登录，并踢出全部会话）。</summary>
     public bool IsBanned { get; set; } = false;
 

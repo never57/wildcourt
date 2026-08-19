@@ -88,6 +88,14 @@ public class UserController : ControllerBase
         return ApiResponse<User>.Ok(user);
     }
 
+    /// <summary>标记角色创建/资料初始化完成（昵称+地区保存成功后调用，幂等；token 鉴权）。</summary>
+    [HttpPut("complete-initialization")]
+    public async Task<ApiResponse<User>> CompleteInitialization()
+    {
+        var user = await _userService.MarkProfileInitializedAsync(GetUserId());
+        return ApiResponse<User>.Ok(user);
+    }
+
     /// <summary>
     /// 上传头像（multipart/form-data，字段名 avatar；jpg/png，≤8MB，token 鉴权）。
     /// 保存到 wwwroot/uploads/avatar/{userId}-{时间戳}.{ext}（文件名带版本号），并回填 User.AvatarUrl。
