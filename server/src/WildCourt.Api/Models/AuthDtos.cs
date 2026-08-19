@@ -53,3 +53,21 @@ public class LocationResponse
 
     public int CityId { get; set; }
 }
+
+/// <summary>搜索到的玩家卡片（GET /api/v1/user/search，仅含加好友所需字段，不含敏感数据）。</summary>
+public class PlayerSearchDto
+{
+    public long UserId { get; set; }
+
+    public string Nickname { get; set; } = string.Empty;
+
+    public string? AvatarUrl { get; set; }
+
+    /// <summary>个性签名（未设置时为空）。</summary>
+    public string? Signature { get; set; }
+
+    public int Level { get; set; }
+
+    /// <summary>当前用户是否已与对方成为好友。</summary>
+    public bool IsFriend { get; set; }
+}

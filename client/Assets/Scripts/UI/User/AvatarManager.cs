@@ -133,6 +133,9 @@ namespace WildCourt.UI.User
         {
             if (!string.IsNullOrEmpty(evt.AvatarUrl))
             {
+                // 头像内容可能已变但 URL 不变（/uploads/avatar/{userId}.png），
+                // 失效该 URL 的图片缓存，强制各界面重新下载新头像
+                WildCourt.Utils.AvatarLoader.Invalidate(evt.AvatarUrl);
                 _myAvatarUrl = evt.AvatarUrl;
             }
         }

@@ -148,6 +148,50 @@ public partial class UserService
     }
 
     /// <summary>
+    /// 只允许按 userId 精确搜索玩家（不再支持昵称模糊），返回加好友所需的精简卡片。
+    /// 非纯数字 keyword 一律返回空列表。
+    /// </summary>
+    public async Task<List<PlayerSearchDto>> SearchAsync(string? keyword, long excludeUserId)
+    {
+        var result = new List<PlayerSearchDto>();
+        if (string.IsNullOrWhiteSpace(keyword)) return result;
+
+        // 查询当前用户的好友 ID 集合，用于标记搜索结果中的好友关系
+        HashSet<long> friendIds = new HashSet<long>();
+        var myFriendRows = await _db.Friends
+            .Where(f => f.UserId == excludeUserId)
+            .Select(f => f.FriendId)
+            .ToListAsync();
+        foreach (var fid in myFriendRows) friendIds.Add(fid);
+
+        var kw = keyword.Trim();
+
+        // 只按 userId 精确匹配；非纯数字直接返回空
+        if (!long.TryParse(kw, out var uid)) return result;
+
+        var byId = await _db.Users
+            .Where(u => u.UserId == uid && u.UserId != excludeUserId)
+            .Select(u => new PlayerSearchDto
+            {
+                UserId = u.UserId,
+                Nickname = u.Nickname,
+                AvatarUrl = u.AvatarUrl,
+                Signature = u.Signature,
+                Level = u.Level,
+            })
+            .FirstOrDefaultAsync();
+        if (byId != null) result.Add(byId);
+
+        // 标记好友关系
+        foreach (var r in result)
+        {
+            r.IsFriend = friendIds.Contains(r.UserId);
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// 获取玩家省份城市（不存在返回 null，由 Controller 转 404）。
     /// </summary>
     public async Task<LocationResponse?> GetLocationAsync(long userId)

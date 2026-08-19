@@ -259,8 +259,9 @@ public class FriendService
                 FromUserId = r.FromUserId,
                 FromNickname = u?.Nickname ?? string.Empty,
                 AvatarUrl = u?.AvatarUrl ?? string.Empty,
+                Signature = u?.Signature,
                 Status = r.Status,
-                CreatedAt = new DateTimeOffset(r.CreatedAt).ToUnixTimeMilliseconds(),
+                CreatedAt = new DateTimeOffset(System.DateTime.SpecifyKind(r.CreatedAt, System.DateTimeKind.Utc)).ToUnixTimeMilliseconds(),
             };
         }).ToList();
 

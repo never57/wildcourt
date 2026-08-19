@@ -60,6 +60,14 @@ public class UserController : ControllerBase
         return ApiResponse<User>.Ok(user);
     }
 
+    /// <summary>搜索玩家（只支持按 userId 精确搜索，token 鉴权；排除自己）。</summary>
+    [HttpGet("search")]
+    public async Task<ApiResponse<List<PlayerSearchDto>>> Search([FromQuery] string keyword)
+    {
+        var result = await _userService.SearchAsync(keyword, GetUserId());
+        return ApiResponse<List<PlayerSearchDto>>.Ok(result);
+    }
+
     /// <summary>获取玩家省份城市（token 鉴权）。</summary>
     [HttpGet("location")]
     public async Task<ApiResponse<LocationResponse>> GetLocation()
@@ -82,7 +90,7 @@ public class UserController : ControllerBase
 
     /// <summary>
     /// 上传头像（multipart/form-data，字段名 avatar；jpg/png，≤8MB，token 鉴权）。
-    /// 保存到 wwwroot/uploads/avatar/{userId}.png，并回填 User.AvatarUrl。
+    /// 保存到 wwwroot/uploads/avatar/{userId}-{时间戳}.{ext}（文件名带版本号），并回填 User.AvatarUrl。
     /// </summary>
     [HttpPut("avatar")]
     public async Task<ApiResponse<User>> UploadAvatar([FromForm] IFormFile? avatar)
@@ -103,19 +111,28 @@ public class UserController : ControllerBase
             throw new BusinessException(ApiCodes.BadRequest, "图片不能超过 8MB");
         }
 
-        // 保存路径：wwwroot/uploads/avatar/{userId}{ext}
+        // 保存路径：wwwroot/uploads/avatar/{userId}-{时间戳}{ext}
+        // 文件名带时间戳作为「头像版本」：每次换头像 URL 变化，客户端按 URL 判重自动重新下载，
+        // 从而实现好友/列表/聊天等处的头像实时同步（无需客户端额外判断逻辑）。
         var webRoot = Path.Combine(_env.ContentRootPath, "wwwroot");
         var dir = Path.Combine(webRoot, "uploads", "avatar");
         Directory.CreateDirectory(dir);
 
-        // 清理旧头像文件（可能换了扩展名）
-        foreach (var old in new[] { ".png", ".jpg", ".jpeg" })
+        // 清理该用户所有旧头像文件（兼容旧格式 {userId}.{ext} 与新格式 {userId}-*.{ext}）
+        var oldPrefix = $"{userId}-";
+        foreach (var oldFile in System.IO.Directory.GetFiles(dir))
         {
-            var oldPath = Path.Combine(dir, $"{userId}{old}");
-            if (System.IO.File.Exists(oldPath)) System.IO.File.Delete(oldPath);
+            var name = System.IO.Path.GetFileName(oldFile);
+            if (name.StartsWith(oldPrefix, System.StringComparison.OrdinalIgnoreCase) ||
+                name.Equals($"{userId}.png", System.StringComparison.OrdinalIgnoreCase) ||
+                name.Equals($"{userId}.jpg", System.StringComparison.OrdinalIgnoreCase) ||
+                name.Equals($"{userId}.jpeg", System.StringComparison.OrdinalIgnoreCase))
+            {
+                try { System.IO.File.Delete(oldFile); } catch { /* 忽略删除失败 */ }
+            }
         }
 
-        var fileName = $"{userId}{ext}";
+        var fileName = $"{userId}-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}";
         var fullPath = Path.Combine(dir, fileName);
         await using (var stream = new FileStream(fullPath, FileMode.Create))
         {

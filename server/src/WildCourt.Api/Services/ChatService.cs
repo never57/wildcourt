@@ -125,7 +125,9 @@ public class ChatService
             ToUserId = e.ToUserId,
             Content = e.Content,
             IsRead = e.IsRead,
-            CreatedAt = new DateTimeOffset(e.CreatedAt).ToUnixTimeMilliseconds(),
+            // e.CreatedAt 由 UtcNow 写入，但 MySQL datetime 读取后 Kind 为 Unspecified，
+            // 需显式标注为 UTC，避免 DateTimeOffset 误按容器本地时区（Asia/Shanghai）偏移
+            CreatedAt = new DateTimeOffset(System.DateTime.SpecifyKind(e.CreatedAt, System.DateTimeKind.Utc)).ToUnixTimeMilliseconds(),
             AvatarUrl = avatarUrl ?? string.Empty,
         };
     }
@@ -145,7 +147,7 @@ public class ChatService
             ToUserId = e.ToUserId,
             Content = e.Content,
             IsRead = e.IsRead,
-            CreatedAt = new DateTimeOffset(e.CreatedAt).ToUnixTimeMilliseconds(),
+            CreatedAt = new DateTimeOffset(System.DateTime.SpecifyKind(e.CreatedAt, System.DateTimeKind.Utc)).ToUnixTimeMilliseconds(),
             AvatarUrl = avatarUrl ?? string.Empty,
         };
     }

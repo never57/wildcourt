@@ -27,6 +27,7 @@ namespace WildCourt.Net.Protocol
         public long fromUserId;
         public string fromNickname;
         public string avatarUrl;
+        public string signature;
         public string status;
         public long createdAt;
     }
@@ -64,5 +65,49 @@ namespace WildCourt.Net.Protocol
     public class ChatHistoryResponse
     {
         public ChatMessageDto[] messages;
+    }
+
+    /// <summary>好友申请/接受/拒绝请求体（apply 时 userId=被申请人，accept/reject 时 userId=申请人）。</summary>
+    [Serializable]
+    public class FriendApplyRequest
+    {
+        public long userId;
+    }
+
+    [Serializable]
+    public class FriendAcceptRequest
+    {
+        public long fromUserId;
+    }
+
+    /// <summary>偷菜请求（文档 08 §8.3：30% 产量、1 次/作物/天、20 次/天、保护罩 24h）。</summary>
+    [Serializable]
+    public class StealRequest
+    {
+        public long targetUserId;
+        public int cellId; // 目标农田格（0 起）
+    }
+
+    [Serializable]
+    public class StealResultResponse
+    {
+        public string cropId;
+        public int count;   // 偷取数量（floor(yield × 0.3)，受余量限制）
+    }
+
+    [Serializable]
+    public class FeedRequest
+    {
+        public long targetUserId; // 喂食 3 次/天，宠物被喂 +2 EXP（文档 08 §8.4）
+    }
+
+    /// <summary>好友庭院快照（互访渲染，文档 03 §3.2 Yard）。</summary>
+    [Serializable]
+    public class YardSnapshotResponse
+    {
+        public long userId;
+        public string nickname;
+        public string layoutJson; // 庭院布局（摆放数据）
+        public long foodCount;    // 食物盆余量（决定是否留下，文档 05 §5.3）
     }
 }

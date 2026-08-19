@@ -119,7 +119,7 @@ namespace WildCourt.UI.User
                 (code, msg) => Debug.LogWarning($"[UserPanel] profile 加载失败: {msg}"));
         }
 
-        private void ApplyProfile(UserProfileResponse data)
+        private void ApplyProfile(UserProfileResponse data, bool forceAvatar = false)
         {
             if (data == null) return;
             _profile = data;
@@ -141,7 +141,7 @@ namespace WildCourt.UI.User
             // 头像：有 URL 则加载显示
             if (!string.IsNullOrEmpty(data.avatarUrl))
             {
-                AvatarLoader.LoadInto(avatarImage, AvatarLoader.ToAbsoluteUrl(data.avatarUrl), this);
+                AvatarLoader.LoadInto(avatarImage, data.avatarUrl, this, forceAvatar);
             }
         }
 
@@ -312,7 +312,9 @@ namespace WildCourt.UI.User
                 "avatar" + ext, bytes,
                 resp =>
                 {
-                    ApplyProfile(resp.data);
+                    // 头像内容已变但 URL 不变（/uploads/avatar/{userId}.png），
+                    // 用 force 强制刷新：失效缓存 + 追加时间戳绕过 HTTP 缓存，重新下载新头像
+                    ApplyProfile(resp.data, forceAvatar: true);
                     // 广播头像更新，供 YardMainUI 等同步
                     EventBus.Publish(new ProfileUpdatedEvent
                     {
