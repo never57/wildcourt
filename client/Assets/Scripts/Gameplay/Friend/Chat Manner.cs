@@ -53,6 +53,8 @@ public class ChatManner : MonoBehaviour
     [Header("好友列表")]
     public Transform friendListContent;  //好友按钮
     public GameObject friendButtonPrefab;  //好友按钮预制体
+    public TMP_InputField friendSearchInput;  //好友搜索输入框（Chat Window 顶部，按昵称/ID 过滤好友）
+    public Button friendSearchButton;         //好友搜索按钮（search）
 
     [Header("消息列表")]
     public Transform messContent; // 存放消息
@@ -85,6 +87,9 @@ public class ChatManner : MonoBehaviour
     // ---- 未读角标状态 ----
     private readonly Dictionary<long, int> _unreadCounts = new Dictionary<long, int>();   // friendId → 未读消息数
     private readonly Dictionary<long, FriendUnreadBadge> _friendBadges = new Dictionary<long, FriendUnreadBadge>(); // friendId → 角标（红点 + 数字文本）
+
+    // ---- 好友列表过滤状态 ----
+    private readonly Dictionary<long, GameObject> _friendRowNodes = new Dictionary<long, GameObject>(); // friendId → Friend Button 实例（搜索过滤用）
 
     /// <summary>好友条目的未读角标：Status 红点 + 其下 UnreadCount 数字文本。</summary>
     private class FriendUnreadBadge
@@ -122,6 +127,7 @@ public class ChatManner : MonoBehaviour
         if (chatButton != null) chatButton.onClick.AddListener(ShowChatArea);
         if (searchButton != null) searchButton.onClick.AddListener(ShowSearchArea);
         if (searchConfirmButton != null) searchConfirmButton.onClick.AddListener(OnSearchClick);
+        if (friendSearchButton != null) friendSearchButton.onClick.AddListener(OnFriendSearchClick);
 
         // 拉取当前用户信息（拿到 userId 用于判断消息左右侧）
         LoadMyProfile();
@@ -200,6 +206,9 @@ public class ChatManner : MonoBehaviour
 
     public void ChatClose()
     {
+        // 关闭时清空好友搜索（清空输入框 + 恢复显示全部好友）
+        ClearFriendSearch();
+
         // 关闭整个 FriendSystem
         if (friendSystemRoot != null)
         {
@@ -625,8 +634,9 @@ public class ChatManner : MonoBehaviour
     {
         if (friendListContent == null || friendButtonPrefab == null) return;
 
-        // 清空旧按钮（同时清空角标映射，重建后重新填充）
+        // 清空旧按钮（同时清空角标/行节点映射，重建后重新填充）
         _friendBadges.Clear();
+        _friendRowNodes.Clear();
         for (int i = friendListContent.childCount - 1; i >= 0; i--)
         {
             Destroy(friendListContent.GetChild(i).gameObject);
@@ -635,6 +645,7 @@ public class ChatManner : MonoBehaviour
         foreach (var f in _friends)
         {
             var go = Instantiate(friendButtonPrefab, friendListContent);
+            _friendRowNodes[f.userId] = go;   // 记录 friendId → 按钮实例，供搜索过滤显示/隐藏
             var text = go.GetComponentInChildren<TMP_Text>();
             if (text != null) text.text = string.IsNullOrEmpty(f.nickname) ? f.userId.ToString() : f.nickname;
 
@@ -767,6 +778,51 @@ public class ChatManner : MonoBehaviour
         {
             ApplyBadge(badge, 0);
         }
+    }
+
+    // ============ 好友搜索过滤（Chat Window 顶部的搜索框） ============
+
+    /// <summary>点击 search 按钮：按昵称/ID 过滤好友列表，匹配的好友显示，不匹配的隐藏。</summary>
+    private void OnFriendSearchClick()
+    {
+        var keyword = friendSearchInput != null ? friendSearchInput.text.Trim() : string.Empty;
+        ApplyFriendFilter(keyword);
+    }
+
+    /// <summary>按关键字过滤好友列表：昵称或 ID 含关键字则显示，否则隐藏。空关键字显示全部。</summary>
+    private void ApplyFriendFilter(string keyword)
+    {
+        if (_friendRowNodes.Count == 0)
+        {
+            // 列表尚未渲染（如好友为空），直接返回
+            return;
+        }
+
+        bool hasFilter = !string.IsNullOrEmpty(keyword);
+        foreach (var f in _friends)
+        {
+            if (!_friendRowNodes.TryGetValue(f.userId, out var row) || row == null) continue;
+
+            bool match;
+            if (!hasFilter)
+            {
+                match = true;   // 空关键字显示全部
+            }
+            else
+            {
+                var name = string.IsNullOrEmpty(f.nickname) ? f.userId.ToString() : f.nickname;
+                match = name.IndexOf(keyword, System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || f.userId.ToString().IndexOf(keyword, System.StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            row.SetActive(match);
+        }
+    }
+
+    /// <summary>清空好友搜索：清空输入框并恢复显示全部好友。</summary>
+    private void ClearFriendSearch()
+    {
+        if (friendSearchInput != null) friendSearchInput.text = string.Empty;
+        ApplyFriendFilter(string.Empty);
     }
 
     //更新当前聊天对象喵
