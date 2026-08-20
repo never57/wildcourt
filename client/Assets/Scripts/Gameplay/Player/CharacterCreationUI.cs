@@ -20,6 +20,12 @@ public class CharacterCreationUI : MonoBehaviour
     public TMP_Dropdown cityDropdown;
     public Button confirmButton;
 
+    [Header("云朵动画")]
+    public RectTransform topCloud;  // 上图层云朵
+    public RectTransform bottomCloud;  // 下图层云朵
+    public float flyDuration = 1.2f;
+    public float flyDistance = 800f;
+
     private Province[] provinces;
     private Province selectedProvince;
 
@@ -224,9 +230,55 @@ public class CharacterCreationUI : MonoBehaviour
     void OnAllDataSaved()
     {
         Debug.Log("所有数据保存完毕");
+        StartCoroutine(PlayCloudFlyAnimation());
         _isSubmitting = false;
         SetConfirmEnabled(true);
-        ClosePanel();
+        //ClosePanel();
+    }
+
+    IEnumerator PlayCloudFlyAnimation()
+    {
+        //记录一下初始位置
+        Vector2 topStartPos = topCloud.anchoredPosition;
+        Vector2 bottomStartPos = bottomCloud.anchoredPosition;
+
+        // 上云向左，下云向右
+        Vector2 topTargetPos = topStartPos + new Vector2(-flyDistance, 0);
+        Vector2 bottomTargetPos = bottomStartPos + new Vector2(flyDistance, 0);
+
+        float elapsed = 0f;
+
+        while(elapsed < flyDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / flyDuration;
+            float smoothT = 1 - Mathf.Pow(1 - t, 2);
+
+            topCloud.anchoredPosition = Vector2.Lerp(topStartPos, topTargetPos, smoothT);
+            bottomCloud.anchoredPosition = Vector2.Lerp(bottomStartPos, bottomTargetPos, smoothT);
+
+            //透明度逐渐降低
+            CanvasGroup topCg = topCloud.GetComponent<CanvasGroup>();
+            CanvasGroup bottomCg = bottomCloud.GetComponent<CanvasGroup>();
+            if (topCg != null) topCg.alpha -= smoothT;
+            if (bottomCg != null) bottomCg.alpha -= smoothT;
+
+            yield return null;
+
+        }
+
+        //确认到达终点
+        topCloud.anchoredPosition = topTargetPos;
+        bottomCloud.anchoredPosition = bottomTargetPos;
+
+        CanvasGroup rootCg = GetComponent<CanvasGroup>();
+        if(rootCg != null)
+        {
+            rootCg.alpha = 0;
+            rootCg.interactable = false;
+            rootCg.blocksRaycasts = false;
+
+        }
     }
 
     void SetConfirmEnabled(bool enabled)
@@ -234,7 +286,7 @@ public class CharacterCreationUI : MonoBehaviour
         if (confirmButton != null) confirmButton.interactable = enabled;
     }
 
-    public void ClosePanel()
+    /*public void ClosePanel()
     {
         CanvasGroup cg = GetComponent<CanvasGroup>();
         if (cg != null)
@@ -244,7 +296,7 @@ public class CharacterCreationUI : MonoBehaviour
             cg.blocksRaycasts = false;
             Debug.Log("面板已关闭");
         }
-    }
+    }*/
 }
 
 [System.Serializable]

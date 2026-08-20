@@ -675,7 +675,6 @@ RectTransform:
   m_Children:
   - {fileID: 688949657}
   - {fileID: 1410378540}
-  - {fileID: 1198307780}
   m_Father: {fileID: 1582534798}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -2040,7 +2039,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1198307779}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -2048,7 +2047,7 @@ RectTransform:
   - {fileID: 815523323}
   - {fileID: 1834149834}
   - {fileID: 1202821957}
-  m_Father: {fileID: 286053664}
+  m_Father: {fileID: 1582534798}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
@@ -2910,6 +2909,10 @@ MonoBehaviour:
   provinceDropdown: {fileID: 1202821960}
   cityDropdown: {fileID: 1834149837}
   confirmButton: {fileID: 1410378537}
+  topCloud: {fileID: 286053664}
+  bottomCloud: {fileID: 1198307780}
+  flyDuration: 1.2
+  flyDistance: 800
 --- !u!114 &1582534795
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2986,6 +2989,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 286053664}
+  - {fileID: 1198307780}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
