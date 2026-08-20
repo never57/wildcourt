@@ -7,7 +7,6 @@ using WildCourt.Core;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
 using WildCourt.UI.Yard;
-using WildCourt.UI.Farm;
 using WildCourt.UI.Letters;
 using WildCourt.UI.User;
 
@@ -64,9 +63,6 @@ namespace WildCourt.UI
 
         [Tooltip("拖入 YardPanel Prefab，登录成功后注入 YardPanel.YardPanelPrefab（建造面板，点击建造按钮时打开，支持热更）")]
         public GameObject yardPanelPrefab;
-
-        [Tooltip("拖入 FarmPanel Prefab，登录成功后注入 FarmPanel.FarmPanelPrefab（支持热更）")]
-        public GameObject farmPanelPrefab;
 
         [Tooltip("拖入 MailPanel Prefab，登录成功后注入 MailPanel.MailPanelPrefab（信箱面板，点击庭院 mail 按钮打开，支持热更）")]
         public GameObject mailPanelPrefab;
@@ -129,7 +125,7 @@ namespace WildCourt.UI
                     // token 有效：进入已登录菜单，并同步昵称
                     ShowLoginMenu(true);
                     ClearStatus();
-                    // 自动登录同样需要注入庭院/农场等预制体，否则进主场景后 YardMainUI/FarmPanel 未注入无法创建
+                    // 自动登录同样需要注入庭院等预制体，否则进主场景后 YardMainUI 未注入无法创建
                     PreloadYardPanel();
                     AvatarManager.EnsureCreated();
                     AvatarManager.Instance.OnProfileReady(() =>
@@ -326,7 +322,6 @@ namespace WildCourt.UI
         {
             if (yardMainUiPrefab != null) YardMainUI.YardMainUIPrefab = yardMainUiPrefab;
             if (yardPanelPrefab != null) YardPanel.YardPanelPrefab = yardPanelPrefab;
-            if (farmPanelPrefab != null) FarmPanel.FarmPanelPrefab = farmPanelPrefab;
             if (mailPanelPrefab != null) MailPanel.MailPanelPrefab = mailPanelPrefab;
             if (userPanelPrefab != null) UserPanel.UserPanelPrefab = userPanelPrefab;
         }

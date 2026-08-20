@@ -5,7 +5,6 @@ using WildCourt.Lua;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
 using WildCourt.UI;
-using WildCourt.UI.Farm;
 using WildCourt.UI.Letters;
 using WildCourt.UI.User;
 
@@ -89,8 +88,7 @@ namespace WildCourt.Gameplay.Crop
                     Debug.Log($"[DebugSceneAutoLogin] 登录成功 user={TestUsername} userId={resp.data.userId}");
                     Debug.Log("[DebugSceneAutoLogin] 可执行调试 Lua（如 require('Logic.Farm.FarmDebug') 后调 Init()/Plant()）");
                     OnLoggedIn?.Invoke(resp.data.token);
-                    EnsureFarmPanelPrefab();
-                    FarmPanel.CreateOrInstantiate();
+                    EnsurePanelPrefabs();
                 },
                 onError: (code, msg) =>
                 {
@@ -125,18 +123,11 @@ namespace WildCourt.Gameplay.Crop
         }
 
         /// <summary>
-        /// DebugScene 无登录流程（LoginController 不存在），直接注入 FarmPanel 预制体引用
-        /// （Resources 下手工搭建的 FarmPanel.prefab），保证 CreateOrInstantiate 可打开面板。
+        /// DebugScene 无登录流程（LoginController 不存在），直接注入面板预制体引用
+        /// （Resources 下手工搭建的预制体），保证各面板 CreateOrInstantiate 可打开。
         /// </summary>
-        private static void EnsureFarmPanelPrefab()
+        private static void EnsurePanelPrefabs()
         {
-            if (FarmPanel.FarmPanelPrefab != null) return;
-            FarmPanel.FarmPanelPrefab = Resources.Load<GameObject>("Prefabs/UI/Farm/FarmPanel");
-            if (FarmPanel.FarmPanelPrefab == null)
-            {
-                Debug.LogWarning("[DebugSceneAutoLogin] 未找到 FarmPanel 预制体（Resources/Prefabs/UI/Farm/FarmPanel）");
-            }
-
             if (MailPanel.MailPanelPrefab == null)
             {
                 MailPanel.MailPanelPrefab = Resources.Load<GameObject>("Prefabs/UI/Letters/MailPanel");

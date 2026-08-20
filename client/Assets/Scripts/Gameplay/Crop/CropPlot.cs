@@ -35,6 +35,16 @@ public class CropPlot
         OnStateChanged?.Invoke(this);
     }
 
+    /// <summary>播种：直接指定生长秒数（本地调试/加速用，分钟版见 <see cref="Plant"/>）。</summary>
+    public void PlantSeconds(string cropId, float growSeconds)
+    {
+        CropId = cropId;
+        GrowDurationSec = Mathf.Max(1, Mathf.RoundToInt(growSeconds));
+        PlantTime = Time.time;
+        State = PlotState.Growing;
+        OnStateChanged?.Invoke(this);
+    }
+
     /// <summary>每帧/定时推进，判断是否成熟。</summary>
     public void Tick()
     {

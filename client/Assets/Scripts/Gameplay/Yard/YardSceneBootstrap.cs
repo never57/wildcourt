@@ -5,7 +5,6 @@ using WildCourt.Core;
 using WildCourt.Lua;
 using WildCourt.Net;
 using WildCourt.UI.Yard;
-using WildCourt.UI.Farm;
 
 namespace WildCourt.Gameplay.Yard
 {
@@ -69,9 +68,6 @@ namespace WildCourt.Gameplay.Yard
             {
                 LuaManager.Instance.CallFunc<object>("Logic.Farm.FarmManager", "Init");
             }
-
-            // 农场面板（预制体驱动；未注入预制体时仅告警，不影响庭院）
-            FarmPanel.CreateOrInstantiate();
         }
 
         private static void EnsureEventSystem()

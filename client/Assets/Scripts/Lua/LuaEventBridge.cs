@@ -40,7 +40,7 @@ namespace WildCourt.Lua
             if (list.Count == 0) Events.Remove(name);
         }
 
-        /// <summary>C# 侧订阅（FarmPanel 等使用）。</summary>
+        /// <summary>C# 侧订阅（UI 面板等使用）。</summary>
         public static void Subscribe(string name, Action<LuaTable> callback)
         {
             Add(name, new Entry { Id = 0, Callback = callback });
