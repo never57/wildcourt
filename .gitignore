@@ -76,3 +76,6 @@ server/*.log
 docs/
 #XLua源码备份
 temp_backup/
+# DSH 工具链本地目录（Unity MCP 插件等，不入库）
+dsh-plugins/
+
