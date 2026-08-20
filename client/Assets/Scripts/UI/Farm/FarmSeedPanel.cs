@@ -12,8 +12,8 @@ namespace WildCourt.UI.Farm
     /// <summary>
     /// 种子选择面板（Farm.prefab/SeedCanvas 组件）。
     /// 打开时拉取背包（GET /api/v1/user/inventory）过滤种子：只显示持有数 &gt; 0 的种子卡，
-    /// 一张都没有则显示 noSeed 提示并收起列表。点击卡片消耗 1 颗种子并种植（本地消耗，
-    /// 服务端结算待接入）。点击面板外区域（全屏遮罩）关闭，同时恢复被暂时禁用的其他 Canvas。
+    /// 一张都没有则显示 noSeed 提示并收起列表。点击卡片种植（服务端 /yard/plant 校验并原子消耗
+    /// 种子，本地先行扣减仅为即时反馈）；点击面板外区域（全屏遮罩）关闭，同时恢复被暂时禁用的其他 Canvas。
     /// </summary>
     public class FarmSeedPanel : MonoBehaviour
     {
@@ -152,7 +152,7 @@ namespace WildCourt.UI.Farm
             if (farmPlot == null) return;
             int count = _owned.TryGetValue(row.id, out var c) ? c : 0;
             if (count <= 0) return;
-            // 消耗 1 颗种子（本地扣减；服务端结算待接入）
+            // 本地先行扣减做即时反馈；服务端在 /yard/plant 校验并原子消耗种子（以服务端为准）
             if (count == 1) _owned.Remove(row.id);
             else _owned[row.id] = count - 1;
 
