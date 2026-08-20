@@ -53,7 +53,15 @@ public class AuthMiddleware
                 context.Items["UserId"] = userId.Value;
                 context.Items["Token"] = token;
                 // 刷新实时在线标记（滑动窗口，管理后台"实时在线"按此统计）
-                await _redis.TouchOnlineAsync(userId.Value, OnlineTtl);
+                // Redis 不可用时降级（与启动降级策略一致）：在线标记丢失不影响鉴权主流程
+                try
+                {
+                    await _redis.TouchOnlineAsync(userId.Value, OnlineTtl);
+                }
+                catch (Exception)
+                {
+                    // 忽略：实时在线仅为统计用途，Redis 恢复后自动续期
+                }
                 await _next(context);
                 return;
             }

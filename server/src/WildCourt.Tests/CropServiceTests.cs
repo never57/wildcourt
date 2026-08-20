@@ -64,13 +64,10 @@ public class CropServiceTests : IDisposable
         try { Directory.Delete(_configDir, recursive: true); } catch { /* 清理失败忽略 */ }
     }
 
-    private static long FutureReadyAt(int minutes) =>
-        DateTimeOffset.UtcNow.ToUnixTimeSeconds() + minutes * 60L;
-
     [Fact]
     public async Task Plant_ValidCrop_StoresPlot()
     {
-        var plot = await _service.PlantAsync(UserId, 0, "C01", FutureReadyAt(5));
+        var plot = await _service.PlantAsync(UserId, 0, "C01");
 
         Assert.Equal(0, plot.CellId);
         Assert.Equal("C01", plot.CropId);
@@ -82,7 +79,7 @@ public class CropServiceTests : IDisposable
     public async Task Plant_UnknownCrop_Throws()
     {
         var ex = await Assert.ThrowsAsync<BusinessException>(() =>
-            _service.PlantAsync(UserId, 0, "X99", FutureReadyAt(5)));
+            _service.PlantAsync(UserId, 0, "X99"));
 
         Assert.Equal(ApiCodes.BadRequest, ex.Code);
         Assert.Contains("作物不存在", ex.Message);
@@ -93,7 +90,7 @@ public class CropServiceTests : IDisposable
     {
         // farmlandCount=6，合法格子 0~5
         var ex = await Assert.ThrowsAsync<BusinessException>(() =>
-            _service.PlantAsync(UserId, 6, "C01", FutureReadyAt(5)));
+            _service.PlantAsync(UserId, 6, "C01"));
 
         Assert.Equal(ApiCodes.BadRequest, ex.Code);
         Assert.Contains("农田格越界", ex.Message);
@@ -102,10 +99,10 @@ public class CropServiceTests : IDisposable
     [Fact]
     public async Task Plant_CellOccupied_Throws()
     {
-        await _service.PlantAsync(UserId, 0, "C01", FutureReadyAt(5));
+        await _service.PlantAsync(UserId, 0, "C01");
 
         var ex = await Assert.ThrowsAsync<BusinessException>(() =>
-            _service.PlantAsync(UserId, 0, "C02", FutureReadyAt(10)));
+            _service.PlantAsync(UserId, 0, "C02"));
 
         Assert.Equal(ApiCodes.BadRequest, ex.Code);
         Assert.Contains("已有作物在生长", ex.Message);
@@ -114,27 +111,28 @@ public class CropServiceTests : IDisposable
     [Fact]
     public async Task Plant_ExpiredCell_AllowsReplant()
     {
-        await _service.PlantAsync(UserId, 0, "C01", FutureReadyAt(5));
+        await _service.PlantAsync(UserId, 0, "C01");
         var row = await _db.FarmPlots.SingleAsync(p => p.UserId == UserId && p.CellId == 0);
         row.ReadyAt = DateTime.UtcNow.AddMinutes(-1); // 模拟已过期（v1 无收获接口）
         await _db.SaveChangesAsync();
 
-        var plot = await _service.PlantAsync(UserId, 0, "C02", FutureReadyAt(10));
+        var plot = await _service.PlantAsync(UserId, 0, "C02");
 
         Assert.Equal("C02", plot.CropId);
         Assert.Single(_db.FarmPlots.Where(p => p.UserId == UserId));
     }
 
     [Fact]
-    public async Task Plant_PastReadyAt_Throws()
+    public async Task Plant_ServerComputesReadyAt()
     {
-        var past = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 60;
+        // 结束时间由服务端按自身时钟权威计算（不信任客户端时钟，避免时钟偏差导致成熟时间不一致）
+        var before = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var plot = await _service.PlantAsync(UserId, 0, "C01"); // growTime 20 分钟
 
-        var ex = await Assert.ThrowsAsync<BusinessException>(() =>
-            _service.PlantAsync(UserId, 0, "C01", past));
-
-        Assert.Equal(ApiCodes.BadRequest, ex.Code);
-        Assert.Contains("结束时间", ex.Message);
+        // readyAt = 服务端 now + growTime*60（C01 = 20 分钟），误差仅本次调用耗时（<2s）
+        Assert.InRange(plot.ReadyAt, before + 20 * 60L, before + 20 * 60L + 2);
+        var row = await _db.FarmPlots.SingleAsync(p => p.UserId == UserId && p.CellId == 0);
+        Assert.Equal(plot.ReadyAt, new DateTimeOffset(row.ReadyAt.ToUniversalTime()).ToUnixTimeSeconds());
     }
 
     [Fact]
@@ -152,6 +150,7 @@ public class CropServiceTests : IDisposable
         Assert.Equal(2, resp.Plots.Count);
         Assert.Equal("mature", resp.Plots[0].State);  // cell 0 已过期
         Assert.Equal("growing", resp.Plots[1].State); // cell 1 未到期
+        Assert.True(resp.ServerTime > 0);             // 客户端用 readyAt - serverTime 消除时钟偏差
     }
 
     [Fact]
@@ -159,7 +158,7 @@ public class CropServiceTests : IDisposable
     {
         // C03 棉花：玩家未持有 seed_cotton
         var ex = await Assert.ThrowsAsync<BusinessException>(() =>
-            _service.PlantAsync(UserId, 0, "C03", FutureReadyAt(40)));
+            _service.PlantAsync(UserId, 0, "C03"));
 
         Assert.Equal(ApiCodes.BadRequest, ex.Code);
         Assert.Contains("种子不足", ex.Message);
@@ -169,7 +168,7 @@ public class CropServiceTests : IDisposable
     [Fact]
     public async Task Plant_WithSeed_DeductsOneAndRecordsTransaction()
     {
-        await _service.PlantAsync(UserId, 0, "C01", FutureReadyAt(20));
+        await _service.PlantAsync(UserId, 0, "C01");
 
         var inv = await _db.Inventories.SingleAsync(i => i.UserId == UserId && i.ItemId == "seed_wheat");
         Assert.Equal(4, inv.Count); // 5 - 1
@@ -189,7 +188,7 @@ public class CropServiceTests : IDisposable
         await _db.SaveChangesAsync();
 
         var ex = await Assert.ThrowsAsync<BusinessException>(() =>
-            _service.PlantAsync(UserId, 0, "C02", FutureReadyAt(30)));
+            _service.PlantAsync(UserId, 0, "C02"));
 
         Assert.Equal(ApiCodes.BadRequest, ex.Code);
         Assert.Contains("种子不足", ex.Message);

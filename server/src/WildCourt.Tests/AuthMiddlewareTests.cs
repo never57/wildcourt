@@ -19,7 +19,9 @@ public class AuthMiddlewareTests
         sessions.Setup(s => s.TryGetUserIdAsync("valid-token")).ReturnsAsync((long?)42L);
         sessions.Setup(s => s.TryGetUserIdAsync(It.Is<string>(t => t != "valid-token")))
             .ReturnsAsync((long?)null);
-        var middleware = new AuthMiddleware(_ => Task.CompletedTask, sessions.Object);
+        // RedisUtil：abortConnect=false，本机无 Redis 也不会抛异常（后台重试）；鉴权通过路径会 TouchOnlineAsync
+        var redis = new RedisUtil("localhost:6379");
+        var middleware = new AuthMiddleware(_ => Task.CompletedTask, sessions.Object, redis);
         return (middleware, sessions);
     }
 

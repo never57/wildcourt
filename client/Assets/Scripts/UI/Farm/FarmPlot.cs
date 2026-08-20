@@ -180,7 +180,10 @@ namespace WildCourt.UI.Farm
                     foreach (var p in resp.data.plots)
                     {
                         if (p == null || p.cellId != cellId) continue;
-                        long remain = p.readyAt - UnixNow();
+                        // 优先用服务端返回的 serverTime 换算剩余时间（消除客户端/服务端时钟偏差）；
+                        // 旧版服务端无该字段（0）时退回本地时钟。
+                        long serverNow = resp.data.serverTime > 0 ? resp.data.serverTime : UnixNow();
+                        long remain = p.readyAt - serverNow;
                         if (remain > 0)
                         {
                             _plot.PlantSeconds(p.cropId, remain);   // 按剩余秒数重建生长（成熟时刻与 readyAt 对齐）

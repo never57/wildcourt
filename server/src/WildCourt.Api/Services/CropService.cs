@@ -6,9 +6,8 @@ using WildCourt.Data.Entities;
 namespace WildCourt.Api.Services;
 
 /// <summary>
-/// 种田业务（文档 04）：种植上报（客户端 Lua 识别作物并计算结束时间后 POST）、
-/// 种植状态查询、成熟收获（产量入背包并清空格子）。v1 信任客户端上报的 readyAt
-/// （仅做合法性校验），反作弊重算 / 偷菜结算留后续。
+/// 种田业务（文档 04）：种植上报（作物结束时间由服务端按自身时钟权威计算，不信任客户端时钟）、
+/// 种植状态查询、成熟收获（产量入背包并清空格子）。反作弊重算 / 偷菜结算留后续。
 /// </summary>
 public class CropService
 {
@@ -32,7 +31,7 @@ public class CropService
     /// 种植：校验作物存在、格子范围（玩家等级 farmlandCount）、结束时间合法、格子未占用，
     /// 已过期格允许覆盖重种（v1 无收获接口，避免格子卡死）。
     /// </summary>
-    public async Task<FarmPlotDto> PlantAsync(long userId, int cellId, string cropId, long readyAt)
+    public async Task<FarmPlotDto> PlantAsync(long userId, int cellId, string cropId)
     {
         if (string.IsNullOrWhiteSpace(cropId))
         {
@@ -55,10 +54,9 @@ public class CropService
         }
 
         var now = DateTimeOffset.UtcNow;
-        if (readyAt <= now.ToUnixTimeSeconds())
-        {
-            throw new BusinessException(ApiCodes.BadRequest, "作物结束时间必须晚于当前时间");
-        }
+        // 结束时间由服务端按自身时钟权威计算：客户端时钟与服务端不一致（偏差 Δ）时，
+        // 若信任客户端上报的 readyAt，会出现客户端已显示成熟而服务端仍未到期、收获被拒的问题。
+        var readyAtSec = now.ToUnixTimeSeconds() + crop.GrowTime * 60L;
 
         var existing = await _db.FarmPlots.FindAsync(userId, cellId);
         if (existing != null && existing.ReadyAt > now.UtcDateTime)
@@ -80,7 +78,7 @@ public class CropService
             }
         }
 
-        var ready = DateTimeOffset.FromUnixTimeSeconds(readyAt).UtcDateTime;
+        var ready = DateTimeOffset.FromUnixTimeSeconds(readyAtSec).UtcDateTime;
         if (existing == null)
         {
             _db.FarmPlots.Add(new FarmPlotEntity
@@ -122,7 +120,7 @@ public class CropService
         {
             CellId = cellId,
             CropId = crop.Id,
-            ReadyAt = readyAt,
+            ReadyAt = readyAtSec,
             State = GrowingState,
         };
     }
@@ -144,7 +142,13 @@ public class CropService
             State = p.ReadyAt <= nowUtc ? MatureState : GrowingState,
         }).ToList();
 
-        return new FarmPlotsResponse { Plots = plots };
+        // serverTime 供客户端换算剩余时间：客户端时钟可能与服务端有偏差，直接用
+        // readyAt - serverTime 可完全消除该偏差（旧版客户端忽略此字段）。
+        return new FarmPlotsResponse
+        {
+            Plots = plots,
+            ServerTime = new DateTimeOffset(nowUtc).ToUnixTimeSeconds(),
+        };
     }
 
     /// <summary>

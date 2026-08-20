@@ -44,11 +44,11 @@ public class YardController : ControllerBase
         return ApiResponse<YardResponse>.Ok(yard);
     }
 
-    /// <summary>种植作物（客户端 Lua 识别作物并计算结束时间后上报，服务端校验并落库）。</summary>
+    /// <summary>种植作物（结束时间由服务端按自身时钟权威计算，不信任客户端时钟）。</summary>
     [HttpPost("plant")]
     public async Task<ApiResponse<FarmPlotDto>> Plant([FromBody] PlantCropRequest request)
     {
-        var plot = await _cropService.PlantAsync(GetUserId(), request.CellId, request.CropId, request.ReadyAt);
+        var plot = await _cropService.PlantAsync(GetUserId(), request.CellId, request.CropId);
         return ApiResponse<FarmPlotDto>.Ok(plot);
     }
 
