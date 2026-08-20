@@ -89,8 +89,17 @@ namespace WildCourt.UI
         /// <summary>拉取最新公告并填充显示（复用已有实例时调用）。</summary>
         public void FetchAndShow()
         {
-            // 兜底：非预制体模式（层级缺失）时按代码动态创建布局
-            if (!_isPrefab) Build();
+            // 兜底：仅当四个 UI 引用确实缺失（纯代码模式）时才动态 Build；
+            // 若字段已绑定（预制体模式），即使 Awake 未执行（inactive/时机问题）也走预制体复用，避免对已有布局重复 Build。
+            if (!_isPrefab && (_titleText == null || _dateText == null || _contentText == null || _closeButton == null))
+            {
+                Build();
+            }
+            else if (!_isPrefab && !gameObject.activeSelf)
+            {
+                // 字段绑定齐全但 _isPrefab 未置位（Awake 未执行）：补置为预制体模式
+                _isPrefab = true;
+            }
 
             AuthService.EnsureNetManager();
 

@@ -7,6 +7,7 @@ using TMPro;
 using System.IO;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
+using WildCourt.UI.User;
 
 /// <summary>
 /// 角色创建界面：玩家首次进入时设置「昵称 + 省份/城市」，并标记资料初始化完成。
@@ -35,6 +36,19 @@ public class CharacterCreationUI : MonoBehaviour
 
     void Start()
     {
+        // 已初始化（profile_initialized=true）则隐藏本面板，跳过角色创建；未初始化则正常显示引导。
+        // 用 OnProfileReady 等 profile 拉取完成（AvatarManager 异步），确保拿到权威初始化状态。
+        if (AvatarManager.Instance != null)
+        {
+            AvatarManager.Instance.OnProfileReady(() =>
+            {
+                if (AvatarManager.Instance.ProfileInitialized)
+                {
+                    gameObject.SetActive(false);
+                }
+            });
+        }
+
         StartCoroutine(LoadLocationDataCoroutine());
         confirmButton.onClick.AddListener(OnConfirm);
     }

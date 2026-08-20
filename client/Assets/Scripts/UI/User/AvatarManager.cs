@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using WildCourt.Core;
@@ -19,6 +20,8 @@ namespace WildCourt.UI.User
 
         private long _myUserId;
         private string _myAvatarUrl;
+        private string _myNickname;
+        private bool _profileInitialized;
         private bool _profileLoaded;
 
         // userId -> avatarUrl（相对路径 /uploads/...，未拼绝对地址）
@@ -56,6 +59,12 @@ namespace WildCourt.UI.User
 
         /// <summary>本地是否已拿到自己的头像缓存（未加载前返回空）。</summary>
         public bool ProfileLoaded => _profileLoaded;
+
+        /// <summary>角色创建/资料初始化是否完成。false=登录后需创建角色创建界面。</summary>
+        public bool ProfileInitialized => _profileInitialized;
+
+        /// <summary>自己的昵称（未加载返回 null）。</summary>
+        public string MyNickname => _myNickname;
 
         /// <summary>当前登录用户 ID（-1 表示尚未加载）。</summary>
         public long MyUserId => _profileLoaded ? _myUserId : -1;
@@ -106,6 +115,18 @@ namespace WildCourt.UI.User
             _friendAvatars.Clear();
         }
 
+        /// <summary>退出登录时重置 profile 缓存，供重新登录使用。</summary>
+        public void ClearProfile()
+        {
+            _myUserId = 0;
+            _myAvatarUrl = null;
+            _myNickname = null;
+            _profileInitialized = false;
+            _profileLoaded = false;
+            _friendAvatars.Clear();
+            _onProfileReady = null;
+        }
+
         /// <summary>确保自己的 profile 已拉取（幂等；网络未就绪则跳过，下次调用重试）。</summary>
         private void EnsureProfileLoaded()
         {
@@ -118,6 +139,9 @@ namespace WildCourt.UI.User
                     {
                         _myUserId = resp.data.userId;
                         _myAvatarUrl = resp.data.avatarUrl;
+                        _myNickname = resp.data.nickname;
+                        _profileInitialized = resp.data.profileInitialized;
+                        InvokeProfileReady();
                     }
                 },
                 (code, msg) =>
@@ -126,6 +150,28 @@ namespace WildCourt.UI.User
                     _profileLoaded = false;
                     Debug.LogWarning($"[AvatarManager] 拉取玩家资料失败：{msg}");
                 });
+        }
+
+        private Action _onProfileReady;
+
+        /// <summary>注册「自己的 profile 拉取完成」回调（若已就绪则立即执行一次）。用于引导逻辑判断是否创建角色创建界面。</summary>
+        public void OnProfileReady(Action cb)
+        {
+            if (_profileLoaded && _myUserId > 0)
+            {
+                cb?.Invoke();
+                return;
+            }
+            _onProfileReady += cb;
+            // 未加载（如退出登录后重新登录）时主动触发拉取，确保回调能被后续 InvokeProfileReady 触发
+            EnsureProfileLoaded();
+        }
+
+        private void InvokeProfileReady()
+        {
+            var cb = _onProfileReady;
+            _onProfileReady = null;
+            cb?.Invoke();
         }
 
         /// <summary>头像/昵称修改后同步缓存（UserPanel 修改头像/昵称时广播）。</summary>

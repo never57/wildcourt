@@ -178,6 +178,11 @@ public class ChatManner : MonoBehaviour
         // 默认显示聊天区（ShowChatArea 内部会清空搜索栏）
         ShowChatArea();
 
+        // 每次打开都重新拉取 profile 刷新 Label 头像+昵称：
+        // ChatManner 是单例复用，LoadMyProfile 只在首次实例化（Start）执行，
+        // 若不在此刷新，重开好友系统会用旧数据，导致改头像后不更新（重启游戏才更新）。
+        RefreshLabelPlayerInfo();
+
         // 打开时刷新好友列表
         LoadFriendList();
     }
@@ -564,8 +569,7 @@ public class ChatManner : MonoBehaviour
 
                 if (labelAvatarImage != null && !string.IsNullOrEmpty(data.avatarUrl))
                 {
-                    // 服务端头像 URL 已带版本号（{userId}-{时间戳}.png），换头像后 URL 变化，
-                    // LoadInto 自动检测差异并下载新头像；URL 未变则命中本地缓存秒回，无需 force
+                    // 服务端头像 URL 带版本，换头像后 URL 变化，LoadInto 自动检测差异下载新头像
                     AvatarLoader.LoadInto(labelAvatarImage, data.avatarUrl, this);
                 }
             },

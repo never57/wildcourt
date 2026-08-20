@@ -257,15 +257,21 @@ namespace WildCourt.Net.WebSocket
                 _ws.OnMessage -= OnWsMessage;
                 _ws.OnError -= OnWsError;
                 _ws.OnClose -= OnWsClose;
+                var ws = _ws;
+                _ws = null;
                 try
                 {
-                    _ws.Close();
+                    // WebSocketSharp 的 Close() 是同步的，会发送关闭帧并等待握手（默认超时约 5s）。
+                    // 放到后台线程执行，避免阻塞 Unity 主线程导致「退出登录卡顿」。
+                    System.Threading.Tasks.Task.Run(() =>
+                    {
+                        try { ws.Close(); } catch { /* 忽略关闭异常 */ }
+                    });
                 }
                 catch
                 {
-                    // 忽略关闭异常
+                    // 忽略调度异常
                 }
-                _ws = null;
             }
         }
 
