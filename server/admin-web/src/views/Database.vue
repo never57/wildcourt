@@ -106,7 +106,7 @@
                     </template>
                     <template #default="{ row }">
                       <span :class="{ 'cell-null': row[col.name] == null }">
-                        {{ formatCell(row[col.name]) }}
+                        {{ formatCell(row[col.name], col) }}
                       </span>
                     </template>
                   </el-table-column>
@@ -205,7 +205,7 @@ CREATE TABLE IF NOT EXISTS `gift_codes` (
                     show-overflow-tooltip
                   >
                     <template #default="{ row }">
-                      <span :class="{ 'cell-null': row[col] == null }">{{ formatCell(row[col]) }}</span>
+                      <span :class="{ 'cell-null': row[col] == null }">{{ formatCell(row[col], col) }}</span>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -645,10 +645,52 @@ function onPageSizeChange() {
   loadData()
 }
 
-function formatCell(value: unknown): string {
+function formatCell(value: unknown, column?: ColumnInfo | string): string {
   if (value == null) return 'NULL'
+  if (value instanceof Date) return formatUtcToBeijing(value)
   if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
+  const s = String(value)
+  // 时间列：数据库存的是 UTC，需转成北京时间（+8）显示
+  if (isTimeColumn(column)) {
+    const d = parseDateAsUtc(s)
+    if (d) return formatUtcToBeijing(d)
+  }
+  return s
+}
+
+/** 判断某列是否时间列（优先用列类型，其次用列名启发式）。 */
+function isTimeColumn(column?: ColumnInfo | string): boolean {
+  if (!column) return false
+  let type = ''
+  let name = ''
+  if (typeof column === 'string') {
+    name = column
+  } else {
+    type = column.columnType || ''
+    name = column.name || ''
+  }
+  if (/(datetime|timestamp|date|time)/i.test(type)) return true
+  return /(_at|_time|_date|at$|time$|date$)/i.test(name)
+}
+
+/** 把形如 "2026-08-20T10:00:00" / "2026-08-20 10:00:00" 的字符串当作 UTC 解析；已带时区的按原样。 */
+function parseDateAsUtc(s: string): Date | null {
+  const iso = s.trim()
+  if (!iso) return null
+  if (/(Z$|[+-]\d{2}:?\d{2}$)/.test(iso)) {
+    const d = new Date(iso)
+    return isNaN(d.getTime()) ? null : d
+  }
+  const withZ = iso.includes('T') ? iso + 'Z' : iso.replace(' ', 'T') + 'Z'
+  const d = new Date(withZ)
+  return isNaN(d.getTime()) ? null : d
+}
+
+/** 把 UTC 时间转成北京时间（UTC+8）并格式化为 YYYY-MM-DD HH:mm:ss。 */
+function formatUtcToBeijing(utc: Date): string {
+  const t = new Date(utc.getTime() + 8 * 3600 * 1000) // UTC + 8h
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())} ${p(t.getUTCHours())}:${p(t.getUTCMinutes())}:${p(t.getUTCSeconds())}`
 }
 
 function isBoolCol(col: ColumnInfo): boolean {
