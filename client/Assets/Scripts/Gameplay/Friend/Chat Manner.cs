@@ -82,6 +82,17 @@ public class ChatManner : MonoBehaviour
     private long _activeFriendId = -1;     // 当前正在聊天的好友 ID
     private readonly List<FriendItem> _friends = new List<FriendItem>();
 
+    // ---- 未读角标状态 ----
+    private readonly Dictionary<long, int> _unreadCounts = new Dictionary<long, int>();   // friendId → 未读消息数
+    private readonly Dictionary<long, FriendUnreadBadge> _friendBadges = new Dictionary<long, FriendUnreadBadge>(); // friendId → 角标（红点 + 数字文本）
+
+    /// <summary>好友条目的未读角标：Status 红点 + 其下 UnreadCount 数字文本。</summary>
+    private class FriendUnreadBadge
+    {
+        public GameObject status;   // Status 红点节点
+        public TMP_Text unreadText; // Status/UnreadCount 数字文本
+    }
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -583,15 +594,22 @@ public class ChatManner : MonoBehaviour
             resp =>
             {
                 _friends.Clear();
+                // 重新加载好友列表时，未读数以服务端统计为准（覆盖实时累计），随后重建列表点亮角标
+                _unreadCounts.Clear();
                 if (resp != null && resp.data != null && resp.data.friends != null)
                 {
                     _friends.AddRange(resp.data.friends);
-                    // 把好友头像喂入全局缓存，供消息头像与其它模块复用
-                    if (AvatarManager.Instance != null)
+                    foreach (var f in resp.data.friends)
                     {
-                        foreach (var f in resp.data.friends)
+                        // 把好友头像喂入全局缓存，供消息头像与其它模块复用
+                        if (AvatarManager.Instance != null)
                         {
                             AvatarManager.Instance.SetFriendAvatar(f.userId, f.avatarUrl);
+                        }
+                        // 记录服务端统计的未读消息数（用于 BindUnreadBadge 渲染数字角标）
+                        if (f.unreadCount > 0)
+                        {
+                            _unreadCounts[f.userId] = f.unreadCount;
                         }
                     }
                 }
@@ -607,7 +625,8 @@ public class ChatManner : MonoBehaviour
     {
         if (friendListContent == null || friendButtonPrefab == null) return;
 
-        // 清空旧按钮
+        // 清空旧按钮（同时清空角标映射，重建后重新填充）
+        _friendBadges.Clear();
         for (int i = friendListContent.childCount - 1; i >= 0; i--)
         {
             Destroy(friendListContent.GetChild(i).gameObject);
@@ -619,19 +638,34 @@ public class ChatManner : MonoBehaviour
             var text = go.GetComponentInChildren<TMP_Text>();
             if (text != null) text.text = string.IsNullOrEmpty(f.nickname) ? f.userId.ToString() : f.nickname;
 
+            // 未读角标：记录 Status 节点映射并按当前未读状态显示/隐藏
+            BindUnreadBadge(go, f);
+
             // 好友头像：按玩家 ID 从 AvatarManager 缓存取（LoadFriendList 已喂入缓存），再加载显示。
             // 头像 URL 现已带版本号（/uploads/avatar/{userId}-{ts}.png），好友换头像 URL 会变化，
             // LoadInto 按 URL 判缓存自然重下，无需 force，也避免每次打开都重新下载。
             BindFriendAvatar(go, f.userId, f.avatarUrl);
 
-            // 点击好友 → 拉历史消息
+            // 点击好友 → 拉历史消息（只允许点击 Friend Button 子节点 ChatButton 才进入聊天）
             long friendId = f.userId;
-            var btn = go.GetComponent<Button>();
-            if (btn == null) btn = go.GetComponentInChildren<Button>();
-            if (btn != null)
+            var chatBtnNode = go.transform.Find("ChatButton");
+            if (chatBtnNode == null) chatBtnNode = FindNode(go, "ChatButton");
+            var chatBtn = chatBtnNode != null ? chatBtnNode.GetComponent<Button>() : null;
+            if (chatBtn == null && chatBtnNode != null)
             {
-                btn.onClick.RemoveAllListeners();
-                btn.onClick.AddListener(() => OpenFriendChat(friendId));
+                chatBtn = chatBtnNode.gameObject.AddComponent<Button>();
+            }
+            if (chatBtn != null)
+            {
+                chatBtn.onClick.RemoveAllListeners();
+                chatBtn.onClick.AddListener(() => OpenFriendChat(friendId));
+            }
+            // 禁用 Friend Button 根节点自身的 Button，避免点击整块（头像/文字区域）就进入聊天
+            var rootBtn = go.GetComponent<Button>();
+            if (rootBtn != null && rootBtn != chatBtn)
+            {
+                rootBtn.onClick.RemoveAllListeners();
+                rootBtn.enabled = false;
             }
         }
     }
@@ -661,10 +695,86 @@ public class ChatManner : MonoBehaviour
         }
     }
 
+    // ============ 未读角标（Friend Button 的 Status 节点） ============
+
+    /// <summary>渲染好友按钮时，记录 Status 红点 + UnreadCount 文本映射，并按该好友当前未读数显示/隐藏。</summary>
+    private void BindUnreadBadge(GameObject go, FriendItem f)
+    {
+        var statusNode = go.transform.Find("Status");
+        if (statusNode == null) statusNode = FindNode(go, "Status");
+        if (statusNode == null) return;
+
+        var badge = new FriendUnreadBadge
+        {
+            status = statusNode.gameObject,
+            unreadText = FindUnreadCountText(statusNode),
+        };
+        _friendBadges[f.userId] = badge;
+
+        _unreadCounts.TryGetValue(f.userId, out var count);
+        ApplyBadge(badge, count);
+    }
+
+    /// <summary>在 Status 节点下查找 UnreadCount 数字文本组件。</summary>
+    private TMP_Text FindUnreadCountText(Transform statusNode)
+    {
+        var t = statusNode.Find("UnreadCount");
+        if (t == null) t = FindNode(statusNode.gameObject, "UnreadCount");
+        return t != null ? t.GetComponent<TMP_Text>() : null;
+    }
+
+    /// <summary>按未读数应用角标：有未读则显示 Status 红点并填数字（≥99 显示 99+），无未读则隐藏。</summary>
+    private void ApplyBadge(FriendUnreadBadge badge, int count)
+    {
+        if (badge == null) return;
+        bool has = count > 0;
+        if (badge.status != null) badge.status.SetActive(has);
+        if (badge.unreadText != null)
+        {
+            badge.unreadText.text = has ? FormatUnreadCount(count) : string.Empty;
+        }
+    }
+
+    /// <summary>未读数格式化：低于 99 显示数字，大于等于 99 显示 99+。</summary>
+    private static string FormatUnreadCount(int count)
+    {
+        return count >= 99 ? "99+" : count.ToString();
+    }
+
+    /// <summary>设置好友未读数（服务端拉取/初始化时用），并刷新角标。</summary>
+    private void SetUnreadCount(long friendId, int count)
+    {
+        if (count > 0) _unreadCounts[friendId] = count;
+        else _unreadCounts.Remove(friendId);
+        if (_friendBadges.TryGetValue(friendId, out var badge))
+        {
+            ApplyBadge(badge, count);
+        }
+    }
+
+    /// <summary>好友新增一条未读消息（实时消息用），未读数 +1 并刷新角标。</summary>
+    private void AddUnread(long friendId)
+    {
+        _unreadCounts.TryGetValue(friendId, out var cur);
+        SetUnreadCount(friendId, cur + 1);
+    }
+
+    /// <summary>清除好友未读状态，隐藏其 Friend Button 的 Status 角标。</summary>
+    private void ClearFriendUnread(long friendId)
+    {
+        _unreadCounts.Remove(friendId);
+        if (_friendBadges.TryGetValue(friendId, out var badge))
+        {
+            ApplyBadge(badge, 0);
+        }
+    }
+
     //更新当前聊天对象喵
     private void OpenFriendChat(long friendId)
     {
         _activeFriendId = friendId;
+        // 打开聊天即视为已读，隐藏该好友的未读角标
+        ClearFriendUnread(friendId);
         //更新标题
         string friendName = GetFriendName(friendId);
         UpdateTitle(friendName);
@@ -828,13 +938,17 @@ public class ChatManner : MonoBehaviour
 
     private void OnPrivateMessage(PrivateMessageEvent evt)
     {
-        // 实时收到好友消息：仅当正在与该好友聊天时显示，否则忽略（好友列表可加未读角标，暂略）
+        // 实时收到好友消息
         if (_activeFriendId > 0 && evt.FromUserId == _activeFriendId)
         {
+            // 正在与该好友聊天：直接显示消息，视为已读
             AddMessage(evt.Content, MessageSender.Friend, evt.AvatarUrl, evt.FromUserId, evt.CreatedAt);
+            ClearFriendUnread(evt.FromUserId);
         }
         else
         {
+            // 未打开该会话：未读数 +1，点亮 Friend Button 的 Status 红点角标并显示数字
+            AddUnread(evt.FromUserId);
             Debug.Log($"[Chat] 收到 {evt.FromUserId} 的消息（未打开该会话）：{evt.Content}");
         }
     }

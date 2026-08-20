@@ -10,6 +10,7 @@ namespace WildCourt.Net.Protocol
         public string nickname;
         public string avatarUrl;
         public int level;
+        public int unreadCount;  // 该好友发给我的未读消息数（未读角标用）
     }
 
     /// <summary>好友列表响应。</summary>

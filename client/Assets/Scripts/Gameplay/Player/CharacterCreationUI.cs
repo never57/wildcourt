@@ -33,6 +33,7 @@ public class CharacterCreationUI : MonoBehaviour
     private string _lastNickname = "";
     private bool _isNicknameSaved = false;   // 本次流程昵称是否保存成功（用于防重复/流程判断，不落库）
     private bool _isSubmitting = false;      // 是否正在提交（防重复点击）
+    private bool _locationLoaded = false;    // 地区数据是否已加载（防重复启动协程）
 
     void Start()
     {
@@ -49,8 +50,26 @@ public class CharacterCreationUI : MonoBehaviour
             });
         }
 
-        StartCoroutine(LoadLocationDataCoroutine());
         confirmButton.onClick.AddListener(OnConfirm);
+        EnsureLocationLoaded();
+    }
+
+    private void OnEnable()
+    {
+        // 面板从 inactive 重新激活时（或首次激活）若地区数据未加载则启动加载
+        EnsureLocationLoaded();
+    }
+
+    /// <summary>
+    /// 确保地区数据已加载。协程不能在 inactive 的 GameObject 上启动，
+    /// 因此用 activeInHierarchy 保护：若面板未激活则跳过，待激活时由 OnEnable 再触发。
+    /// </summary>
+    private void EnsureLocationLoaded()
+    {
+        if (_locationLoaded) return;
+        if (!gameObject.activeInHierarchy) return;   // 关键：inactive 时不能 StartCoroutine
+        _locationLoaded = true;
+        StartCoroutine(LoadLocationDataCoroutine());
     }
 
     /// <summary>
@@ -244,7 +263,11 @@ public class CharacterCreationUI : MonoBehaviour
     void OnAllDataSaved()
     {
         Debug.Log("所有数据保存完毕");
-        StartCoroutine(PlayCloudFlyAnimation());
+        // 协程不能在 inactive 的 GameObject 上启动，面板未激活时跳过动画
+        if (gameObject.activeInHierarchy)
+        {
+            StartCoroutine(PlayCloudFlyAnimation());
+        }
         _isSubmitting = false;
         SetConfirmEnabled(true);
         //ClosePanel();

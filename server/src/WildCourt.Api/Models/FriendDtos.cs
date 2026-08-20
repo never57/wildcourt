@@ -40,6 +40,9 @@ public class FriendDto
     public string AvatarUrl { get; set; } = string.Empty;
 
     public int Level { get; set; }
+
+    /// <summary>该好友发给我的未读私聊消息数（聊天未读角标用）。</summary>
+    public int UnreadCount { get; set; }
 }
 
 /// <summary>好友申请记录（被申请人视角的待处理申请）。</summary>

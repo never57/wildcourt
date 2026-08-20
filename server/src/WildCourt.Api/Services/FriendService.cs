@@ -206,17 +206,26 @@ public class FriendService
             .Where(u => friendIds.Contains(u.UserId))
             .ToDictionaryAsync(u => u.UserId, u => u);
 
-        var list = friendIds
-            .Where(users.ContainsKey)
+        // 统计每个好友发给我的未读私聊消息数（IsRead=false 且 ToUserId 为我），用于聊天未读角标
+        var validIds = friendIds.Where(users.ContainsKey).ToList();
+        var unreadCounts = await _db.ChatMessages
+            .Where(m => m.ToUserId == userId && !m.IsRead && validIds.Contains(m.FromUserId))
+            .GroupBy(m => m.FromUserId)
+            .Select(g => new { FriendId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.FriendId, g => g.Count);
+
+        var list = validIds
             .Select(id =>
             {
                 var u = users[id];
+                unreadCounts.TryGetValue(id, out var unread);
                 return new FriendDto
                 {
                     UserId = u.UserId,
                     Nickname = u.Nickname,
                     AvatarUrl = u.AvatarUrl ?? string.Empty,
                     Level = u.Level,
+                    UnreadCount = unread,
                 };
             })
             .ToList();
