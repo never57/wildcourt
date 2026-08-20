@@ -55,11 +55,16 @@ public class ChatManner : MonoBehaviour
     public GameObject friendButtonPrefab;  //好友按钮预制体
     public TMP_InputField friendSearchInput;  //好友搜索输入框（Chat Window 顶部，按昵称/ID 过滤好友）
     public Button friendSearchButton;         //好友搜索按钮（search）
+    public GameObject friendSearchStatus;     //好友搜索无结果提示（SearchStatus，搜不到时显示）
 
     [Header("消息列表")]
     public Transform messContent; // 存放消息
     public GameObject myMessagePrefab;  // 本人消息预制体
     public GameObject friendMessagePrefab;  // 好友消息预制体
+
+    [Header("菜单动画")]
+    public Button menuButton;  // 标题栏右侧 Menu 按钮（点击播放 FriendsInformation 动画）
+    public FriendInfoAnimController friendInfoController;  // FriendsInformation 的动画控制器
 
     [Header("输入框")]
     public TMP_InputField inputField;  // 输入框
@@ -128,6 +133,7 @@ public class ChatManner : MonoBehaviour
         if (searchButton != null) searchButton.onClick.AddListener(ShowSearchArea);
         if (searchConfirmButton != null) searchConfirmButton.onClick.AddListener(OnSearchClick);
         if (friendSearchButton != null) friendSearchButton.onClick.AddListener(OnFriendSearchClick);
+        if (menuButton != null) menuButton.onClick.AddListener(OnMenuClick);
 
         // 拉取当前用户信息（拿到 userId 用于判断消息左右侧）
         LoadMyProfile();
@@ -248,6 +254,9 @@ public class ChatManner : MonoBehaviour
     /// <summary>显示搜索/申请区（显示搜索区，隐藏聊天区），并刷新好友申请列表。</summary>
     public void ShowSearchArea()
     {
+        // 点击 Label 里的 search 切换到搜索界面时，清空好友列表搜索状态并恢复默认显示
+        ClearFriendSearch();
+
         if (searchWindow != null) searchWindow.SetActive(true);
         if (chatWindow != null) chatWindow.SetActive(false);
         LoadFriendRequests();
@@ -630,6 +639,19 @@ public class ChatManner : MonoBehaviour
             (code, msg) => Debug.LogWarning($"[Chat] 拉取好友列表失败：{msg}"));
     }
 
+    /// <summary>按是否有未读消息对好友列表排序：有未读的优先排在前面，其余保持原顺序。</summary>
+    private void SortFriendsByUnread()
+    {
+        if (_friends == null || _friends.Count < 2) return;
+        _friends.Sort((a, b) =>
+        {
+            bool aUnread = _unreadCounts.ContainsKey(a.userId);
+            bool bUnread = _unreadCounts.ContainsKey(b.userId);
+            if (aUnread == bUnread) return 0;   // 相同状态保持原顺序（稳定排序）
+            return aUnread ? -1 : 1;            // 有未读的排前面
+        });
+    }
+
     private void RebuildFriendList()
     {
         if (friendListContent == null || friendButtonPrefab == null) return;
@@ -641,6 +663,9 @@ public class ChatManner : MonoBehaviour
         {
             Destroy(friendListContent.GetChild(i).gameObject);
         }
+
+        // 有未读消息的好友优先排在最上面
+        SortFriendsByUnread();
 
         foreach (var f in _friends)
         {
@@ -789,16 +814,21 @@ public class ChatManner : MonoBehaviour
         ApplyFriendFilter(keyword);
     }
 
-    /// <summary>按关键字过滤好友列表：昵称或 ID 含关键字则显示，否则隐藏。空关键字显示全部。</summary>
+    /// <summary>点击 Menu 按钮：播放 FriendsInformation 的动画。</summary>
+    private void OnMenuClick()
+    {
+        if (friendInfoController != null)
+        {
+            friendInfoController.PlayAnimation();
+        }
+    }
+
+    /// <summary>按关键字过滤好友列表：昵称或 ID 含关键字则显示，否则隐藏。空关键字显示全部。搜不到时显示 SearchStatus 提示。</summary>
     private void ApplyFriendFilter(string keyword)
     {
-        if (_friendRowNodes.Count == 0)
-        {
-            // 列表尚未渲染（如好友为空），直接返回
-            return;
-        }
-
         bool hasFilter = !string.IsNullOrEmpty(keyword);
+        int matchCount = 0;
+
         foreach (var f in _friends)
         {
             if (!_friendRowNodes.TryGetValue(f.userId, out var row) || row == null) continue;
@@ -815,6 +845,13 @@ public class ChatManner : MonoBehaviour
                         || f.userId.ToString().IndexOf(keyword, System.StringComparison.OrdinalIgnoreCase) >= 0;
             }
             row.SetActive(match);
+            if (match) matchCount++;
+        }
+
+        // 搜索无匹配结果：显示 SearchStatus 提示；空搜索或存在匹配则隐藏
+        if (friendSearchStatus != null)
+        {
+            friendSearchStatus.SetActive(hasFilter && matchCount == 0);
         }
     }
 
