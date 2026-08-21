@@ -226,6 +226,13 @@ namespace WildCourt.UI.Farm
             if (hasFocus && useServer) RestoreFromServer();
         }
 
+        /// <summary>应用恢复（编辑器暂停/移动端退后台返回）：暂停期间 Time.time 冻结、服务端照常计时，
+        /// 恢复时同样需要重新对齐倒计时。</summary>
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            if (!pauseStatus && useServer) RestoreFromServer();
+        }
+
         private static long UnixNow()
         {
             return DateTimeOffset.UtcNow.ToUnixTimeSeconds();
