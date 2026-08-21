@@ -134,12 +134,21 @@ public class CropService
             .OrderBy(p => p.CellId)
             .ToListAsync();
 
-        var plots = rows.Select(p => new FarmPlotDto
+        var plots = rows.Select(p =>
         {
-            CellId = p.CellId,
-            CropId = p.CropId,
-            ReadyAt = new DateTimeOffset(p.ReadyAt.ToUniversalTime()).ToUnixTimeSeconds(),
-            State = p.ReadyAt <= nowUtc ? MatureState : GrowingState,
+            // MySQL 读回的 DateTime Kind=Unspecified（写入时是 Utc 墙钟）。直接 ToUniversalTime()
+            // 会按服务器本地时区换算（Asia/Shanghai = UTC+8 时偏移 8 小时），返回的 readyAt 偏早
+            // 8 小时 → 客户端误判成熟（收获被 400 拦截）。必须显式按 UTC 解释，与写入值一致。
+            var readyAtUtc = p.ReadyAt.Kind == DateTimeKind.Utc
+                ? p.ReadyAt
+                : DateTime.SpecifyKind(p.ReadyAt, DateTimeKind.Utc);
+            return new FarmPlotDto
+            {
+                CellId = p.CellId,
+                CropId = p.CropId,
+                ReadyAt = new DateTimeOffset(readyAtUtc).ToUnixTimeSeconds(),
+                State = p.ReadyAt <= nowUtc ? MatureState : GrowingState,
+            };
         }).ToList();
 
         // serverTime 供客户端换算剩余时间：客户端时钟可能与服务端有偏差，直接用

@@ -154,6 +154,24 @@ public class CropServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetPlots_UnspecifiedKindReadyAt_NoTimezoneShift()
+    {
+        // 回归：MySQL 读回的 DateTime Kind=Unspecified（值本身是 UTC 墙钟）。若按 ToUniversalTime()
+        // 会按服务器本地时区（Asia/Shanghai，UTC+8）再偏移 8 小时，客户端会误判成熟（收获被 400 拦截）。
+        // 必须显式按 UTC 解释，保证返回的 ReadyAt 与写入值一致。
+        await _service.PlantAsync(UserId, 0, "C01");
+        var row = await _db.FarmPlots.SingleAsync(p => p.UserId == UserId && p.CellId == 0);
+        var originalUtc = new DateTimeOffset(DateTime.SpecifyKind(row.ReadyAt, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        // 模拟 MySQL 读回：墙钟不变，Kind 变为 Unspecified
+        row.ReadyAt = DateTime.SpecifyKind(row.ReadyAt, DateTimeKind.Unspecified);
+        await _db.SaveChangesAsync();
+
+        var resp = await _service.GetPlotsAsync(UserId);
+
+        Assert.Equal(originalUtc, resp.Plots[0].ReadyAt); // 不得偏移 8 小时
+    }
+
+    [Fact]
     public async Task Plant_WithoutSeed_Throws()
     {
         // C03 棉花：玩家未持有 seed_cotton
