@@ -3,8 +3,10 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using WildCourt.Core;
 using WildCourt.Net;
 using WildCourt.Net.Protocol;
+using WildCourt.Utils;
 
 namespace WildCourt.UI.Farm
 {
@@ -188,7 +190,18 @@ namespace WildCourt.UI.Farm
                         long remain = p.readyAt - serverNow;
                         if (remain > 0)
                         {
-                            _plot.PlantSeconds(p.cropId, remain);   // 按剩余秒数重建生长（成熟时刻与 readyAt 对齐）
+                            // 进度条公式 = 1 - 剩余/总时长（真实生长百分比）：按完整生长时长 + 已生长秒数
+                            // 重建，成熟时刻 = now + (总时长 - 已生长) = now + 剩余，仍与 readyAt 对齐；
+                            // 配置缺失（兜底 3600s）且剩余更长时退化为按剩余秒数起走。
+                            float fullSec = CropGrowSeconds(p.cropId);
+                            if (fullSec >= remain)
+                            {
+                                _plot.PlantWithElapsed(p.cropId, fullSec, fullSec - remain);
+                            }
+                            else
+                            {
+                                _plot.PlantSeconds(p.cropId, remain);
+                            }
                         }
                         else
                         {
@@ -196,7 +209,7 @@ namespace WildCourt.UI.Farm
                             _plot.ForceMature();
                         }
                         RefreshView();
-                        Debug.Log($"[FarmPlot] 恢复种植状态: {p.cropId} 格 {cellId} 剩余 {Mathf.Max(0f, remain)}s");
+                        Debug.Log($"[FarmPlot] 恢复种植状态: {p.cropId} 格 {cellId} 剩余 {Mathf.Max(0f, remain)}s 进度 {_plot.Progress:P0}");
                         return;
                     }
                 },
@@ -216,6 +229,29 @@ namespace WildCourt.UI.Farm
         private static long UnixNow()
         {
             return DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        }
+
+        /// <summary>作物完整生长秒数（Config_Crops.growTime 分钟 × 60）；配置缺失时兜底 1 小时。</summary>
+        private float CropGrowSeconds(string cropId)
+        {
+            if (string.IsNullOrEmpty(cropId)) return 3600f;
+            string json = ConfigMgr.Instance != null ? ConfigMgr.Instance.GetRawJson("Crops") : null;
+            if (string.IsNullOrEmpty(json)) return 3600f;
+            foreach (var row in JsonUtil.FromJsonArray<CropRow>(json))
+            {
+                if (row != null && string.Equals(row.id, cropId, StringComparison.OrdinalIgnoreCase) && row.growTime > 0)
+                {
+                    return row.growTime * 60f;
+                }
+            }
+            return 3600f;
+        }
+
+        [Serializable]
+        private sealed class CropRow
+        {
+            public string id;
+            public int growTime;   // 分钟
         }
 
         /// <summary>按地块状态刷新 Plant 可见性、生长阶段与进度条。</summary>

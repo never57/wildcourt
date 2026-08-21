@@ -45,6 +45,14 @@ public class CropPlot
         OnStateChanged?.Invoke(this);
     }
 
+    /// <summary>恢复播种：按完整生长时长 + 已生长秒数重建（进度从 elapsed 处继续显示，
+    /// 进度条公式 = 已生长/总时长 = 1 - 剩余/总时长；成熟时刻 = now + (totalSec - elapsedSec)）。</summary>
+    public void PlantWithElapsed(string cropId, float totalSec, float elapsedSec)
+    {
+        PlantSeconds(cropId, totalSec);
+        PlantTime = Time.time - Mathf.Clamp(elapsedSec, 0f, GrowDurationSec - 1f);
+    }
+
     /// <summary>每帧/定时推进，判断是否成熟。</summary>
     public void Tick()
     {
