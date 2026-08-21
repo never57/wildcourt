@@ -47,7 +47,7 @@ namespace WildCourt.UI.Farm
         [SerializeField] private int cellId = 0;
 
         private readonly CropPlot _plot = new CropPlot(0);
-        private bool _restored;
+        private bool _restoring;   // 恢复请求进行中（防并发重复拉取）
 
         private void Start()
         {
@@ -162,20 +162,22 @@ namespace WildCourt.UI.Farm
                 (code, msg) => Debug.LogWarning($"[FarmPlot] 收获失败 {code}:{msg}（作物尚未成熟或状态不同步，可稍后重试）"));
         }
 
-        /// <summary>启动恢复：拉取服务端种植状态，按剩余时间重建倒计时。</summary>
+        /// <summary>启动/重新聚焦时恢复：拉取服务端种植状态（含 serverTime），按剩余时间重建倒计时。
+        /// 失焦期间本地倒计时会暂停/漂移（Time.time 不走），重新聚焦时以此与服务端重新对齐。</summary>
         private void RestoreFromServer()
         {
-            if (_restored) return;
-            _restored = true;
+            if (_restoring) return;
             var net = NetManager.Instance;
             if (net == null || string.IsNullOrEmpty(net.Token))
             {
                 Debug.LogWarning("[FarmPlot] 未登录，跳过种植状态恢复");
                 return;
             }
+            _restoring = true;
             net.Get<FarmPlotsResponse>(ApiPaths.YardPlots,
                 resp =>
                 {
+                    _restoring = false;
                     if (resp == null || resp.data == null || resp.data.plots == null) return;
                     foreach (var p in resp.data.plots)
                     {
@@ -198,7 +200,17 @@ namespace WildCourt.UI.Farm
                         return;
                     }
                 },
-                (code, msg) => Debug.LogWarning($"[FarmPlot] 种植状态恢复失败 {code}:{msg}"));
+                (code, msg) =>
+                {
+                    _restoring = false;
+                    Debug.LogWarning($"[FarmPlot] 种植状态恢复失败 {code}:{msg}");
+                });
+        }
+
+        /// <summary>窗口重新聚焦：重新拉取服务端时间对齐倒计时（失焦期间本地倒计时暂停/漂移）。</summary>
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            if (hasFocus && useServer) RestoreFromServer();
         }
 
         private static long UnixNow()
