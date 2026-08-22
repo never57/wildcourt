@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91b03d52ff9d04c48a55b9382d93345c, type: 3}
+  m_Name: B02_FlavorBait
+  m_EditorClassIdentifier: 
+  id: B02
+  displayName: "\u9999\u7CBE\u9C7C\u9975"
+  price: 8
+  biteChance: 0.75
+  catchWeights: 1e000000190000000a0000000f00000014000000
+  description: "\u63D0\u5347\u54AC\u94A9\u7387\u4E0E\u7A00\u6709\u9C7C\u5360\u6BD4"
+  icon: {fileID: 21300000, guid: c517819575a936b4b999b40f12cb7df8, type: 3}

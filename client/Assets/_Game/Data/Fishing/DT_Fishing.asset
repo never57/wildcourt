@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e6637a5f09c6744a9f2c71524a0b99f, type: 3}
+  m_Name: DT_Fishing
+  m_EditorClassIdentifier: 
+  fishes:
+  - {fileID: 11400000, guid: 89b19a133c7fdf84cbf256f57d826a91, type: 2}
+  - {fileID: 11400000, guid: 3db9bf0ab4f443e4d861c90321305b2f, type: 2}
+  - {fileID: 11400000, guid: 44a089d48716aa64ca9614a7425f1f0c, type: 2}
+  - {fileID: 11400000, guid: 4c42512482ba54349b4a3874cf81351b, type: 2}
+  - {fileID: 11400000, guid: 08a30773841b62b4bb8b6276b7f9c108, type: 2}
+  baits:
+  - {fileID: 11400000, guid: 1b267a69ccd24e0419f1fabf821b99da, type: 2}
+  - {fileID: 11400000, guid: 86594136355ac5245a4bd4c6be4ccac5, type: 2}
+  - {fileID: 11400000, guid: 5b86d126c17a7f04bad0122b416af6ba, type: 2}

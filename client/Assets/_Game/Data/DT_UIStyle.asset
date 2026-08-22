@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3bbdbc77636ace34bae709b80bb7be9a, type: 3}
+  m_Name: DT_UIStyle
+  m_EditorClassIdentifier: 
+  titleSize: 52
+  bodySize: 36
+  descSize: 28
+  topCountSize: 46
+  rightLabelSize: 34
+  bubbleSize: 40
+  toastSize: 42
+  mainButtonTextSize: 48
+  sceneNameSize: 40
+  timeOfDaySize: 32
+  tensionStateSize: 34
+  catchProgressSize: 28
+  rightItemSize: {x: 150, y: 200}
+  rightIconSize: 96
+  rightSpacing: 24
+  rightInset: 24
+  mainButtonSize: 280
+  mainButtonOffset: {x: -40, y: -60}
+  reelButtonSize: 260
+  panelBodySize: {x: 720, y: 1300}
+  closeButtonSize: 64
+  closeButtonTextSize: 40
+  closeButtonOffset: {x: 24, y: 24}
+  closeButtonBgColor: {r: 0.15, g: 0.12, b: 0.08, a: 0.95}
+  closeButtonMarkColor: {r: 1, g: 1, b: 1, a: 1}
+  buyButtonSize: {x: 200, y: 84}
+  qtyButtonSize: {x: 72, y: 56}
+  shopRowHeight: 190
+  bagRowHeight: 170
+  bagIconSize: 100
+  bagFrameSize: 114
+  topBarIconSize: 72
+  topBarGroupHeight: 96
+  topBarPlusSize: 96
+  tensionSliderHeight: 44
+  catchSliderHeight: 24

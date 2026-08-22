@@ -49,6 +49,8 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public DbSet<ChatMessageEntity> ChatMessages => Set<ChatMessageEntity>();
 
+    public DbSet<FishingEventEntity> FishingEvents => Set<FishingEventEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureUser(modelBuilder);
@@ -66,6 +68,7 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
         ConfigureAdminOperationLog(modelBuilder);
         ConfigureFriendRequest(modelBuilder);
         ConfigureChatMessage(modelBuilder);
+        ConfigureFishingEvent(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -297,6 +300,26 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.SignDate).HasColumnName("sign_date").HasColumnType("date").IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
             e.HasIndex(x => new { x.UserId, x.SignDate }).HasDatabaseName("uk_sign_in_user_date").IsUnique();
+        });
+    }
+
+    private static void ConfigureFishingEvent(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<FishingEventEntity>(e =>
+        {
+            e.ToTable("fishing_events");
+            e.HasKey(x => x.EventId);
+            e.Property(x => x.EventId).HasColumnName("event_id").ValueGeneratedOnAdd();
+            e.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            e.Property(x => x.EventType).HasColumnName("event_type").HasMaxLength(16).IsRequired();
+            e.Property(x => x.BaitId).HasColumnName("bait_id").HasMaxLength(64).IsRequired();
+            e.Property(x => x.FishId).HasColumnName("fish_id").HasMaxLength(64);
+            e.Property(x => x.FishName).HasColumnName("fish_name").HasMaxLength(64);
+            e.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(255);
+            e.Property(x => x.TimestampMs).HasColumnName("timestamp_ms").IsRequired();
+            e.Property(x => x.ServerTime).HasColumnName("server_time").IsRequired();
+            e.HasIndex(x => x.UserId).HasDatabaseName("idx_fishing_events_user_id");
+            e.HasIndex(x => x.ServerTime).HasDatabaseName("idx_fishing_events_created_at");
         });
     }
 

@@ -85,6 +85,11 @@ namespace WildCourt.UI.Yard
             EventBus.Subscribe<ProfileUpdatedEvent>(OnProfileUpdated);
         }
 
+        private void Start()
+        {
+            // Step11 界面合一：钓鱼不再有独立入口，统一在 FishingScene（池塘鱼群游动动画）内进行
+        }
+
         /// <summary>货币变化（领取附件/购买等）：重拉玩家资料，保证建筑面板余额显示最新值。</summary>
         private void OnCurrencyChanged(CurrencyChangedEvent evt)
         {
@@ -123,6 +128,7 @@ namespace WildCourt.UI.Yard
                 _editorButton.onClick.RemoveAllListeners();
                 _editorButton.onClick.AddListener(OpenUserPanel);
             }
+            // Step11 界面合一：移除钓鱼切屏入口（钓鱼统一在 FishingScene 内进行）
             YardPanel.BackPressed -= OnBuildPanelClosed;
             YardPanel.BackPressed += OnBuildPanelClosed;
         }
@@ -187,6 +193,8 @@ namespace WildCourt.UI.Yard
             var panel = UserPanel.CreateOrInstantiate();
             if (panel != null) panel.Open();
         }
+
+        /// <summary>Step11 界面合一：钓鱼不再提供独立入口，统一在 FishingScene（池塘鱼群游动动画）内进行。</summary>
 
         /// <summary>点击“建造”按钮：实例化打开庭院建造面板（YardPanel），注入已缓存资料，并隐藏主 UI。</summary>
         private void OpenBuildPanel()

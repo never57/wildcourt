@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 75e0e9fe68e06c445a6a4af59fce48e3, type: 3}
+  m_Name: F01_Crucian
+  m_EditorClassIdentifier: 
+  id: F01
+  species: 0
+  displayName: "\u9CAB\u9C7C"
+  rarity: 0
+  sellPrice: 8
+  usage: "\u9C9C\u9C7C\u9910\u6750\u6599"
+  icon: {fileID: 21300000, guid: 243ddcf6d2572774cbb97e14ffdde6dd, type: 3}

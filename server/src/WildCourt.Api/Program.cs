@@ -47,6 +47,7 @@ builder.Services.AddScoped<FriendService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<SignInService>();
 builder.Services.AddScoped<LetterService>();
+builder.Services.AddScoped<FishingService>();
 
 // 运营后台：令牌服务 + 业务服务 + 监控/部署
 var adminSecret = builder.Configuration["Admin:JwtSecret"] ?? "wildcourt-admin-secret-change-me";

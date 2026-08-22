@@ -74,6 +74,9 @@ namespace WildCourt.Net.Protocol
         public static string MiniGameStart(string gameId) => Base + $"/minigame/start/{gameId}";
         public const string MiniGameFinish = Base + "/minigame/finish";
         public const string MiniGameDailyCap = Base + "/minigame/daily-cap";
+
+        // FishingController（钓鱼事件上报：成功/失败结算时 POST）
+        public const string FishingEvent = Base + "/fishing/event";
     }
 
     /// <summary>统一业务码（0 成功，非 0 错误；与服务端 ExceptionMiddleware 对齐）。</summary>
