@@ -122,10 +122,10 @@ namespace WildCourt.UI.User
                 (code, msg) => Debug.LogWarning($"[UserPanel] profile 加载失败: {msg}"));
         }
 
-        /// <summary>资料更新（改头像/昵称后广播）：重新拉取 profile 刷新头像+昵称，确保实时同步。</summary>
+        /// <summary>资料更新（改头像/昵称后广播）：仅在头像变化时重拉并刷新头像；改昵称时头像无需刷新。</summary>
         private void OnProfileUpdated(ProfileUpdatedEvent evt)
         {
-            LoadProfile();
+            if (evt.AvatarChanged) LoadProfile();
         }
 
         private void ApplyProfile(UserProfileResponse data, bool forceAvatar = false)
@@ -248,12 +248,13 @@ namespace WildCourt.UI.User
                     {
                         userNameInput.text = nickname;
                     }
-                    ApplyProfile(resp.data);
-                    // 广播昵称更新，供 YardMainUI 等同步
+                    // 注意：改昵称不调 ApplyProfile（它会带头像加载），避免头像被刷新
+                    // 广播昵称更新，供 YardMainUI 等同步；AvatarUrl 置空 + AvatarChanged=false 表明头像未变
                     EventBus.Publish(new ProfileUpdatedEvent
                     {
-                        AvatarUrl = resp.data != null ? resp.data.avatarUrl : null,
-                        Nickname = resp.data != null ? resp.data.nickname : nickname
+                        AvatarUrl = null,
+                        Nickname = resp.data != null ? resp.data.nickname : nickname,
+                        AvatarChanged = false
                     });
                 },
                 (code, msg) =>
@@ -323,11 +324,12 @@ namespace WildCourt.UI.User
                 {
                     // 头像 URL 带版本，换头像后 URL 变化，LoadInto 自动下载新头像
                     ApplyProfile(resp.data);
-                    // 广播头像更新，供 YardMainUI / ChatManner 等同步
+                    // 广播头像更新，供 YardMainUI / ChatManner 等同步；AvatarChanged=true 表明头像已变
                     EventBus.Publish(new ProfileUpdatedEvent
                     {
                         AvatarUrl = resp.data != null ? resp.data.avatarUrl : null,
-                        Nickname = resp.data != null ? resp.data.nickname : null
+                        Nickname = resp.data != null ? resp.data.nickname : null,
+                        AvatarChanged = true
                     });
                 },
                 (code, msg) =>

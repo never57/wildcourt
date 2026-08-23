@@ -174,10 +174,10 @@ namespace WildCourt.UI.User
             cb?.Invoke();
         }
 
-        /// <summary>头像/昵称修改后同步缓存（UserPanel 修改头像/昵称时广播）。</summary>
+        /// <summary>头像/昵称修改后同步缓存（UserPanel 修改头像/昵称时广播）。仅头像真正变化才失效缓存。</summary>
         private void OnProfileUpdated(ProfileUpdatedEvent evt)
         {
-            if (!string.IsNullOrEmpty(evt.AvatarUrl))
+            if (evt.AvatarChanged && !string.IsNullOrEmpty(evt.AvatarUrl))
             {
                 // 头像内容可能已变但 URL 不变（/uploads/avatar/{userId}.png），
                 // 失效该 URL 的图片缓存，强制各界面重新下载新头像

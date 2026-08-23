@@ -91,6 +91,9 @@ namespace WildCourt.Core
     {
         public string AvatarUrl;
         public string Nickname;
+
+        /// <summary>本次是否改了头像。false（只改昵称）时订阅者不应刷新/重下头像，避免改昵称头像也被刷新。</summary>
+        public bool AvatarChanged;
     }
 
     /// <summary>徽章解锁。</summary>

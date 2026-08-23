@@ -572,9 +572,16 @@ public class ChatManner : MonoBehaviour
     /// </summary>
     private void OnProfileUpdated(ProfileUpdatedEvent evt)
     {
-        // 主动拉取 profile 并 force 刷新头像 + 昵称，确保拿到服务端最新数据，
-        // 而非仅依赖事件携带的 URL（可能为空/旧值）。force 保证换头像后即使 URL 不变也强制重下。
-        RefreshLabelPlayerInfo();
+        // 改头像：重拉 profile 刷新头像 + 昵称，确保拿到服务端最新数据
+        if (evt.AvatarChanged)
+        {
+            RefreshLabelPlayerInfo();
+        }
+        // 改昵称：只更新昵称文本，不重拉 profile、不刷新头像
+        else if (!string.IsNullOrEmpty(evt.Nickname) && labelNameText != null)
+        {
+            labelNameText.text = evt.Nickname;
+        }
     }
 
     /// <summary>

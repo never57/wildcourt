@@ -97,12 +97,12 @@ namespace WildCourt.UI.Yard
         }
 
         /// <summary>
-        /// 资料更新（UserPanel 改头像/昵称后广播）：重新拉取 profile，用权威数据 force 刷新 playerinformation 头像。
-        /// 主动拉 profile 而非仅用事件携带的 URL，确保拿到服务端最新头像（事件 URL 可能为空/旧值）。
+        /// 资料更新（UserPanel 改头像/昵称后广播）：仅在头像变化时重拉 profile 刷新 playerinformation 头像。
+        /// 改昵称时头像未变，不重拉，避免头像被刷新。
         /// </summary>
         private void OnProfileUpdated(ProfileUpdatedEvent evt)
         {
-            LoadProfile();
+            if (evt.AvatarChanged) LoadProfile();
         }
 
         private void BindYard(YardManager yard)
