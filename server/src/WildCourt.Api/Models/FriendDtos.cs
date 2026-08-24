@@ -43,6 +43,9 @@ public class FriendDto
 
     /// <summary>该好友发给我的未读私聊消息数（聊天未读角标用）。</summary>
     public int UnreadCount { get; set; }
+
+    /// <summary>我给该好友设置的备注（未设置时为空字符串）。</summary>
+    public string Note { get; set; } = string.Empty;
 }
 
 /// <summary>好友申请记录（被申请人视角的待处理申请）。</summary>
@@ -109,4 +112,12 @@ public class ChatMessageDto
 public class ChatHistoryResponse
 {
     public List<ChatMessageDto> Messages { get; set; } = new();
+}
+
+// ============ 好友备注 ============
+
+/// <summary>设置/清除好友备注请求（PUT /api/v1/friend/note/{friendId}，note 为空字符串则清除）。</summary>
+public class SetFriendNoteRequest
+{
+    public string Note { get; set; } = string.Empty;
 }

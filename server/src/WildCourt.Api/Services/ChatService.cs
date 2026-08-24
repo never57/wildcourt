@@ -114,6 +114,28 @@ public class ChatService
         };
     }
 
+    /// <summary>删除我与某好友之间的全部聊天记录（双向物理删除），返回删除的消息条数。</summary>
+    public async Task<int> DeleteConversationAsync(long userId, long friendUserId)
+    {
+        if (userId == friendUserId)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "不能删除与自己的聊天记录");
+        }
+        await EnsureFriendAsync(userId, friendUserId);
+
+        var messages = await _db.ChatMessages
+            .Where(m =>
+                (m.FromUserId == userId && m.ToUserId == friendUserId) ||
+                (m.FromUserId == friendUserId && m.ToUserId == userId))
+            .ToListAsync();
+
+        if (messages.Count == 0) return 0;
+
+        _db.ChatMessages.RemoveRange(messages);
+        await _db.SaveChangesAsync();
+        return messages.Count;
+    }
+
     /// <summary>构造消息 DTO，并从头像字典回填发送者头像。</summary>
     private static ChatMessageDto ToDto(ChatMessageEntity e, IReadOnlyDictionary<long, string> avatarMap)
     {

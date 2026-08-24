@@ -44,6 +44,9 @@ public class UserEntity
     /// <summary>是否被封禁（管理后台封禁后禁止登录，并踢出全部会话）。</summary>
     public bool IsBanned { get; set; } = false;
 
+    /// <summary>聊天功能封禁截止时间（UTC）。为空表示未封禁聊天；已过期视为未封禁。</summary>
+    public DateTime? ChatBanUntil { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime? LastLogin { get; set; }

@@ -1004,6 +1004,28 @@ public class ChatManner : MonoBehaviour
         if (inputField == null) return;
         string msg = inputField.text;
         if (string.IsNullOrEmpty(msg)) return;
+
+        // 发送前检查聊天封禁：被封禁则提示并禁止发送
+        if (NetManager.Instance != null)
+        {
+            string pendingMsg = msg;
+            NetManager.Instance.Get<ChatBanStatusResponse>(ApiPaths.ChatBanStatus, resp =>
+            {
+                if (resp != null && resp.banned)
+                {
+                    ShowBanTip(resp);
+                    return;
+                }
+                DoSend(pendingMsg);
+            }, () => { DoSend(pendingMsg); });
+            return;
+        }
+        DoSend(msg);
+    }
+
+    /// <summary>实际发送私聊消息（封禁检查通过后调用）。</summary>
+    private void DoSend(string msg)
+    {
         if (_activeFriendId <= 0)
         {
             Debug.LogWarning("[Chat] 未选择好友，无法发送");
@@ -1025,6 +1047,15 @@ public class ChatManner : MonoBehaviour
             (code, errMsg) => Debug.LogWarning($"[Chat] 发送失败：{errMsg}"));
 
         inputField.text = "";
+    }
+
+    /// <summary>提示玩家聊天功能被封禁（暂以日志提示，后续可接入全局 Toast）。</summary>
+    private void ShowBanTip(ChatBanStatusResponse status)
+    {
+        string tip = status.remainDays > 0
+            ? $"聊天功能已被封禁，剩余 {status.remainDays} 天"
+            : "聊天功能已被封禁";
+        Debug.LogWarning($"[Chat] {tip}");
     }
 
     private void ScrollToBottom()

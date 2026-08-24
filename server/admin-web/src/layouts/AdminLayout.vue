@@ -30,6 +30,10 @@
           <el-icon><ChatDotRound /></el-icon>
           <template #title>运营审核</template>
         </el-menu-item>
+        <el-menu-item v-if="authStore.hasPermission('reports:view')" index="/reports">
+          <el-icon><Warning /></el-icon>
+          <template #title>举报审理</template>
+        </el-menu-item>
         <el-menu-item v-if="authStore.hasPermission('announcements:view')" index="/announcements">
           <el-icon><Bell /></el-icon>
           <template #title>公告管理</template>

@@ -335,6 +335,49 @@ export const reviewApi = {
     request<void>({ url: '/letter/review', method: 'post', data: { letterId, approve } }),
 }
 
+// ================= 举报审理 =================
+
+export interface AdminReportItem {
+  id: number
+  reporterUserId: number
+  reporterNickname: string
+  reportedUserId: number
+  reportedNickname: string
+  reason: string
+  status: number // 0=待审理 1=已处理
+  createdAt: string
+}
+
+export interface ChatBanStatus {
+  banned: boolean
+  banUntil: string | null
+  remainDays: number
+  reason: string
+}
+
+export interface AdminReportDetail extends AdminReportItem {
+  chatBan: ChatBanStatus
+  chatMessages: {
+    id: number
+    fromUserId: number
+    toUserId: number
+    content: string
+    createdAt: number
+  }[]
+}
+
+export const reportsApi = {
+  list: (params: { status?: number; page?: number; pageSize?: number }) =>
+    request<PagedResult<AdminReportItem>>({ url: '/reports', params }),
+  detail: (id: number) => request<AdminReportDetail>({ url: `/reports/${id}` }),
+  resolve: (id: number, data: { chatBanDays: number; note?: string }) =>
+    request<void>({ url: `/reports/${id}/resolve`, method: 'post', data }),
+  chatBan: (userId: number, days: number, reason?: string) =>
+    request<{ changed: boolean }>({ url: `/players/${userId}/chat-ban`, method: 'post', data: { days, reason } }),
+  chatUnban: (userId: number) =>
+    request<{ changed: boolean }>({ url: `/players/${userId}/chat-unban`, method: 'post' }),
+}
+
 // ================= 公告管理 =================
 
 export const announcementApi = {

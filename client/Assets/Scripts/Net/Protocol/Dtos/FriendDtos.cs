@@ -68,6 +68,16 @@ namespace WildCourt.Net.Protocol
         public ChatMessageDto[] messages;
     }
 
+    /// <summary>聊天封禁状态响应（GET /chat/ban-status）。</summary>
+    [Serializable]
+    public class ChatBanStatusResponse
+    {
+        public bool banned;          // 是否处于聊天封禁中
+        public long? banUntil;       // 封禁截止时间（Unix 毫秒，未封禁为空）
+        public int remainDays;       // 剩余封禁天数
+        public string reason;        // 封禁理由（可选）
+    }
+
     /// <summary>好友申请/接受/拒绝请求体（apply 时 userId=被申请人，accept/reject 时 userId=申请人）。</summary>
     [Serializable]
     public class FriendApplyRequest

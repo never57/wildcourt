@@ -10,10 +10,20 @@ namespace WildCourt.Api.Controllers;
 public class ChatController : ControllerBase
 {
     private readonly ChatService _chatService;
+    private readonly ReportService _reportService;
 
-    public ChatController(ChatService chatService)
+    public ChatController(ChatService chatService, ReportService reportService)
     {
         _chatService = chatService;
+        _reportService = reportService;
+    }
+
+    /// <summary>查询当前玩家的聊天封禁状态（是否被封禁、剩余天数）。</summary>
+    [HttpGet("ban-status")]
+    public async Task<ApiResponse<ChatBanStatusDto>> BanStatus()
+    {
+        var result = await _reportService.GetChatBanStatusAsync(GetUserId());
+        return ApiResponse<ChatBanStatusDto>.Ok(result);
     }
 
     /// <summary>发送私聊消息：入库后由 ChatService 经 WebSocket 推送给接收者（在线则实时，离线则下次拉历史）。</summary>
@@ -30,6 +40,14 @@ public class ChatController : ControllerBase
     {
         var result = await _chatService.HistoryAsync(GetUserId(), friendUserId, beforeId, limit);
         return ApiResponse<ChatHistoryResponse>.Ok(result);
+    }
+
+    /// <summary>删除与某好友的全部聊天记录（双向物理删除），返回删除的消息条数。</summary>
+    [HttpDelete("history/{friendUserId:long}")]
+    public async Task<ApiResponse<object>> DeleteHistory(long friendUserId)
+    {
+        int count = await _chatService.DeleteConversationAsync(GetUserId(), friendUserId);
+        return ApiResponse<object>.Ok(new { deleted = count });
     }
 
     private long GetUserId()

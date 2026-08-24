@@ -23,6 +23,9 @@ public static class AdminPermissions
     public const string AnnouncementsView = "announcements:view";
     public const string AnnouncementsEdit = "announcements:edit";
 
+    public const string ReportsView = "reports:view";   // 查看举报审理
+    public const string ReportsEdit = "reports:edit";   // 处理举报/封禁聊天
+
     public const string DatabaseView = "database:view";        // 查看表结构/数据
     public const string DatabaseExecute = "database:execute";  // 执行 SQL（含写操作）
 
@@ -58,6 +61,7 @@ public static class AdminPermissions
                 DashboardView, ServerView, ServerRestart,
                 PlayersView, PlayersEdit, PlayersBan,
                 ReviewsView, ReviewsEdit,
+                ReportsView, ReportsEdit,
                 AnnouncementsView, AnnouncementsEdit,
                 DatabaseView, DatabaseExecute,
                 DeployView, DeployEdit,
@@ -69,6 +73,7 @@ public static class AdminPermissions
                 DashboardView, ServerView,
                 PlayersView, PlayersEdit, PlayersBan,
                 ReviewsView, ReviewsEdit,
+                ReportsView, ReportsEdit,
                 AnnouncementsView, AnnouncementsEdit,
                 DatabaseView,
                 DeployView,
@@ -79,6 +84,7 @@ public static class AdminPermissions
                 DashboardView, ServerView,
                 PlayersView,
                 ReviewsView, ReviewsEdit,
+                ReportsView, ReportsEdit,
                 AnnouncementsView,
                 AuditView,
             },
@@ -87,6 +93,7 @@ public static class AdminPermissions
                 DashboardView, ServerView,
                 PlayersView,
                 ReviewsView,
+                ReportsView,
                 AnnouncementsView,
                 AuditView,
             },

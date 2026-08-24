@@ -214,11 +214,17 @@ public class FriendService
             .Select(g => new { FriendId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.FriendId, g => g.Count);
 
+        // 查询我给每个好友设置的备注（单向，仅我视角可见）
+        var notes = await _db.FriendNotes
+            .Where(n => n.UserId == userId && validIds.Contains(n.FriendId))
+            .ToDictionaryAsync(n => n.FriendId, n => n.Note);
+
         var list = validIds
             .Select(id =>
             {
                 var u = users[id];
                 unreadCounts.TryGetValue(id, out var unread);
+                notes.TryGetValue(id, out var note);
                 return new FriendDto
                 {
                     UserId = u.UserId,
@@ -226,11 +232,66 @@ public class FriendService
                     AvatarUrl = u.AvatarUrl ?? string.Empty,
                     Level = u.Level,
                     UnreadCount = unread,
+                    Note = note ?? string.Empty,
                 };
             })
             .ToList();
 
         return new FriendListResponse { Friends = list };
+    }
+
+    /// <summary>设置/清除好友备注（note 为空字符串则清除记录）。备注单向，仅本人视角可见。</summary>
+    public async Task SetNoteAsync(long userId, long friendUserId, string note)
+    {
+        if (userId == friendUserId)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "不能给自己设置备注");
+        }
+        await EnsureFriendAsync(userId, friendUserId);
+
+        var existing = await _db.FriendNotes
+            .FirstOrDefaultAsync(n => n.UserId == userId && n.FriendId == friendUserId);
+
+        var trimmed = note?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            // 清除备注
+            if (existing != null)
+            {
+                _db.FriendNotes.Remove(existing);
+                await _db.SaveChangesAsync();
+            }
+            return;
+        }
+
+        if (existing != null)
+        {
+            existing.Note = trimmed;
+            existing.UpdatedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            _db.FriendNotes.Add(new FriendNoteEntity
+            {
+                UserId = userId,
+                FriendId = friendUserId,
+                Note = trimmed,
+                UpdatedAt = DateTime.UtcNow,
+            });
+        }
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>校验好友关系，非好友抛业务异常。</summary>
+    private async Task EnsureFriendAsync(long userId, long friendUserId)
+    {
+        var isFriend = await _db.Friends.AnyAsync(f =>
+            (f.UserId == userId && f.FriendId == friendUserId) ||
+            (f.UserId == friendUserId && f.FriendId == userId));
+        if (!isFriend)
+        {
+            throw new BusinessException(ApiCodes.BadRequest, "还不是好友关系");
+        }
     }
 
     /// <summary>删除好友（双向删除）。</summary>

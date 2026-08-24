@@ -43,6 +43,10 @@ namespace WildCourt.Net.Protocol
         // ChatController（好友私聊）
         public const string ChatSend = Base + "/chat/send";
         public static string ChatHistory(long friendUserId) => Base + $"/chat/history/{friendUserId}";
+        public const string ChatBanStatus = Base + "/chat/ban-status";   // GET，查询聊天封禁状态
+
+        // ReportController（玩家举报）
+        public const string Report = Base + "/report";   // POST，举报他人
 
         // ShopController
         public const string ShopShelves = Base + "/shop/shelves";

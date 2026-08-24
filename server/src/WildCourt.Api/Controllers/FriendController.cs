@@ -66,6 +66,14 @@ public class FriendController : ControllerBase
         return ApiResponse<object>.Ok(new object());
     }
 
+    /// <summary>设置/清除好友备注（note 为空字符串则清除备注）。</summary>
+    [HttpPut("note/{friendId:long}")]
+    public async Task<ApiResponse<object>> SetNote(long friendId, [FromBody] SetFriendNoteRequest request)
+    {
+        await _friendService.SetNoteAsync(GetUserId(), friendId, request.Note);
+        return ApiResponse<object>.Ok(new object());
+    }
+
     /// <summary>偷菜（30% 产量向下取整、每好友每作物每天 1 次、每日 20 次，文档 08 §8.3）。</summary>
     [HttpPost("steal")]
     public async Task<ApiResponse<StealResultDto>> Steal([FromBody] StealCropRequest request)

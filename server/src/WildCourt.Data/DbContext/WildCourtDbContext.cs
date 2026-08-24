@@ -47,6 +47,10 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public DbSet<FriendRequestEntity> FriendRequests => Set<FriendRequestEntity>();
 
+    public DbSet<FriendNoteEntity> FriendNotes => Set<FriendNoteEntity>();
+
+    public DbSet<ReportEntity> Reports => Set<ReportEntity>();
+
     public DbSet<ChatMessageEntity> ChatMessages => Set<ChatMessageEntity>();
 
     public DbSet<FishingEventEntity> FishingEvents => Set<FishingEventEntity>();
@@ -67,8 +71,10 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
         ConfigureAnnouncement(modelBuilder);
         ConfigureAdminOperationLog(modelBuilder);
         ConfigureFriendRequest(modelBuilder);
+        ConfigureFriendNote(modelBuilder);
         ConfigureChatMessage(modelBuilder);
         ConfigureFishingEvent(modelBuilder);
+        ConfigureReport(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -199,6 +205,19 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
         });
     }
 
+    private static void ConfigureFriendNote(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<FriendNoteEntity>(e =>
+        {
+            e.ToTable("friend_notes");
+            e.HasKey(x => new { x.UserId, x.FriendId });
+            e.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            e.Property(x => x.FriendId).HasColumnName("friend_id").IsRequired();
+            e.Property(x => x.Note).HasColumnName("note").HasMaxLength(64);
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        });
+    }
+
     private static void ConfigureChatMessage(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ChatMessageEntity>(e =>
@@ -320,6 +339,25 @@ public class WildCourtDbContext : Microsoft.EntityFrameworkCore.DbContext
             e.Property(x => x.ServerTime).HasColumnName("server_time").IsRequired();
             e.HasIndex(x => x.UserId).HasDatabaseName("idx_fishing_events_user_id");
             e.HasIndex(x => x.ServerTime).HasDatabaseName("idx_fishing_events_created_at");
+        });
+    }
+
+    private static void ConfigureReport(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ReportEntity>(e =>
+        {
+            e.ToTable("reports");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            e.Property(x => x.ReporterUserId).HasColumnName("reporter_user_id").IsRequired();
+            e.Property(x => x.ReportedUserId).HasColumnName("reported_user_id").IsRequired();
+            e.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(500);
+            e.Property(x => x.Status).HasColumnName("status").IsRequired();
+            e.Property(x => x.HandledByAdminId).HasColumnName("handled_by_admin_id");
+            e.Property(x => x.HandledAt).HasColumnName("handled_at");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            e.HasIndex(x => x.ReportedUserId).HasDatabaseName("idx_reports_reported_user_id");
+            e.HasIndex(x => x.Status).HasDatabaseName("idx_reports_status");
         });
     }
 
